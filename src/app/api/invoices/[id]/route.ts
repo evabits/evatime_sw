@@ -2,68 +2,133 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { handleError } from "@/lib/api";
+
+const lineSchema = z.object({
+  id: z.string().optional(),
+  description: z.string().min(1),
+  quantity: z.number(),
+  unitPrice: z.number(),
+  lineType: z.enum(["HOURS", "KM", "OTHER"]),
+});
 
 const updateSchema = z.object({
-  status: z.enum(["DRAFT", "SENT", "PAID", "CANCELLED"]),
-  notes: z.string().optional(),
+  status: z.enum(["DRAFT", "SENT", "PAID", "CANCELLED"]).optional(),
+  notes: z.string().optional().nullable(),
+  issueDate: z.string().optional(),
   dueDate: z.string().optional(),
+  vatRate: z.number().min(0).max(100).optional(),
+  lines: z.array(lineSchema).optional(),
+  lineIdsToDelete: z.array(z.string()).optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await params;
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
-    include: {
-      customer: true,
-      lines: {
-        include: {
-          timeEntries: { include: { user: { select: { name: true } }, project: { select: { name: true } } } },
-          kmEntries: { include: { user: { select: { name: true } }, project: { select: { name: true } } } },
-        },
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        lines: { orderBy: { createdAt: "asc" } },
       },
-    },
-  });
-  if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(invoice);
+    });
+    if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(invoice);
+  } catch (e) { return handleError(e); }
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await params;
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
 
-  const body = await req.json();
-  const data = updateSchema.parse(body);
-  const invoice = await prisma.invoice.update({
-    where: { id },
-    data: {
-      status: data.status,
-      notes: data.notes,
-      ...(data.dueDate ? { dueDate: new Date(data.dueDate) } : {}),
-    },
-  });
-  return NextResponse.json(invoice);
+    const data = updateSchema.parse(await req.json());
+    const existing = await prisma.invoice.findUnique({ where: { id }, select: { status: true, vatRate: true, lines: { select: { id: true } } } });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    if (data.lines !== undefined && existing.status !== "DRAFT") {
+      return NextResponse.json({ error: "Alleen concept facturen kunnen worden bewerkt" }, { status: 400 });
+    }
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      // Delete removed lines and unlink their entries
+      if (data.lineIdsToDelete?.length) {
+        await tx.timeEntry.updateMany({
+          where: { invoiceLineId: { in: data.lineIdsToDelete } },
+          data: { invoiced: false, invoiceLineId: null },
+        });
+        await tx.kmEntry.updateMany({
+          where: { invoiceLineId: { in: data.lineIdsToDelete } },
+          data: { invoiced: false, invoiceLineId: null },
+        });
+        await tx.invoiceLine.deleteMany({ where: { id: { in: data.lineIdsToDelete } } });
+      }
+
+      // Upsert lines
+      if (data.lines) {
+        for (const line of data.lines) {
+          const lineData = {
+            description: line.description,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            total: line.quantity * line.unitPrice,
+            lineType: line.lineType,
+          };
+          if (line.id) {
+            await tx.invoiceLine.update({ where: { id: line.id }, data: lineData });
+          } else {
+            await tx.invoiceLine.create({ data: { ...lineData, invoiceId: id } });
+          }
+        }
+      }
+
+      // Recompute totals if lines changed
+      let subtotal: number | undefined;
+      let vatAmount: number | undefined;
+      let total: number | undefined;
+      if (data.lines !== undefined || data.lineIdsToDelete?.length) {
+        const allLines = await tx.invoiceLine.findMany({ where: { invoiceId: id } });
+        const vatRate = data.vatRate ?? Number(existing.vatRate);
+        subtotal = allLines.reduce((s, l) => s + Number(l.total), 0);
+        vatAmount = (subtotal * vatRate) / 100;
+        total = subtotal + vatAmount;
+      }
+
+      return tx.invoice.update({
+        where: { id },
+        data: {
+          ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+          ...(data.issueDate ? { issueDate: new Date(data.issueDate) } : {}),
+          ...(data.dueDate ? { dueDate: new Date(data.dueDate) } : {}),
+          ...(data.vatRate !== undefined ? { vatRate: data.vatRate } : {}),
+          ...(subtotal !== undefined ? { subtotal, vatAmount, total } : {}),
+        },
+        include: { lines: { orderBy: { createdAt: "asc" } }, customer: true },
+      });
+    });
+
+    return NextResponse.json(invoice);
+  } catch (e) { return handleError(e); }
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await params;
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
 
-  const invoice = await prisma.invoice.findUnique({ where: { id }, select: { lines: { select: { id: true } } } });
-  if (invoice) {
-    await prisma.timeEntry.updateMany({
-      where: { invoiceLineId: { in: invoice.lines.map((l) => l.id) } },
-      data: { invoiced: false, invoiceLineId: null },
-    });
-    await prisma.kmEntry.updateMany({
-      where: { invoiceLineId: { in: invoice.lines.map((l) => l.id) } },
-      data: { invoiced: false, invoiceLineId: null },
-    });
-  }
-  await prisma.invoice.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+    const invoice = await prisma.invoice.findUnique({ where: { id }, select: { lines: { select: { id: true } } } });
+    if (invoice) {
+      const lineIds = invoice.lines.map((l) => l.id);
+      await prisma.timeEntry.updateMany({ where: { invoiceLineId: { in: lineIds } }, data: { invoiced: false, invoiceLineId: null } });
+      await prisma.kmEntry.updateMany({ where: { invoiceLineId: { in: lineIds } }, data: { invoiced: false, invoiceLineId: null } });
+    }
+    await prisma.invoice.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (e) { return handleError(e); }
 }

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { handleError } from "@/lib/api";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -13,25 +14,33 @@ const schema = z.object({
   country: z.string().optional(),
   vatNumber: z.string().optional(),
   iban: z.string().optional(),
+  logoUrl: z.string().optional().nullable(),
 });
 
 export async function GET() {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const settings = await prisma.companySettings.findFirst();
-  return NextResponse.json(settings);
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const settings = await prisma.companySettings.findFirst();
+    return NextResponse.json(settings);
+  } catch (e) { return handleError(e); }
 }
 
 export async function PUT(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
-  const data = schema.parse(body);
-  const existing = await prisma.companySettings.findFirst();
-  const settings = existing
-    ? await prisma.companySettings.update({ where: { id: existing.id }, data: { ...data, email: data.email || null } })
-    : await prisma.companySettings.create({ data: { ...data, email: data.email || null } });
-  return NextResponse.json(settings);
+    const data = schema.parse(await req.json());
+    const existing = await prisma.companySettings.findFirst();
+    const settings = existing
+      ? await prisma.companySettings.update({
+          where: { id: existing.id },
+          data: { ...data, email: data.email || null },
+        })
+      : await prisma.companySettings.create({
+          data: { ...data, email: data.email || null },
+        });
+    return NextResponse.json(settings);
+  } catch (e) { return handleError(e); }
 }
