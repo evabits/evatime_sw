@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
@@ -15,6 +16,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   providers: [
+    Google,
     Credentials({
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
@@ -23,7 +25,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
         });
-        if (!user) return null;
+        if (!user || !user.password) return null;
 
         const valid = await compare(parsed.data.password, user.password);
         if (!valid) return null;
@@ -33,10 +35,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    signIn({ user }) {
+      return user.email?.endsWith("@evabits.com") ?? false;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id;
-        token.role = (user as any).role;
+        if (account?.provider === "google") {
+          const dbUser = await prisma.user.upsert({
+            where: { email: user.email! },
+            update: {},
+            create: {
+              email: user.email!,
+              name: user.name ?? user.email!,
+              role: "EMPLOYEE",
+              password: null,
+            },
+          });
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+        } else {
+          token.id = user.id;
+          token.role = (user as any).role;
+        }
       }
       return token;
     },
