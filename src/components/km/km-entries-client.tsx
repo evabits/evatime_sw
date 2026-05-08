@@ -25,6 +25,18 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+function currentMonth() {
+  return format(new Date(), "yyyy-MM");
+}
+
+function monthBounds(ym: string): { from: string; to: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const from = `${ym}-01`;
+  const last = new Date(y, m, 0).getDate();
+  const to = `${ym}-${String(last).padStart(2, "0")}`;
+  return { from, to };
+}
+
 interface Props {
   projects: any[];
   initialEntries: any[];
@@ -34,6 +46,9 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filterMonth, setFilterMonth] = useState(currentMonth());
+  const [filterProject, setFilterProject] = useState("all");
+  const [fetching, setFetching] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -42,6 +57,26 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
+  async function fetchEntries(month: string, projectId: string) {
+    setFetching(true);
+    const { from, to } = monthBounds(month);
+    const params = new URLSearchParams({ from, to });
+    if (projectId !== "all") params.set("projectId", projectId);
+    const res = await fetch(`/api/km?${params}`);
+    if (res.ok) setEntries(await res.json());
+    setFetching(false);
+  }
+
+  function handleMonthChange(month: string) {
+    setFilterMonth(month);
+    fetchEntries(month, filterProject);
+  }
+
+  function handleProjectChange(projectId: string) {
+    setFilterProject(projectId);
+    fetchEntries(filterMonth, projectId);
+  }
 
   async function onSubmit(data: FormData) {
     setLoading(true);
@@ -70,7 +105,11 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
         });
         if (res.ok) {
           const created = await res.json();
-          setEntries((prev) => [created, ...prev]);
+          const { from, to } = monthBounds(filterMonth);
+          const entryDate = data.date;
+          if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
+            setEntries((prev) => [created, ...prev]);
+          }
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
         }
       }
@@ -97,6 +136,8 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
     });
   }
 
+  const totalKm = entries.reduce((s, e) => s + Number(e.km), 0);
+
   return (
     <div className="space-y-6">
       <div>
@@ -105,73 +146,99 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
       </div>
 
       <Card>
-          <CardHeader>
-            <CardTitle>{editing ? "Km aanpassen" : "Km toevoegen"}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Project *</Label>
-                <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
-                  <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
-              </div>
+        <CardHeader>
+          <CardTitle>{editing ? "Km aanpassen" : "Km toevoegen"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Project *</Label>
+              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
+                <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
+            </div>
 
-              <div className="space-y-2">
-                <Label>Datum *</Label>
-                <Input type="date" {...form.register("date")} />
-              </div>
+            <div className="space-y-2">
+              <Label>Datum *</Label>
+              <Input type="date" {...form.register("date")} />
+            </div>
 
-              <div className="space-y-2">
-                <Label>Kilometers *</Label>
-                <Input type="number" step="0.1" min="0.1" placeholder="45.5" {...form.register("km")} />
-                {form.formState.errors.km && <p className="text-xs text-destructive">{form.formState.errors.km.message}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label>Kilometers *</Label>
+              <Input type="number" step="0.1" min="0.1" placeholder="45.5" {...form.register("km")} />
+              {form.formState.errors.km && <p className="text-xs text-destructive">{form.formState.errors.km.message}</p>}
+            </div>
 
-              <div className="space-y-2">
-                <Label>
-                  Tarief override (€/km)
-                  {selectedProject?.defaultKmRate && (
-                    <span className="text-muted-foreground font-normal"> · standaard: €{Number(selectedProject.defaultKmRate).toFixed(2)}</span>
-                  )}
-                </Label>
-                <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Factureerbaar</Label>
-                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ja</SelectItem>
-                    <SelectItem value="false">Nee</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Omschrijving</Label>
-                <Textarea placeholder="Bijv. bezoek klant Amsterdam" {...form.register("description")} rows={2} />
-              </div>
-
-              <div className="sm:col-span-2 flex gap-2">
-                <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
-                {editing && (
-                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+            <div className="space-y-2">
+              <Label>
+                Tarief override (€/km)
+                {selectedProject?.defaultKmRate && (
+                  <span className="text-muted-foreground font-normal"> · standaard: €{Number(selectedProject.defaultKmRate).toFixed(2)}</span>
                 )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </Label>
+              <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Factureerbaar</Label>
+              <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ja</SelectItem>
+                  <SelectItem value="false">Nee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Omschrijving</Label>
+              <Textarea placeholder="Bijv. bezoek klant Amsterdam" {...form.register("description")} rows={2} />
+            </div>
+
+            <div className="sm:col-span-2 flex gap-2">
+              <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
+              {editing && (
+                <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
-        <CardHeader><CardTitle>Recente registraties</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CardTitle>Registraties</CardTitle>
+              {entries.length > 0 && (
+                <span className="text-sm text-muted-foreground">{totalKm.toFixed(1)} km</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                className="w-40 h-8 text-sm"
+              />
+              <Select value={filterProject} onValueChange={handleProjectChange}>
+                <SelectTrigger className="w-48 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle projecten</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -185,10 +252,13 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.length === 0 && (
+              {fetching && (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+              )}
+              {!fetching && entries.length === 0 && (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
-              {entries.map((entry) => (
+              {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(entry.date)}</TableCell>
                   <TableCell>

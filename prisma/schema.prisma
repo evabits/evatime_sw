@@ -138,6 +138,7 @@ model Invoice {
   vatRate         Decimal             @db.Decimal(5, 2) @default(21)
   vatAmount       Decimal             @db.Decimal(10, 2)
   total           Decimal             @db.Decimal(10, 2)
+  viewToken       String              @unique @default(dbgenerated("gen_random_uuid()"))
   sentAt          DateTime?
   reminderSentAt  DateTime?
   createdAt       DateTime            @default(now())

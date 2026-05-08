@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -290,12 +290,17 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                 </Button>
               )}
               <Button variant="outline" asChild>
-                <Link href={`/invoices/${invoice.id}/print`} target="_blank">
-                  <Printer className="h-4 w-4 mr-2" /> Afdrukken / PDF
+                <Link href={`/invoices/${invoice.id}/print?preview=1`} target="_blank">
+                  <Eye className="h-4 w-4 mr-2" /> Voorbeeld
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild title="Openen in nieuw tabblad">
-                <Link href={`/invoices/${invoice.id}/print`} target="_blank">
+              <Button variant="outline" asChild>
+                <a href={`/api/invoices/${invoice.id}/pdf`} download={`Factuur-${invoice.invoiceNumber}.pdf`}>
+                  <Printer className="h-4 w-4 mr-2" /> PDF downloaden
+                </a>
+              </Button>
+              <Button variant="ghost" size="icon" asChild title="Bekijken in nieuw tabblad">
+                <Link href={`/invoice/${invoice.viewToken}`} target="_blank">
                   <ExternalLink className="h-4 w-4" />
                 </Link>
               </Button>

@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer";
 import { MailtrapTransport } from "mailtrap";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { createElement } from "react";
+import { InvoicePdf } from "@/components/invoices/invoice-pdf";
 import { formatCurrency } from "@/lib/utils";
 
 const transport = nodemailer.createTransport(
@@ -10,7 +13,7 @@ function fmt(date: string) {
   return new Date(date).toLocaleDateString("nl-NL");
 }
 
-function invoiceHtml(invoice: any, settings: any, appUrl: string): string {
+function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   const linesHtml = invoice.lines
     .map(
       (l: any) => `
@@ -57,7 +60,7 @@ function invoiceHtml(invoice: any, settings: any, appUrl: string): string {
   <p style="margin:24px 0 8px;color:#666;font-size:13px;">Factuurdatum: ${fmt(invoice.issueDate)} &nbsp;·&nbsp; Vervaldatum: ${fmt(invoice.dueDate)}</p>
   ${invoice.notes ? `<p style="margin:0 0 24px;color:#444;font-size:13px;white-space:pre-wrap;">${invoice.notes}</p>` : ""}
 
-  <a href="${appUrl}/invoices/${invoice.id}/print" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken / afdrukken</a>
+  <a href="${publicUrl}" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken / afdrukken</a>
 
   <p style="margin-top:40px;color:#888;font-size:12px;">
     ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}<br>
@@ -73,27 +76,36 @@ function invoiceHtml(invoice: any, settings: any, appUrl: string): string {
 export async function sendInvoiceEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const publicUrl = `${appUrl}/invoice/${invoice.viewToken}`;
 
-  const attachmentFetches = (invoice.attachments ?? []).map(async (a: any) => {
-    const res = await fetch(a.url, {
-      headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-    });
-    const buf = await res.arrayBuffer();
-    return { filename: a.filename, content: Buffer.from(buf) };
-  });
-  const attachments = await Promise.all(attachmentFetches);
+  const [pdfBuffer, ...blobAttachments] = await Promise.all([
+    renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any),
+    ...(invoice.attachments ?? []).map(async (a: any) => {
+      const res = await fetch(a.url, {
+        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+      });
+      const buf = await res.arrayBuffer();
+      return { filename: a.filename, content: Buffer.from(buf) };
+    }),
+  ]);
+
+  const attachments = [
+    { filename: `Factuur-${invoice.invoiceNumber}.pdf`, content: pdfBuffer },
+    ...blobAttachments,
+  ];
 
   await transport.sendMail({
     from,
     to: invoice.customer.email,
     subject: `Factuur ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
-    html: invoiceHtml(invoice, settings, appUrl),
+    html: invoiceHtml(invoice, settings, publicUrl),
     attachments,
   });
 }
 
 export async function sendReminderEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const publicUrl = `${appUrl}/invoice/${invoice.viewToken}`;
   const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
 
   const html = `<!DOCTYPE html>
@@ -107,7 +119,7 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
   <p style="margin:0 0 16px;">Het openstaande bedrag is <strong>${formatCurrency(Number(invoice.total))}</strong>.</p>
   <p style="margin:0 0 24px;">Graag verzoeken wij u dit bedrag zo spoedig mogelijk over te maken onder vermelding van het factuurnummer.</p>
 
-  <a href="${appUrl}/invoices/${invoice.id}/print" style="display:inline-block;margin-top:8px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken</a>
+  <a href="${publicUrl}" style="display:inline-block;margin-top:8px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken</a>
 
   <p style="margin-top:40px;color:#888;font-size:12px;">
     ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}<br>

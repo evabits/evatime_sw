@@ -21,9 +21,14 @@ export default async function TimePage() {
     }),
     prisma.activityType.findMany({ orderBy: { name: "asc" } }),
     prisma.timeEntry.findMany({
-      where: { userId },
+      where: {
+        userId,
+        date: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
+        },
+      },
       orderBy: { date: "desc" },
-      take: 50,
       include: {
         project: { select: { name: true, customer: { select: { name: true } } } },
         activityType: { select: { name: true } },

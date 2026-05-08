@@ -30,6 +30,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
+    "@react-pdf/renderer": "^4.5.1",
     "@types/nodemailer": "^6.4.23",
     "@vercel/blob": "^2.3.3",
     "bcryptjs": "^3.0.3",

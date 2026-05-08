@@ -27,6 +27,18 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+function currentMonth() {
+  return format(new Date(), "yyyy-MM");
+}
+
+function monthBounds(ym: string): { from: string; to: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const from = `${ym}-01`;
+  const last = new Date(y, m, 0).getDate();
+  const to = `${ym}-${String(last).padStart(2, "0")}`;
+  return { from, to };
+}
+
 interface Props {
   projects: any[];
   activityTypes: any[];
@@ -38,6 +50,9 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filterMonth, setFilterMonth] = useState(currentMonth());
+  const [filterProject, setFilterProject] = useState("all");
+  const [fetching, setFetching] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -54,6 +69,26 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
     const actType = activityTypes.find((a: any) => a.id === activityTypeId);
     if (actType?.defaultRate) return Number(actType.defaultRate);
     return selectedProject.defaultHourlyRate ? Number(selectedProject.defaultHourlyRate) : null;
+  }
+
+  async function fetchEntries(month: string, projectId: string) {
+    setFetching(true);
+    const { from, to } = monthBounds(month);
+    const params = new URLSearchParams({ from, to });
+    if (projectId !== "all") params.set("projectId", projectId);
+    const res = await fetch(`/api/time?${params}`);
+    if (res.ok) setEntries(await res.json());
+    setFetching(false);
+  }
+
+  function handleMonthChange(month: string) {
+    setFilterMonth(month);
+    fetchEntries(month, filterProject);
+  }
+
+  function handleProjectChange(projectId: string) {
+    setFilterProject(projectId);
+    fetchEntries(filterMonth, projectId);
   }
 
   async function onSubmit(data: FormData) {
@@ -84,7 +119,12 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
         });
         if (res.ok) {
           const created = await res.json();
-          setEntries((prev) => [created, ...prev]);
+          // Only prepend if it falls in the current filter
+          const { from, to } = monthBounds(filterMonth);
+          const entryDate = data.date;
+          if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
+            setEntries((prev) => [created, ...prev]);
+          }
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
         }
       }
@@ -114,6 +154,7 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
 
   const activityTypeId = form.watch("activityTypeId");
   const effectiveRate = getEffectiveRate(activityTypeId);
+  const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0);
 
   return (
     <div className="space-y-6">
@@ -123,86 +164,110 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
       </div>
 
       <Card>
-          <CardHeader>
-            <CardTitle>{editing ? "Uren aanpassen" : "Uren toevoegen"}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Project *</Label>
-                <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
-                  <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
-              </div>
+        <CardHeader>
+          <CardTitle>{editing ? "Uren aanpassen" : "Uren toevoegen"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Project *</Label>
+              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
+                <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
+            </div>
 
-              <div className="space-y-2">
-                <Label>Activiteit</Label>
-                <Select onValueChange={(v) => form.setValue("activityTypeId", v)} value={form.watch("activityTypeId")}>
-                  <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
-                  <SelectContent>
-                    {activityTypes.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}{a.defaultRate ? ` (€${Number(a.defaultRate).toFixed(2)}/u)` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Activiteit</Label>
+              <Select onValueChange={(v) => form.setValue("activityTypeId", v)} value={form.watch("activityTypeId")}>
+                <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
+                <SelectContent>
+                  {activityTypes.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{a.defaultRate ? ` (€${Number(a.defaultRate).toFixed(2)}/u)` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2">
-                <Label>Datum *</Label>
-                <Input type="date" {...form.register("date")} />
-              </div>
+            <div className="space-y-2">
+              <Label>Datum *</Label>
+              <Input type="date" {...form.register("date")} />
+            </div>
 
-              <div className="space-y-2">
-                <Label>Uren *</Label>
-                <Input type="number" step="0.25" min="0.25" placeholder="1.5" {...form.register("hours")} />
-                {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label>Uren *</Label>
+              <Input type="number" step="0.25" min="0.25" placeholder="1.5" {...form.register("hours")} />
+              {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
+            </div>
 
-              <div className="space-y-2">
-                <Label>
-                  Tarief override (€/u)
-                  {effectiveRate && <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
-                </Label>
-                <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
-              </div>
+            <div className="space-y-2">
+              <Label>
+                Tarief override (€/u)
+                {effectiveRate && <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
+              </Label>
+              <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
+            </div>
 
-              <div className="space-y-2">
-                <Label>Factureerbaar</Label>
-                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ja</SelectItem>
-                    <SelectItem value="false">Nee</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Factureerbaar</Label>
+              <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ja</SelectItem>
+                  <SelectItem value="false">Nee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Omschrijving</Label>
-                <Textarea placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
-              </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Omschrijving</Label>
+              <Textarea placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
+            </div>
 
-              <div className="sm:col-span-2 flex gap-2">
-                <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
-                {editing && (
-                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
-                )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            <div className="sm:col-span-2 flex gap-2">
+              <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
+              {editing && (
+                <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Recente registraties</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CardTitle>Registraties</CardTitle>
+              {entries.length > 0 && (
+                <span className="text-sm text-muted-foreground">{formatHours(totalHours)} uur</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                className="w-40 h-8 text-sm"
+              />
+              <Select value={filterProject} onValueChange={handleProjectChange}>
+                <SelectTrigger className="w-48 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle projecten</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -218,10 +283,13 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.length === 0 && (
+              {fetching && (
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+              )}
+              {!fetching && entries.length === 0 && (
                 <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
-              {entries.map((entry) => (
+              {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(entry.date)}</TableCell>
                   <TableCell>

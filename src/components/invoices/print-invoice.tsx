@@ -196,7 +196,7 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
       {/* Print controls */}
       <div className="print-btn">
         <button className="btn btn-secondary" onClick={() => window.close()}>Sluiten</button>
-        <button className="btn btn-primary" onClick={() => window.print()}>Afdrukken / PDF</button>
+        <button className="btn btn-primary" onClick={() => window.print()}>Afdrukken</button>
       </div>
     </>
   );
