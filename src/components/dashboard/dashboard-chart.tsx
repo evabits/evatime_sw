@@ -24,7 +24,7 @@ export function DashboardChart({ data }: Props) {
                 formatter={(value) => [`${Number(value).toFixed(2)} uur`, "Uren"]}
                 labelFormatter={(label) => `Project: ${label}`}
               />
-              <Bar dataKey="hours" fill="hsl(221.2 83.2% 53.3%)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="hours" fill="hsl(121 37% 36%)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

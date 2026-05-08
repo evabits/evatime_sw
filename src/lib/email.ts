@@ -1,7 +1,10 @@
-import { MailtrapClient } from "mailtrap";
+import nodemailer from "nodemailer";
+import { MailtrapTransport } from "mailtrap";
 import { formatCurrency } from "@/lib/utils";
 
-const client = new MailtrapClient({ token: process.env.MAILTRAP_API_TOKEN! });
+const transport = nodemailer.createTransport(
+  MailtrapTransport({ token: process.env.MAILTRAP_API_TOKEN! })
+);
 
 function fmt(date: string) {
   return new Date(date).toLocaleDateString("nl-NL");
@@ -69,26 +72,20 @@ function invoiceHtml(invoice: any, settings: any, appUrl: string): string {
 
 export async function sendInvoiceEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = { email: settings?.email ?? "noreply@evabits.com", name: settings?.name ?? "EVAbits" };
-  const to = [{ email: invoice.customer.email }];
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
 
   const attachmentFetches = (invoice.attachments ?? []).map(async (a: any) => {
     const res = await fetch(a.url, {
       headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
     });
     const buf = await res.arrayBuffer();
-    return {
-      filename: a.filename,
-      content: Buffer.from(buf).toString("base64"),
-      type: "application/octet-stream",
-      disposition: "attachment" as const,
-    };
+    return { filename: a.filename, content: Buffer.from(buf) };
   });
   const attachments = await Promise.all(attachmentFetches);
 
-  await client.send({
+  await transport.sendMail({
     from,
-    to,
+    to: invoice.customer.email,
     subject: `Factuur ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
     html: invoiceHtml(invoice, settings, appUrl),
     attachments,
@@ -97,8 +94,7 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
 
 export async function sendReminderEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = { email: settings?.email ?? "noreply@evabits.com", name: settings?.name ?? "EVAbits" };
-  const to = [{ email: invoice.customer.email }];
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -122,9 +118,9 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
 </body>
 </html>`;
 
-  await client.send({
+  await transport.sendMail({
     from,
-    to,
+    to: invoice.customer.email,
     subject: `Herinnering: openstaande factuur ${invoice.invoiceNumber}`,
     html,
   });

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -54,6 +55,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [reminding, setReminding] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ type: "send" | "remind" } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -278,12 +280,12 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                 </SelectContent>
               </Select>
               {invoice.customer?.email && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-                <Button variant="outline" onClick={sendInvoice} disabled={sending}>
+                <Button variant="outline" onClick={() => setConfirmDialog({ type: "send" })} disabled={sending}>
                   <Mail className="h-4 w-4 mr-2" /> {sending ? "Verzenden..." : "Verzenden"}
                 </Button>
               )}
               {invoice.status === "SENT" && invoice.customer?.email && (
-                <Button variant="outline" onClick={sendReminder} disabled={reminding}>
+                <Button variant="outline" onClick={() => setConfirmDialog({ type: "remind" })} disabled={reminding}>
                   <Bell className="h-4 w-4 mr-2" /> {reminding ? "Sturen..." : "Herinnering"}
                 </Button>
               )}
@@ -579,6 +581,34 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
           )}
         </CardContent>
       </Card>
+      {/* Send / remind confirmation dialog */}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmDialog?.type === "remind" ? "Betalingsherinnering sturen" : "Factuur verzenden"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog?.type === "remind"
+                ? "Er wordt een betalingsherinnering verstuurd naar:"
+                : "De factuur wordt per e-mail verstuurd naar:"}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="font-medium text-sm">{invoice.customer?.email}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Annuleren</Button>
+            <Button
+              onClick={() => {
+                setConfirmDialog(null);
+                if (confirmDialog?.type === "remind") sendReminder();
+                else sendInvoice();
+              }}
+            >
+              {confirmDialog?.type === "remind" ? "Herinnering sturen" : "Verzenden"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
