@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
@@ -33,7 +33,6 @@ interface Props {
 export function KmEntriesClient({ projects, initialEntries }: Props) {
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
@@ -61,7 +60,6 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
           const updated = await res.json();
           setEntries((prev) => prev.map((e) => (e.id === editing ? { ...e, ...updated } : e)));
           setEditing(null);
-          setShowForm(false);
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
         }
       } else {
@@ -73,7 +71,6 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
         if (res.ok) {
           const created = await res.json();
           setEntries((prev) => [created, ...prev]);
-          setShowForm(false);
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
         }
       }
@@ -90,7 +87,6 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
 
   function startEdit(entry: any) {
     setEditing(entry.id);
-    setShowForm(true);
     form.reset({
       projectId: entry.projectId,
       date: format(new Date(entry.date), "yyyy-MM-dd"),
@@ -103,18 +99,12 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Kilometers registreren</h1>
-          <p className="text-muted-foreground">Beheer uw kilometerregistraties</p>
-        </div>
-        <Button onClick={() => { setShowForm(!showForm); setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>
-          <Plus className="h-4 w-4 mr-2" /> Km toevoegen
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold">Kilometers registreren</h1>
+        <p className="text-muted-foreground">Beheer uw kilometerregistraties</p>
       </div>
 
-      {showForm && (
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle>{editing ? "Km aanpassen" : "Km toevoegen"}</CardTitle>
           </CardHeader>
@@ -171,13 +161,14 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
               </div>
 
               <div className="sm:col-span-2 flex gap-2">
-                <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
-                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditing(null); }}>Annuleren</Button>
+                <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
+                {editing && (
+                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+                )}
               </div>
             </form>
           </CardContent>
         </Card>
-      )}
 
       <Card>
         <CardHeader><CardTitle>Recente registraties</CardTitle></CardHeader>
