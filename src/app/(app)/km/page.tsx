@@ -1,0 +1,31 @@
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { KmEntriesClient } from "@/components/km/km-entries-client";
+
+export default async function KmPage() {
+  const session = await auth();
+  const userId = session?.user?.id ?? "";
+
+  const [projects, recentEntries] = await Promise.all([
+    prisma.project.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        defaultKmRate: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    prisma.kmEntry.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+      take: 50,
+      include: {
+        project: { select: { name: true, customer: { select: { name: true } } } },
+      },
+    }),
+  ]);
+
+  return <KmEntriesClient projects={projects} initialEntries={recentEntries} />;
+}

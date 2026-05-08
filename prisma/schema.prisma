@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String      @id @default(cuid())
+  name        String
+  email       String      @unique
+  password    String
+  role        Role        @default(EMPLOYEE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  timeEntries TimeEntry[]
+  kmEntries   KmEntry[]
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+model Customer {
+  id         String    @id @default(cuid())
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String?
+  vatNumber  String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  projects   Project[]
+  invoices   Invoice[]
+}
+
+model Project {
+  id                String                @id @default(cuid())
+  customerId        String
+  customer          Customer              @relation(fields: [customerId], references: [id])
+  name              String
+  description       String?
+  status            ProjectStatus         @default(ACTIVE)
+  defaultHourlyRate Decimal?              @db.Decimal(10, 2)
+  defaultKmRate     Decimal?              @db.Decimal(10, 2)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  timeEntries       TimeEntry[]
+  kmEntries         KmEntry[]
+  activityRates     ProjectActivityRate[]
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+}
+
+model ActivityType {
+  id           String                @id @default(cuid())
+  name         String                @unique
+  defaultRate  Decimal?              @db.Decimal(10, 2)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  timeEntries  TimeEntry[]
+  projectRates ProjectActivityRate[]
+}
+
+model ProjectActivityRate {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activityTypeId String
+  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  rate           Decimal      @db.Decimal(10, 2)
+  createdAt      DateTime     @default(now())
+
+  @@unique([projectId, activityTypeId])
+}
+
+model TimeEntry {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id])
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
+  date           DateTime      @db.Date
+  hours          Decimal       @db.Decimal(5, 2)
+  description    String?
+  rateOverride   Decimal?      @db.Decimal(10, 2)
+  billable       Boolean       @default(true)
+  invoiced       Boolean       @default(false)
+  invoiceLineId  String?
+  invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model KmEntry {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id])
+  date          DateTime     @db.Date
+  km            Decimal      @db.Decimal(8, 2)
+  description   String?
+  rateOverride  Decimal?     @db.Decimal(10, 2)
+  billable      Boolean      @default(true)
+  invoiced      Boolean      @default(false)
+  invoiceLineId String?
+  invoiceLine   InvoiceLine? @relation(fields: [invoiceLineId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  issueDate     DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  status        InvoiceStatus @default(DRAFT)
+  notes         String?
+  subtotal      Decimal       @db.Decimal(10, 2)
+  vatRate       Decimal       @db.Decimal(5, 2) @default(21)
+  vatAmount     Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lines         InvoiceLine[]
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}
+
+model InvoiceLine {
+  id          String      @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal     @db.Decimal(8, 2)
+  unitPrice   Decimal     @db.Decimal(10, 2)
+  total       Decimal     @db.Decimal(10, 2)
+  lineType    LineType    @default(HOURS)
+  createdAt   DateTime    @default(now())
+  timeEntries TimeEntry[]
+  kmEntries   KmEntry[]
+}
+
+enum LineType {
+  HOURS
+  KM
+  OTHER
+}
+
+model CompanySettings {
+  id         String   @id @default(cuid())
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String?
+  vatNumber  String?
+  iban       String?
+  logoUrl    String?
+  updatedAt  DateTime @updatedAt
+}
