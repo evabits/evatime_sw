@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
@@ -15,7 +15,7 @@ import Link from "next/link";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
-  email: z.string().email("Ongeldig e-mailadres").optional().or(z.literal("")),
+  email: z.string().email("Ongeldig e-mailadres").or(z.literal("")).optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -27,6 +27,11 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+const EMPTY: FormData = {
+  name: "", email: "", phone: "", address: "", city: "",
+  postalCode: "", country: "", vatNumber: "", notes: "",
+};
+
 interface Props {
   initialCustomers: any[];
 }
@@ -36,36 +41,40 @@ export function CustomersClient({ initialCustomers }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
-  const form = useForm<FormData>({ resolver: zodResolver(schema) });
+  const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: EMPTY });
 
   async function onSubmit(data: FormData) {
     setLoading(true);
-    const payload = { ...data, email: data.email || null };
+    setServerError("");
     try {
-      if (editing) {
-        const res = await fetch(`/api/customers/${editing}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          setCustomers((prev) => prev.map((c) => (c.id === editing ? { ...c, ...updated } : c)));
-          close();
+      const url = editing ? `/api/customers/${editing}` : "/api/customers";
+      const method = editing ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        if (editing) {
+          setCustomers((prev) => prev.map((c) => (c.id === editing ? { ...c, ...saved } : c)));
+        } else {
+          setCustomers((prev) =>
+            [...prev, { ...saved, _count: { projects: 0, invoices: 0 } }].sort((a, b) =>
+              a.name.localeCompare(b.name)
+            )
+          );
         }
+        close();
       } else {
-        const res = await fetch("/api/customers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const created = await res.json();
-          setCustomers((prev) => [...prev, { ...created, _count: { projects: 0, invoices: 0 } }].sort((a, b) => a.name.localeCompare(b.name)));
-          close();
-        }
+        const err = await res.json().catch(() => ({}));
+        setServerError(err.error ?? `Fout ${res.status}`);
       }
+    } catch {
+      setServerError("Netwerkfout, probeer opnieuw");
     } finally {
       setLoading(false);
     }
@@ -74,13 +83,15 @@ export function CustomersClient({ initialCustomers }: Props) {
   function close() {
     setDialogOpen(false);
     setEditing(null);
-    form.reset();
+    setServerError("");
+    form.reset(EMPTY);
   }
 
   function startEdit(customer: any) {
     setEditing(customer.id);
+    setServerError("");
     form.reset({
-      name: customer.name,
+      name: customer.name ?? "",
       email: customer.email ?? "",
       phone: customer.phone ?? "",
       address: customer.address ?? "",
@@ -95,8 +106,8 @@ export function CustomersClient({ initialCustomers }: Props) {
 
   async function deleteCustomer(id: string) {
     if (!confirm("Weet u zeker dat u deze klant wilt verwijderen?")) return;
-    await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+    if (res.ok) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
   return (
@@ -106,7 +117,7 @@ export function CustomersClient({ initialCustomers }: Props) {
           <h1 className="text-2xl font-bold">Klanten</h1>
           <p className="text-muted-foreground">Beheer uw klanten</p>
         </div>
-        <Button onClick={() => { form.reset(); setEditing(null); setDialogOpen(true); }}>
+        <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" /> Klant toevoegen
         </Button>
       </div>
@@ -127,14 +138,18 @@ export function CustomersClient({ initialCustomers }: Props) {
             </TableHeader>
             <TableBody>
               {customers.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen klanten gevonden</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Geen klanten gevonden
+                  </TableCell>
+                </TableRow>
               )}
               {customers.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{c.email ?? "—"}</TableCell>
-                  <TableCell>{c.phone ?? "—"}</TableCell>
-                  <TableCell>{c.city ?? "—"}</TableCell>
+                  <TableCell>{c.email || "—"}</TableCell>
+                  <TableCell>{c.phone || "—"}</TableCell>
+                  <TableCell>{c.city || "—"}</TableCell>
                   <TableCell className="text-right">{c._count.projects}</TableCell>
                   <TableCell className="text-right">{c._count.invoices}</TableCell>
                   <TableCell>
@@ -157,7 +172,7 @@ export function CustomersClient({ initialCustomers }: Props) {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) close(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Klant aanpassen" : "Klant toevoegen"}</DialogTitle>
@@ -165,12 +180,17 @@ export function CustomersClient({ initialCustomers }: Props) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
               <Label>Naam *</Label>
-              <Input {...form.register("name")} />
-              {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
+              <Input {...form.register("name")} autoFocus />
+              {form.formState.errors.name && (
+                <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>E-mail</Label>
               <Input type="email" {...form.register("email")} />
+              {form.formState.errors.email && (
+                <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Telefoon</Label>
@@ -200,6 +220,9 @@ export function CustomersClient({ initialCustomers }: Props) {
               <Label>Notities</Label>
               <Textarea {...form.register("notes")} rows={2} />
             </div>
+            {serverError && (
+              <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>
+            )}
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={close}>Annuleren</Button>
               <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
