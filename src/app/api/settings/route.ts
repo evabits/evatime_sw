@@ -13,8 +13,10 @@ const schema = z.object({
   postalCode: z.string().optional(),
   country: z.string().optional(),
   vatNumber: z.string().optional(),
+  kvkNumber: z.string().optional(),
   iban: z.string().optional(),
   logoUrl: z.string().optional().nullable(),
+  reminderDays: z.number().int().min(1).optional(),
 });
 
 export async function GET() {

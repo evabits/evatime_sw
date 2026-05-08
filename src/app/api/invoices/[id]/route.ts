@@ -15,11 +15,15 @@ const lineSchema = z.object({
 const updateSchema = z.object({
   status: z.enum(["DRAFT", "SENT", "PAID", "CANCELLED"]).optional(),
   notes: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  subject: z.string().optional().nullable(),
   issueDate: z.string().optional(),
   dueDate: z.string().optional(),
   vatRate: z.number().min(0).max(100).optional(),
   lines: z.array(lineSchema).optional(),
   lineIdsToDelete: z.array(z.string()).optional(),
+  sentAt: z.string().optional().nullable(),
+  reminderSentAt: z.string().optional().nullable(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +37,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       include: {
         customer: true,
         lines: { orderBy: { createdAt: "asc" } },
+        attachments: { orderBy: { createdAt: "asc" } },
       },
     });
     if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -103,12 +108,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         data: {
           ...(data.status !== undefined ? { status: data.status } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
+          ...(data.reference !== undefined ? { reference: data.reference } : {}),
+          ...(data.subject !== undefined ? { subject: data.subject } : {}),
           ...(data.issueDate ? { issueDate: new Date(data.issueDate) } : {}),
           ...(data.dueDate ? { dueDate: new Date(data.dueDate) } : {}),
           ...(data.vatRate !== undefined ? { vatRate: data.vatRate } : {}),
           ...(subtotal !== undefined ? { subtotal, vatAmount, total } : {}),
+          ...(data.sentAt !== undefined ? { sentAt: data.sentAt ? new Date(data.sentAt) : null } : {}),
+          ...(data.reminderSentAt !== undefined ? { reminderSentAt: data.reminderSentAt ? new Date(data.reminderSentAt) : null } : {}),
         },
-        include: { lines: { orderBy: { createdAt: "asc" } }, customer: true },
+        include: { lines: { orderBy: { createdAt: "asc" } }, customer: true, attachments: { orderBy: { createdAt: "asc" } } },
       });
     });
 

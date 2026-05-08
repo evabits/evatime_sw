@@ -124,21 +124,36 @@ model KmEntry {
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  invoiceNumber String        @unique
-  customerId    String
-  customer      Customer      @relation(fields: [customerId], references: [id])
-  issueDate     DateTime      @db.Date
-  dueDate       DateTime      @db.Date
-  status        InvoiceStatus @default(DRAFT)
-  notes         String?
-  subtotal      Decimal       @db.Decimal(10, 2)
-  vatRate       Decimal       @db.Decimal(5, 2) @default(21)
-  vatAmount     Decimal       @db.Decimal(10, 2)
-  total         Decimal       @db.Decimal(10, 2)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  lines         InvoiceLine[]
+  id              String              @id @default(cuid())
+  invoiceNumber   String              @unique
+  customerId      String
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  issueDate       DateTime            @db.Date
+  dueDate         DateTime            @db.Date
+  status          InvoiceStatus       @default(DRAFT)
+  reference       String?
+  subject         String?
+  notes           String?
+  subtotal        Decimal             @db.Decimal(10, 2)
+  vatRate         Decimal             @db.Decimal(5, 2) @default(21)
+  vatAmount       Decimal             @db.Decimal(10, 2)
+  total           Decimal             @db.Decimal(10, 2)
+  sentAt          DateTime?
+  reminderSentAt  DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  lines           InvoiceLine[]
+  attachments     InvoiceAttachment[]
+}
+
+model InvoiceAttachment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  filename  String
+  url       String
+  size      Int
+  createdAt DateTime @default(now())
 }
 
 enum InvoiceStatus {
@@ -169,16 +184,18 @@ enum LineType {
 }
 
 model CompanySettings {
-  id         String   @id @default(cuid())
-  name       String
-  email      String?
-  phone      String?
-  address    String?
-  city       String?
-  postalCode String?
-  country    String?
-  vatNumber  String?
-  iban       String?
-  logoUrl    String?
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  postalCode   String?
+  country      String?
+  vatNumber    String?
+  kvkNumber    String?
+  iban         String?
+  logoUrl      String?
+  reminderDays Int      @default(14)
+  updatedAt    DateTime @updatedAt
 }

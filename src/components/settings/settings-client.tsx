@@ -18,7 +18,9 @@ const schema = z.object({
   postalCode: z.string().optional(),
   country: z.string().optional(),
   vatNumber: z.string().optional(),
+  kvkNumber: z.string().optional(),
   iban: z.string().optional(),
+  reminderDays: z.coerce.number().int().min(1).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -46,7 +48,9 @@ export function SettingsClient({ initialSettings }: Props) {
       postalCode: initialSettings?.postalCode ?? "",
       country: initialSettings?.country ?? "",
       vatNumber: initialSettings?.vatNumber ?? "",
+      kvkNumber: initialSettings?.kvkNumber ?? "",
       iban: initialSettings?.iban ?? "",
+      reminderDays: initialSettings?.reminderDays ?? 14,
     },
   });
 
@@ -181,9 +185,17 @@ export function SettingsClient({ initialSettings }: Props) {
               <Label>BTW-nummer</Label>
               <Input {...form.register("vatNumber")} placeholder="NL000000000B01" />
             </div>
+            <div className="space-y-1">
+              <Label>KvK-nummer</Label>
+              <Input {...form.register("kvkNumber")} placeholder="12345678" />
+            </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>IBAN</Label>
               <Input {...form.register("iban")} placeholder="NL00 BANK 0000 0000 00" />
+            </div>
+            <div className="space-y-1">
+              <Label>Betalingsherinnering na (dagen)</Label>
+              <Input type="number" min="1" {...form.register("reminderDays")} placeholder="14" />
             </div>
             {serverError && <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>}
             <div className="sm:col-span-2 flex items-center gap-3">

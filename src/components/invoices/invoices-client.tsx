@@ -50,7 +50,12 @@ export function InvoicesClient({ initialInvoices }: Props) {
                 <TableCell>{formatDate(inv.issueDate)}</TableCell>
                 <TableCell>{formatDate(inv.dueDate)}</TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant[inv.status] as any}>{statusLabel[inv.status]}</Badge>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant={statusVariant[inv.status] as any}>{statusLabel[inv.status]}</Badge>
+                    {inv.status === "SENT" && new Date(inv.dueDate) < new Date() && (
+                      <Badge variant="destructive">Achterstallig</Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">{formatCurrency(Number(inv.total))}</TableCell>
                 <TableCell>

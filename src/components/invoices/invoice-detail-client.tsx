@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -41,17 +41,29 @@ interface Props {
   settings: any;
 }
 
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props) {
   const [invoice, setInvoice] = useState(initialInvoice);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [reminding, setReminding] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit state
   const [issueDate, setIssueDate] = useState(format(new Date(invoice.issueDate), "yyyy-MM-dd"));
   const [dueDate, setDueDate] = useState(format(new Date(invoice.dueDate), "yyyy-MM-dd"));
   const [vatRate, setVatRate] = useState(Number(invoice.vatRate));
   const [notes, setNotes] = useState(invoice.notes ?? "");
+  const [reference, setReference] = useState(invoice.reference ?? "");
+  const [subject, setSubject] = useState(invoice.subject ?? "");
   const [lines, setLines] = useState<Line[]>(
     invoice.lines.map((l: any) => ({
       id: l.id,
@@ -65,6 +77,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [lineIdsToDelete, setLineIdsToDelete] = useState<string[]>([]);
 
   const isDraft = invoice.status === "DRAFT";
+  const attachments: any[] = invoice.attachments ?? [];
 
   function computedSubtotal() {
     return lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
@@ -115,6 +128,8 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     setDueDate(format(new Date(invoice.dueDate), "yyyy-MM-dd"));
     setVatRate(Number(invoice.vatRate));
     setNotes(invoice.notes ?? "");
+    setReference(invoice.reference ?? "");
+    setSubject(invoice.subject ?? "");
   }
 
   async function saveEdit() {
@@ -123,7 +138,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     const res = await fetch(`/api/invoices/${invoice.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -159,6 +174,64 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
       setInvoice((prev: any) => ({ ...prev, status: updated.status }));
     }
     setSaving(false);
+  }
+
+  async function sendInvoice() {
+    setSending(true);
+    setError("");
+    const res = await fetch(`/api/invoices/${invoice.id}/send`, { method: "POST" });
+    setSending(false);
+    if (res.ok) {
+      const data = await res.json();
+      setInvoice((prev: any) => ({ ...prev, sentAt: data.sentAt, status: data.status }));
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setError(err.error ?? "Fout bij verzenden");
+    }
+  }
+
+  async function sendReminder() {
+    setReminding(true);
+    setError("");
+    const res = await fetch(`/api/invoices/${invoice.id}/remind`, { method: "POST" });
+    setReminding(false);
+    if (res.ok) {
+      const data = await res.json();
+      setInvoice((prev: any) => ({ ...prev, reminderSentAt: data.reminderSentAt }));
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setError(err.error ?? "Fout bij herinnering sturen");
+    }
+  }
+
+  async function uploadAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    setError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/invoices/${invoice.id}/attachments`, { method: "POST", body: fd });
+    setUploadingFile(false);
+    if (res.ok) {
+      const attachment = await res.json();
+      setInvoice((prev: any) => ({ ...prev, attachments: [...(prev.attachments ?? []), attachment] }));
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setError(err.error ?? "Fout bij uploaden");
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function deleteAttachment(attachmentId: string) {
+    if (!confirm("Bijlage verwijderen?")) return;
+    const res = await fetch(`/api/invoices/${invoice.id}/attachments/${attachmentId}`, { method: "DELETE" });
+    if (res.ok) {
+      setInvoice((prev: any) => ({
+        ...prev,
+        attachments: (prev.attachments ?? []).filter((a: any) => a.id !== attachmentId),
+      }));
+    }
   }
 
   const displayLines = editing ? lines : invoice.lines;
@@ -204,6 +277,16 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                   <SelectItem value="CANCELLED">Geannuleerd</SelectItem>
                 </SelectContent>
               </Select>
+              {invoice.customer?.email && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+                <Button variant="outline" onClick={sendInvoice} disabled={sending}>
+                  <Mail className="h-4 w-4 mr-2" /> {sending ? "Verzenden..." : "Verzenden"}
+                </Button>
+              )}
+              {invoice.status === "SENT" && invoice.customer?.email && (
+                <Button variant="outline" onClick={sendReminder} disabled={reminding}>
+                  <Bell className="h-4 w-4 mr-2" /> {reminding ? "Sturen..." : "Herinnering"}
+                </Button>
+              )}
               <Button variant="outline" asChild>
                 <Link href={`/invoices/${invoice.id}/print`} target="_blank">
                   <Printer className="h-4 w-4 mr-2" /> Afdrukken / PDF
@@ -236,6 +319,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                   {settings.address && <p className="text-muted-foreground">{settings.address}</p>}
                   {settings.city && <p className="text-muted-foreground">{settings.postalCode} {settings.city}</p>}
                   {settings.vatNumber && <p className="text-muted-foreground">BTW: {settings.vatNumber}</p>}
+                  {settings.kvkNumber && <p className="text-muted-foreground">KvK: {settings.kvkNumber}</p>}
                   {settings.iban && <p className="text-muted-foreground">IBAN: {settings.iban}</p>}
                 </div>
               ) : (
@@ -256,7 +340,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-4 border-t pt-4">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 border-t pt-4">
             <div>
               <p className="text-xs text-muted-foreground">Factuurnummer</p>
               <p className="font-mono font-medium">{invoice.invoiceNumber}</p>
@@ -282,6 +366,38 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
               <Badge variant={statusVariant[invoice.status] as any}>{statusLabel[invoice.status]}</Badge>
             </div>
           </div>
+
+          {/* Reference / Subject */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 border-t pt-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Kenmerk</p>
+              {editing ? (
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bijv. MED-FEB26" className="h-7 text-sm" />
+              ) : (
+                <p className="text-sm">{invoice.reference || <span className="text-muted-foreground italic">—</span>}</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Onderwerp</p>
+              {editing ? (
+                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Bijv. Uren februari 2026" className="h-7 text-sm" />
+              ) : (
+                <p className="text-sm">{invoice.subject || <span className="text-muted-foreground italic">—</span>}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Sent timestamps */}
+          {(invoice.sentAt || invoice.reminderSentAt) && (
+            <div className="mt-4 flex flex-wrap gap-4 border-t pt-4 text-xs text-muted-foreground">
+              {invoice.sentAt && (
+                <span>Verzonden: {new Date(invoice.sentAt).toLocaleString("nl-NL")}</span>
+              )}
+              {invoice.reminderSentAt && (
+                <span>Herinnering: {new Date(invoice.reminderSentAt).toLocaleString("nl-NL")}</span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -392,7 +508,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
         </CardContent>
       </Card>
 
-      {/* Notes / free text */}
+      {/* Notes */}
       <Card>
         <CardHeader><CardTitle className="text-base">Opmerkingen / betalingstermijn</CardTitle></CardHeader>
         <CardContent>
@@ -409,6 +525,57 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
             <p className="text-sm text-muted-foreground italic">
               {isDraft ? "Klik op 'Bewerken' om opmerkingen toe te voegen" : "Geen opmerkingen"}
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Attachments */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Paperclip className="h-4 w-4" /> Bijlagen
+              {attachments.length > 0 && <span className="text-sm font-normal text-muted-foreground">({attachments.length})</span>}
+            </CardTitle>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx"
+                onChange={uploadAttachment}
+              />
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}>
+                <Plus className="h-4 w-4 mr-2" /> {uploadingFile ? "Uploaden..." : "Bijlage toevoegen"}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {attachments.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Geen bijlagen</p>
+          ) : (
+            <ul className="space-y-2">
+              {attachments.map((a: any) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 text-sm p-2 rounded-md border">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate">{a.filename}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{fmtBytes(a.size)}</span>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" asChild>
+                      <a href={`/api/invoices/${invoice.id}/attachments/${a.id}/download`} download={a.filename}>
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteAttachment(a.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>
