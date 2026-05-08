@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { InvoicesClient } from "@/components/invoices/invoices-client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export default async function InvoicesPage() {
           <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" /> Nieuwe factuur</Link>
         </Button>
       </div>
-      <InvoicesClient initialInvoices={invoices} />
+      <InvoicesClient initialInvoices={serialize(invoices)} />
     </div>
   );
 }

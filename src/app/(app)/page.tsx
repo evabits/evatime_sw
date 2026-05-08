@@ -6,6 +6,7 @@ import { Clock, Car, Euro, TrendingUp } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { serialize } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -130,7 +131,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DashboardChart data={projectSummary} />
-        <RecentEntries timeEntries={recentTime} kmEntries={recentKm} />
+        <RecentEntries timeEntries={serialize(recentTime)} kmEntries={serialize(recentKm)} />
       </div>
     </div>
   );

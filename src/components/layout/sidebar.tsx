@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   Activity,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/projects", label: "Projecten", icon: FolderOpen },
   { href: "/activity-types", label: "Activiteiten", icon: Activity },
   { href: "/invoices", label: "Facturen", icon: FileText },
+  { href: "/users", label: "Gebruikers", icon: UserCog },
   { href: "/settings", label: "Instellingen", icon: Settings },
 ];
 

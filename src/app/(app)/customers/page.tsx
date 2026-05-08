@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { CustomersClient } from "@/components/customers/customers-client";
 
 export default async function CustomersPage() {
@@ -7,5 +8,5 @@ export default async function CustomersPage() {
     include: { _count: { select: { projects: true, invoices: true } } },
   });
 
-  return <CustomersClient initialCustomers={customers} />;
+  return <CustomersClient initialCustomers={serialize(customers)} />;
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { serialize } from "@/lib/utils";
 import { TimeEntriesClient } from "@/components/time/time-entries-client";
 
 export default async function TimePage() {
@@ -32,9 +33,9 @@ export default async function TimePage() {
 
   return (
     <TimeEntriesClient
-      projects={projects}
-      activityTypes={activityTypes}
-      initialEntries={recentEntries}
+      projects={serialize(projects)}
+      activityTypes={serialize(activityTypes)}
+      initialEntries={serialize(recentEntries)}
       userId={userId}
     />
   );

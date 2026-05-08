@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { ProjectsClient } from "@/components/projects/projects-client";
 
 export default async function ProjectsPage() {
@@ -13,5 +14,5 @@ export default async function ProjectsPage() {
     prisma.customer.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
-  return <ProjectsClient initialProjects={projects} customers={customers} />;
+  return <ProjectsClient initialProjects={serialize(projects)} customers={serialize(customers)} />;
 }

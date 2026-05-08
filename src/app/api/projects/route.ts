@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { handleError } from "@/lib/api";
 
 const schema = z.object({
   customerId: z.string().min(1),
@@ -13,33 +14,33 @@ const schema = z.object({
 });
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { searchParams } = new URL(req.url);
-  const customerId = searchParams.get("customerId");
-  const status = searchParams.get("status");
-
-  const projects = await prisma.project.findMany({
-    where: {
-      ...(customerId ? { customerId } : {}),
-      ...(status ? { status: status as any } : {}),
-    },
-    orderBy: { name: "asc" },
-    include: {
-      customer: { select: { name: true } },
-      _count: { select: { timeEntries: true, kmEntries: true } },
-    },
-  });
-  return NextResponse.json(projects);
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { searchParams } = new URL(req.url);
+    const customerId = searchParams.get("customerId");
+    const status = searchParams.get("status");
+    const projects = await prisma.project.findMany({
+      where: {
+        ...(customerId ? { customerId } : {}),
+        ...(status ? { status: status as any } : {}),
+      },
+      orderBy: { name: "asc" },
+      include: {
+        customer: { select: { name: true } },
+        _count: { select: { timeEntries: true, kmEntries: true } },
+      },
+    });
+    return NextResponse.json(projects);
+  } catch (e) { return handleError(e); }
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const body = await req.json();
-  const data = schema.parse(body);
-  const project = await prisma.project.create({ data });
-  return NextResponse.json(project, { status: 201 });
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const data = schema.parse(await req.json());
+    const project = await prisma.project.create({ data });
+    return NextResponse.json(project, { status: 201 });
+  } catch (e) { return handleError(e); }
 }

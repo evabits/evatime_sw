@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { serialize } from "@/lib/utils";
 import { NewInvoiceClient } from "@/components/invoices/new-invoice-client";
 
 export default async function NewInvoicePage() {
@@ -7,5 +8,5 @@ export default async function NewInvoicePage() {
     select: { id: true, name: true },
   });
 
-  return <NewInvoiceClient customers={customers} />;
+  return <NewInvoiceClient customers={serialize(customers)} />;
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { serialize } from "@/lib/utils";
 import { KmEntriesClient } from "@/components/km/km-entries-client";
 
 export default async function KmPage() {
@@ -27,5 +28,5 @@ export default async function KmPage() {
     }),
   ]);
 
-  return <KmEntriesClient projects={projects} initialEntries={recentEntries} />;
+  return <KmEntriesClient projects={serialize(projects)} initialEntries={serialize(recentEntries)} />;
 }
