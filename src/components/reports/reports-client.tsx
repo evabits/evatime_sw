@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,25 @@ interface Props {
   projects: any[];
   users: any[];
   currentUserId: string;
+  tags: { id: string; name: string }[];
 }
 
-export function ReportsClient({ customers, projects, users }: Props) {
+type ReportData = {
+  timeEntries: any[];
+  kmEntries: any[];
+  expenses: any[];
+};
+
+type EmployeeSummary = {
+  userId: string;
+  name: string;
+  hours: number;
+  km: number;
+  expenses: number;
+  revenue: number;
+};
+
+export function ReportsClient({ customers, projects, users, tags }: Props) {
   const now = new Date();
   const [from, setFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
@@ -26,10 +42,16 @@ export function ReportsClient({ customers, projects, users }: Props) {
   const [projectId, setProjectId] = useState("");
   const [userId, setUserId] = useState("");
   const [billable, setBillable] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [groupByEmployee, setGroupByEmployee] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<{ timeEntries: any[]; kmEntries: any[] } | null>(null);
+  const [data, setData] = useState<ReportData | null>(null);
 
   const filteredProjects = customerId ? projects.filter((p) => p.customerId === customerId) : projects;
+
+  function toggleTag(id: string) {
+    setSelectedTagIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
+  }
 
   async function loadReport() {
     setLoading(true);
@@ -40,6 +62,7 @@ export function ReportsClient({ customers, projects, users }: Props) {
     if (projectId) params.set("projectId", projectId);
     if (userId) params.set("userId", userId);
     if (billable) params.set("billable", billable);
+    if (selectedTagIds.length > 0) params.set("tags", selectedTagIds.join(","));
 
     const res = await fetch(`/api/reports?${params}`);
     if (res.ok) setData(await res.json());
@@ -48,6 +71,7 @@ export function ReportsClient({ customers, projects, users }: Props) {
 
   const totalHours = data?.timeEntries.reduce((s, e) => s + Number(e.hours), 0) ?? 0;
   const totalKm = data?.kmEntries.reduce((s, e) => s + Number(e.km), 0) ?? 0;
+  const totalExpenses = data?.expenses.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
   const totalRevenue = data
     ? data.timeEntries.reduce((s, e) => {
         const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
@@ -56,8 +80,42 @@ export function ReportsClient({ customers, projects, users }: Props) {
       data.kmEntries.reduce((s, e) => {
         const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
         return s + Number(e.km) * rate;
-      }, 0)
+      }, 0) +
+      data.expenses.filter((e) => e.billable).reduce((s, e) => s + Number(e.amount), 0)
     : 0;
+
+  const employeeGroups = useMemo<EmployeeSummary[]>(() => {
+    if (!data) return [];
+    const map = new Map<string, EmployeeSummary>();
+
+    for (const e of data.timeEntries) {
+      const key = e.user?.id ?? "unknown";
+      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
+      const entry = map.get(key)!;
+      const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
+      entry.hours += Number(e.hours);
+      entry.revenue += Number(e.hours) * rate;
+    }
+
+    for (const e of data.kmEntries) {
+      const key = e.user?.id ?? "unknown";
+      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
+      const entry = map.get(key)!;
+      const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
+      entry.km += Number(e.km);
+      entry.revenue += Number(e.km) * rate;
+    }
+
+    for (const e of data.expenses) {
+      const key = e.user?.id ?? "unknown";
+      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
+      const entry = map.get(key)!;
+      entry.expenses += Number(e.amount);
+      if (e.billable) entry.revenue += Number(e.amount);
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
 
   return (
     <div className="space-y-6">
@@ -120,6 +178,36 @@ export function ReportsClient({ customers, projects, users }: Props) {
               </Select>
             </div>
           </div>
+
+          {tags.length > 0 && (
+            <div className="mt-4 space-y-1">
+              <Label>Tags</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant={selectedTagIds.includes(tag.id) ? "default" : "outline"}
+                    className="cursor-pointer select-none"
+                    onClick={() => toggleTag(tag.id)}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="group-by-employee"
+              checked={groupByEmployee}
+              onChange={(e) => setGroupByEmployee(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            <Label htmlFor="group-by-employee">Groepeer per medewerker</Label>
+          </div>
+
           <Button className="mt-4" onClick={loadReport} disabled={loading}>
             <Search className="h-4 w-4 mr-2" />
             {loading ? "Laden..." : "Rapport ophalen"}
@@ -129,7 +217,7 @@ export function ReportsClient({ customers, projects, users }: Props) {
 
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{formatHours(totalHours)}</div>
@@ -144,120 +232,232 @@ export function ReportsClient({ customers, projects, users }: Props) {
             </Card>
             <Card>
               <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+                <p className="text-sm text-muted-foreground">Totaal uitgaven</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
                 <p className="text-sm text-muted-foreground">Totaal omzet (excl. BTW)</p>
               </CardContent>
             </Card>
           </div>
 
-          {data.timeEntries.length > 0 && (
+          {groupByEmployee ? (
             <Card>
-              <CardHeader><CardTitle>Uren ({data.timeEntries.length})</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Per medewerker</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Datum</TableHead>
                       <TableHead>Medewerker</TableHead>
-                      <TableHead>Klant / Project</TableHead>
-                      <TableHead>Activiteit</TableHead>
-                      <TableHead>Omschrijving</TableHead>
                       <TableHead className="text-right">Uren</TableHead>
-                      <TableHead className="text-right">Tarief</TableHead>
-                      <TableHead className="text-right">Bedrag</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.timeEntries.map((e) => {
-                      const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? 0);
-                      const amount = Number(e.hours) * rate;
-                      return (
-                        <TableRow key={e.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
-                          <TableCell>{e.user?.name}</TableCell>
-                          <TableCell>
-                            <div>{e.project?.customer?.name}</div>
-                            <div className="text-xs text-muted-foreground">{e.project?.name}</div>
-                          </TableCell>
-                          <TableCell>{e.activityType?.name ?? "—"}</TableCell>
-                          <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
-                          <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
-                          <TableCell className="text-right">{rate ? formatCurrency(rate) : "—"}</TableCell>
-                          <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
-                          <TableCell>
-                            {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                            {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
-                      <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
-                      <TableCell />
-                      <TableCell className="text-right font-medium">{formatCurrency(totalRevenue)}</TableCell>
-                      <TableCell />
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {data.kmEntries.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Kilometers ({data.kmEntries.length})</CardTitle></CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Datum</TableHead>
-                      <TableHead>Medewerker</TableHead>
-                      <TableHead>Klant / Project</TableHead>
-                      <TableHead>Omschrijving</TableHead>
                       <TableHead className="text-right">Km</TableHead>
-                      <TableHead className="text-right">Tarief</TableHead>
-                      <TableHead className="text-right">Bedrag</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="text-right">Uitgaven</TableHead>
+                      <TableHead className="text-right">Omzet</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.kmEntries.map((e) => {
-                      const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
-                      const amount = Number(e.km) * rate;
-                      return (
-                        <TableRow key={e.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
-                          <TableCell>{e.user?.name}</TableCell>
-                          <TableCell>
-                            <div>{e.project?.customer?.name}</div>
-                            <div className="text-xs text-muted-foreground">{e.project?.name}</div>
-                          </TableCell>
-                          <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
-                          <TableCell className="text-right font-mono">{Number(e.km).toFixed(1)}</TableCell>
-                          <TableCell className="text-right">{rate ? `€${rate.toFixed(2)}/km` : "—"}</TableCell>
-                          <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
-                          <TableCell>
-                            {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {employeeGroups.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          Geen registraties gevonden voor de geselecteerde filters
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {employeeGroups.map((emp) => (
+                      <TableRow key={emp.userId}>
+                        <TableCell className="font-medium">{emp.name}</TableCell>
+                        <TableCell className="text-right font-mono">{formatHours(emp.hours)}</TableCell>
+                        <TableCell className="text-right font-mono">{emp.km.toFixed(1)} km</TableCell>
+                        <TableCell className="text-right">{formatCurrency(emp.expenses)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(emp.revenue)}</TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
+                  {employeeGroups.length > 0 && (
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-medium">Totaal</TableCell>
+                        <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">{totalKm.toFixed(1)} km</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(totalExpenses)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(totalRevenue)}</TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  )}
                 </Table>
               </CardContent>
             </Card>
-          )}
+          ) : (
+            <>
+              {data.timeEntries.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle>Uren ({data.timeEntries.length})</CardTitle></CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Datum</TableHead>
+                          <TableHead>Medewerker</TableHead>
+                          <TableHead>Klant / Project</TableHead>
+                          <TableHead>Activiteit</TableHead>
+                          <TableHead>Omschrijving</TableHead>
+                          <TableHead className="text-right">Uren</TableHead>
+                          <TableHead className="text-right">Tarief</TableHead>
+                          <TableHead className="text-right">Bedrag</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.timeEntries.map((e) => {
+                          const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? 0);
+                          const amount = Number(e.hours) * rate;
+                          return (
+                            <TableRow key={e.id}>
+                              <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
+                              <TableCell>{e.user?.name}</TableCell>
+                              <TableCell>
+                                <div>{e.project?.customer?.name}</div>
+                                <div className="text-xs text-muted-foreground">{e.project?.name}</div>
+                              </TableCell>
+                              <TableCell>{e.activityType?.name ?? "—"}</TableCell>
+                              <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                              <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
+                              <TableCell className="text-right">{rate ? formatCurrency(rate) : "—"}</TableCell>
+                              <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
+                              <TableCell>
+                                {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
+                                {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
+                          <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
+                          <TableCell />
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(data.timeEntries.reduce((s, e) => {
+                              const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
+                              return s + Number(e.hours) * rate;
+                            }, 0))}
+                          </TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
 
-          {data.timeEntries.length === 0 && data.kmEntries.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                Geen registraties gevonden voor de geselecteerde filters
-              </CardContent>
-            </Card>
+              {data.kmEntries.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle>Kilometers ({data.kmEntries.length})</CardTitle></CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Datum</TableHead>
+                          <TableHead>Medewerker</TableHead>
+                          <TableHead>Klant / Project</TableHead>
+                          <TableHead>Omschrijving</TableHead>
+                          <TableHead className="text-right">Km</TableHead>
+                          <TableHead className="text-right">Tarief</TableHead>
+                          <TableHead className="text-right">Bedrag</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.kmEntries.map((e) => {
+                          const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
+                          const amount = Number(e.km) * rate;
+                          return (
+                            <TableRow key={e.id}>
+                              <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
+                              <TableCell>{e.user?.name}</TableCell>
+                              <TableCell>
+                                <div>{e.project?.customer?.name}</div>
+                                <div className="text-xs text-muted-foreground">{e.project?.name}</div>
+                              </TableCell>
+                              <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                              <TableCell className="text-right font-mono">{Number(e.km).toFixed(1)}</TableCell>
+                              <TableCell className="text-right">{rate ? `€${rate.toFixed(2)}/km` : "—"}</TableCell>
+                              <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
+                              <TableCell>
+                                {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.expenses.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle>Uitgaven ({data.expenses.length})</CardTitle></CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Datum</TableHead>
+                          <TableHead>Medewerker</TableHead>
+                          <TableHead>Klant / Project</TableHead>
+                          <TableHead>Categorie</TableHead>
+                          <TableHead>Omschrijving</TableHead>
+                          <TableHead className="text-right">Bedrag</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.expenses.map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
+                            <TableCell>{e.user?.name}</TableCell>
+                            <TableCell>
+                              {e.project ? (
+                                <>
+                                  <div>{e.project?.customer?.name}</div>
+                                  <div className="text-xs text-muted-foreground">{e.project?.name}</div>
+                                </>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>{e.category?.name}</TableCell>
+                            <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(Number(e.amount))}</TableCell>
+                            <TableCell>
+                              {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
+                              {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(totalExpenses)}</TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.timeEntries.length === 0 && data.kmEntries.length === 0 && data.expenses.length === 0 && (
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    Geen registraties gevonden voor de geselecteerde filters
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </>
       )}
