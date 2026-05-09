@@ -19,6 +19,7 @@ const createSchema = z.object({
   email: z.string().email("Ongeldig e-mailadres"),
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
+  weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
 });
 
 const editSchema = z.object({
@@ -26,6 +27,7 @@ const editSchema = z.object({
   email: z.string().email("Ongeldig e-mailadres"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
+  weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
 });
 
 type CreateData = z.infer<typeof createSchema>;
@@ -36,6 +38,7 @@ interface User {
   name: string;
   email: string;
   role: "ADMIN" | "FINANCE" | "EMPLOYEE";
+  weeklyHours: number | null;
   createdAt: string;
 }
 
@@ -69,7 +72,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
 
   function openEdit(user: User) {
     setEditingId(user.id);
-    editForm.reset({ name: user.name, email: user.email, role: user.role, password: "" });
+    editForm.reset({ name: user.name, email: user.email, role: user.role, password: "", weeklyHours: user.weeklyHours ?? undefined });
     setServerError("");
     setDialogOpen(true);
   }
@@ -149,6 +152,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                 <TableHead>Naam</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Rol</TableHead>
+                <TableHead className="text-right">Uren/week</TableHead>
                 <TableHead>Aangemaakt</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -167,6 +171,9 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                     <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
                       {user.role === "ADMIN" ? "Beheerder" : user.role === "FINANCE" ? "Financieel" : "Medewerker"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {user.weeklyHours != null ? `${user.weeklyHours}u` : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell>
@@ -209,17 +216,24 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                 {editForm.formState.errors.email && <p className="text-xs text-destructive">{editForm.formState.errors.email.message}</p>}
               </div>
               {isAdmin && (
-                <div className="space-y-1">
-                  <Label>Rol</Label>
-                  <Select value={editForm.watch("role")} onValueChange={(v) => editForm.setValue("role", v as any)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EMPLOYEE">Medewerker</SelectItem>
-                      <SelectItem value="FINANCE">Financieel</SelectItem>
-                      <SelectItem value="ADMIN">Beheerder</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-1">
+                    <Label>Rol</Label>
+                    <Select value={editForm.watch("role")} onValueChange={(v) => editForm.setValue("role", v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EMPLOYEE">Medewerker</SelectItem>
+                        <SelectItem value="FINANCE">Financieel</SelectItem>
+                        <SelectItem value="ADMIN">Beheerder</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Uren per week <span className="text-muted-foreground font-normal">(leeg = geen target)</span></Label>
+                    <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...editForm.register("weeklyHours")} />
+                    {editForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{editForm.formState.errors.weeklyHours.message}</p>}
+                  </div>
+                </>
               )}
               <div className="space-y-1">
                 <Label>Nieuw wachtwoord <span className="text-muted-foreground font-normal">(leeg = niet wijzigen)</span></Label>
@@ -258,6 +272,11 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                     <SelectItem value="ADMIN">Beheerder</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Uren per week <span className="text-muted-foreground font-normal">(leeg = geen target)</span></Label>
+                <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...createForm.register("weeklyHours")} />
+                {createForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{createForm.formState.errors.weeklyHours.message}</p>}
               </div>
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}
               <DialogFooter>

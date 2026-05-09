@@ -14,7 +14,7 @@ import { Search } from "lucide-react";
 interface Props {
   customers: any[];
   projects: any[];
-  users: any[];
+  users: { id: string; name: string; weeklyHours: number | null }[];
   currentUserId: string;
   tags: { id: string; name: string }[];
 }
@@ -32,6 +32,7 @@ type EmployeeSummary = {
   km: number;
   expenses: number;
   revenue: number;
+  weeklyHours: number | null;
 };
 
 export function ReportsClient({ customers, projects, users, tags }: Props) {
@@ -87,35 +88,37 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
   const employeeGroups = useMemo<EmployeeSummary[]>(() => {
     if (!data) return [];
     const map = new Map<string, EmployeeSummary>();
+    const userWeeklyHours = new Map(users.map((u) => [u.id, u.weeklyHours]));
+
+    function getOrCreate(userId: string, name: string): EmployeeSummary {
+      if (!map.has(userId)) {
+        map.set(userId, { userId, name, hours: 0, km: 0, expenses: 0, revenue: 0, weeklyHours: userWeeklyHours.get(userId) ?? null });
+      }
+      return map.get(userId)!;
+    }
 
     for (const e of data.timeEntries) {
-      const key = e.user?.id ?? "unknown";
-      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
-      const entry = map.get(key)!;
+      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
       const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
       entry.hours += Number(e.hours);
       entry.revenue += Number(e.hours) * rate;
     }
 
     for (const e of data.kmEntries) {
-      const key = e.user?.id ?? "unknown";
-      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
-      const entry = map.get(key)!;
+      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
       const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
       entry.km += Number(e.km);
       entry.revenue += Number(e.km) * rate;
     }
 
     for (const e of data.expenses) {
-      const key = e.user?.id ?? "unknown";
-      if (!map.has(key)) map.set(key, { userId: key, name: e.user?.name ?? "Onbekend", hours: 0, km: 0, expenses: 0, revenue: 0 });
-      const entry = map.get(key)!;
+      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
       entry.expenses += Number(e.amount);
       if (e.billable) entry.revenue += Number(e.amount);
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [data]);
+  }, [data, users]);
 
   return (
     <div className="space-y-6">
@@ -253,6 +256,7 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                     <TableRow>
                       <TableHead>Medewerker</TableHead>
                       <TableHead className="text-right">Uren</TableHead>
+                      <TableHead className="text-right">Extra uren</TableHead>
                       <TableHead className="text-right">Km</TableHead>
                       <TableHead className="text-right">Uitgaven</TableHead>
                       <TableHead className="text-right">Omzet</TableHead>
@@ -261,26 +265,40 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                   <TableBody>
                     {employeeGroups.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                           Geen registraties gevonden voor de geselecteerde filters
                         </TableCell>
                       </TableRow>
                     )}
-                    {employeeGroups.map((emp) => (
-                      <TableRow key={emp.userId}>
-                        <TableCell className="font-medium">{emp.name}</TableCell>
-                        <TableCell className="text-right font-mono">{formatHours(emp.hours)}</TableCell>
-                        <TableCell className="text-right font-mono">{emp.km.toFixed(1)} km</TableCell>
-                        <TableCell className="text-right">{formatCurrency(emp.expenses)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(emp.revenue)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {employeeGroups.map((emp) => {
+                      const days = from && to
+                        ? Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1
+                        : 7;
+                      const targetHours = emp.weeklyHours != null ? emp.weeklyHours * (days / 7) : null;
+                      const extraHours = targetHours != null ? Math.max(0, emp.hours - targetHours) : null;
+
+                      return (
+                        <TableRow key={emp.userId}>
+                          <TableCell className="font-medium">{emp.name}</TableCell>
+                          <TableCell className="text-right font-mono">{formatHours(emp.hours)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {extraHours != null && extraHours > 0
+                              ? <span className="text-amber-600 font-medium">+{formatHours(extraHours)}</span>
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{emp.km.toFixed(1)} km</TableCell>
+                          <TableCell className="text-right">{formatCurrency(emp.expenses)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(emp.revenue)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                   {employeeGroups.length > 0 && (
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-medium">Totaal</TableCell>
                         <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
+                        <TableCell />
                         <TableCell className="text-right font-mono font-medium">{totalKm.toFixed(1)} km</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(totalExpenses)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(totalRevenue)}</TableCell>

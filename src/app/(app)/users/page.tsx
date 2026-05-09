@@ -9,9 +9,9 @@ export default async function UsersPage() {
 
   const rawUsers = await prisma.user.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: { id: true, name: true, email: true, role: true, weeklyHours: true, createdAt: true },
   });
-  const users = rawUsers.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }));
+  const users = rawUsers.map((u) => ({ ...u, weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null, createdAt: u.createdAt.toISOString() }));
 
   return (
     <UsersClient

@@ -139,6 +139,72 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
   });
 }
 
+export async function sendHoursReminderEmail(
+  user: { name: string; email: string },
+  period: { label: string },
+  hoursLogged: number,
+  hoursExpected: number,
+  settings: any
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
+<div style="max-width:640px;margin:0 auto;padding:40px 24px;">
+  <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
+
+  <p style="margin:0 0 8px;">Hallo ${user.name},</p>
+  <p style="margin:0 0 16px;">We constateren dat je voor <strong>${period.label}</strong> nog niet genoeg uren hebt ingevuld.</p>
+  <table style="margin:16px 0;border-collapse:collapse;">
+    <tr>
+      <td style="padding:4px 16px 4px 0;color:#666;">Gelogd:</td>
+      <td style="padding:4px 0;font-weight:600;">${hoursLogged.toFixed(1)} uur</td>
+    </tr>
+    <tr>
+      <td style="padding:4px 16px 4px 0;color:#666;">Verwacht:</td>
+      <td style="padding:4px 0;font-weight:600;">${hoursExpected.toFixed(1)} uur</td>
+    </tr>
+    <tr style="border-top:1px solid #e5e7eb;">
+      <td style="padding:8px 16px 4px 0;color:#666;">Nog in te vullen:</td>
+      <td style="padding:8px 0 4px;font-weight:700;color:#dc2626;">${Math.max(0, hoursExpected - hoursLogged).toFixed(1)} uur</td>
+    </tr>
+  </table>
+  <p style="margin:0 0 24px;">Vul je uren zo snel mogelijk in zodat de administratie up-to-date blijft.</p>
+
+  <a href="${appUrl}/time" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Uren invullen</a>
+
+  <p style="margin-top:40px;color:#888;font-size:12px;">
+    ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}
+  </p>
+</div>
+</body>
+</html>`;
+
+  await transport.sendMail({
+    from,
+    to: user.email,
+    subject: `Herinnering: vul je uren in voor ${period.label}`,
+    html,
+  });
+}
+
+export async function sendBookkeepingEmail(invoice: any, settings: any): Promise<void> {
+  const to = process.env.BOOKKEEPING_EMAIL!;
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+
+  const pdfBuffer = await renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any);
+
+  await transport.sendMail({
+    from,
+    to,
+    subject: `Verkoopboeking ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
+    text: `Factuur ${invoice.invoiceNumber} voor ${invoice.customer.name} — ${formatCurrency(Number(invoice.total))}`,
+    attachments: [{ filename: `Factuur-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }],
+  });
+}
+
 export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;

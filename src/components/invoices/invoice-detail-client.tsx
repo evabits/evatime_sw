@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -55,7 +55,8 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [reminding, setReminding] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ type: "send" | "remind" } | null>(null);
+  const [bookkeeping, setBookkeeping] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ type: "send" | "remind" | "bookkeeping" } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +193,17 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     }
   }
 
+  async function sendToBookkeeping() {
+    setBookkeeping(true);
+    setError("");
+    const res = await fetch(`/api/invoices/${invoice.id}/bookkeeping`, { method: "POST" });
+    setBookkeeping(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setError(err.error ?? "Fout bij verzenden naar boekhouding");
+    }
+  }
+
   async function sendReminder() {
     setReminding(true);
     setError("");
@@ -287,6 +299,11 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
               {invoice.status === "SENT" && invoice.customer?.email && (
                 <Button variant="outline" onClick={() => setConfirmDialog({ type: "remind" })} disabled={reminding}>
                   <Bell className="h-4 w-4 mr-2" /> {reminding ? "Sturen..." : "Herinnering"}
+                </Button>
+              )}
+              {(invoice.status === "SENT" || invoice.status === "PAID") && (
+                <Button variant="outline" onClick={() => setConfirmDialog({ type: "bookkeeping" })} disabled={bookkeeping}>
+                  <BookOpen className="h-4 w-4 mr-2" /> {bookkeeping ? "Sturen..." : "Boekhouding"}
                 </Button>
               )}
               <Button variant="outline" asChild>
@@ -591,25 +608,34 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              {confirmDialog?.type === "remind" ? "Betalingsherinnering sturen" : "Factuur verzenden"}
+              {confirmDialog?.type === "bookkeeping"
+                ? "Versturen naar boekhouding"
+                : confirmDialog?.type === "remind"
+                ? "Betalingsherinnering sturen"
+                : "Factuur verzenden"}
             </DialogTitle>
             <DialogDescription>
-              {confirmDialog?.type === "remind"
+              {confirmDialog?.type === "bookkeeping"
+                ? "De factuur (PDF) wordt verstuurd naar uw boekhoudkantoor."
+                : confirmDialog?.type === "remind"
                 ? "Er wordt een betalingsherinnering verstuurd naar:"
                 : "De factuur wordt per e-mail verstuurd naar:"}
             </DialogDescription>
           </DialogHeader>
-          <p className="font-medium text-sm">{invoice.customer?.email}</p>
+          {confirmDialog?.type !== "bookkeeping" && (
+            <p className="font-medium text-sm">{invoice.customer?.email}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDialog(null)}>Annuleren</Button>
             <Button
               onClick={() => {
                 setConfirmDialog(null);
-                if (confirmDialog?.type === "remind") sendReminder();
+                if (confirmDialog?.type === "bookkeeping") sendToBookkeeping();
+                else if (confirmDialog?.type === "remind") sendReminder();
                 else sendInvoice();
               }}
             >
-              {confirmDialog?.type === "remind" ? "Herinnering sturen" : "Verzenden"}
+              {confirmDialog?.type === "bookkeeping" ? "Versturen" : confirmDialog?.type === "remind" ? "Herinnering sturen" : "Verzenden"}
             </Button>
           </DialogFooter>
         </DialogContent>

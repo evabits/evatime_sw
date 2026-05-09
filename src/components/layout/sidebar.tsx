@@ -17,6 +17,7 @@ import {
   UserCog,
   Tag,
   ClipboardList,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const navGroups: NavGroup[] = [
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
       { href: "/quotes", label: "Offertes", icon: ClipboardList, roles: ["ADMIN"] },
       { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN"] },
+      { href: "/uren-overzicht", label: "Uren Overzicht", icon: CalendarCheck },
     ],
   },
   {

@@ -10,7 +10,10 @@ const updateSchema = z.object({
   email: z.string().email(),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8).optional().or(z.literal("")),
+  weeklyHours: z.coerce.number().positive().optional().nullable(),
 });
+
+const userSelect = { id: true, name: true, email: true, role: true, weeklyHours: true, createdAt: true } as const;
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -30,15 +33,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const updateData: any = { name: data.name, email: data.email };
-    if (isAdmin) updateData.role = data.role;
+    if (isAdmin) {
+      updateData.role = data.role;
+      updateData.weeklyHours = data.weeklyHours ?? null;
+    }
     if (data.password) updateData.password = await hash(data.password, 12);
 
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: userSelect,
     });
-    return NextResponse.json(user);
+    return NextResponse.json({ ...user, weeklyHours: user.weeklyHours ? Number(user.weeklyHours) : null });
   } catch (e) { return handleError(e); }
 }
 
