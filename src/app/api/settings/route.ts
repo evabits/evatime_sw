@@ -31,7 +31,9 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session || (session.user as any)?.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const data = schema.parse(await req.json());
     const existing = await prisma.companySettings.findFirst();

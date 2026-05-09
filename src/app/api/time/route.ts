@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
+import { canViewAllEntries } from "@/lib/roles";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -25,10 +26,14 @@ export async function GET(req: Request) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    const ownerId = canViewAllEntries(role) ? null : session.user?.id;
+
     const entries = await prisma.timeEntry.findMany({
       where: {
+        ...(ownerId ? { userId: ownerId } : {}),
         ...(projectId ? { projectId } : {}),
-        ...(userId ? { userId } : {}),
+        ...(userId && canViewAllEntries(role) ? { userId } : {}),
         ...(customerId ? { project: { customerId } } : {}),
         ...(from || to ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
       },

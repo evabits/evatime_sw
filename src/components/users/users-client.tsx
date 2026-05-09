@@ -18,13 +18,13 @@ const createSchema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres"),
   password: z.string().min(8, "Minimaal 8 tekens"),
-  role: z.enum(["ADMIN", "EMPLOYEE"]),
+  role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
 });
 
 const editSchema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres"),
-  role: z.enum(["ADMIN", "EMPLOYEE"]),
+  role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
 });
 
@@ -35,7 +35,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "EMPLOYEE";
+  role: "ADMIN" | "FINANCE" | "EMPLOYEE";
   createdAt: string;
 }
 
@@ -165,7 +165,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
-                      {user.role === "ADMIN" ? "Beheerder" : "Medewerker"}
+                      {user.role === "ADMIN" ? "Beheerder" : user.role === "FINANCE" ? "Financieel" : "Medewerker"}
                     </Badge>
                   </TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
@@ -215,6 +215,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="EMPLOYEE">Medewerker</SelectItem>
+                      <SelectItem value="FINANCE">Financieel</SelectItem>
                       <SelectItem value="ADMIN">Beheerder</SelectItem>
                     </SelectContent>
                   </Select>

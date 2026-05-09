@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
+import { canViewInvoices, canEditInvoices } from "@/lib/roles";
 
 const lineSchema = z.object({
   id: z.string().optional(),
@@ -30,6 +31,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!canViewInvoices(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
     const invoice = await prisma.invoice.findUnique({
@@ -49,6 +52,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!canEditInvoices(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
     const data = updateSchema.parse(await req.json());
@@ -129,6 +134,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!canEditInvoices(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
     const invoice = await prisma.invoice.findUnique({ where: { id }, select: { lines: { select: { id: true } } } });
@@ -136,6 +143,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       const lineIds = invoice.lines.map((l) => l.id);
       await prisma.timeEntry.updateMany({ where: { invoiceLineId: { in: lineIds } }, data: { invoiced: false, invoiceLineId: null } });
       await prisma.kmEntry.updateMany({ where: { invoiceLineId: { in: lineIds } }, data: { invoiced: false, invoiceLineId: null } });
+      await prisma.expense.updateMany({ where: { invoiceLineId: { in: lineIds } }, data: { invoiced: false, invoiceLineId: null } });
     }
     await prisma.invoice.delete({ where: { id } });
     return NextResponse.json({ success: true });

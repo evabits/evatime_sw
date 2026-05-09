@@ -2,14 +2,16 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { canViewInvoices, canEditInvoices } from "@/lib/roles";
 
 const lineSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
   unitPrice: z.number().positive(),
-  lineType: z.enum(["HOURS", "KM", "OTHER"]),
+  lineType: z.enum(["HOURS", "KM", "OTHER", "EXPENSE"]),
   timeEntryIds: z.array(z.string()).optional(),
   kmEntryIds: z.array(z.string()).optional(),
+  expenseIds: z.array(z.string()).optional(),
 });
 
 const schema = z.object({
@@ -33,9 +35,13 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const role = (session.user as any)?.role ?? "EMPLOYEE";
+  if (!canViewInvoices(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const invoices = await prisma.invoice.findMany({
     orderBy: { issueDate: "desc" },
     include: { customer: { select: { name: true } } },
+    ...(role === "FINANCE" ? { where: { status: { in: ["SENT", "PAID"] } } } : {}),
   });
   return NextResponse.json(invoices);
 }
@@ -43,6 +49,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const role = (session.user as any)?.role ?? "EMPLOYEE";
+  if (!canEditInvoices(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const data = schema.parse(body);
@@ -92,6 +101,12 @@ export async function POST(req: Request) {
       if (line.kmEntryIds?.length) {
         await tx.kmEntry.updateMany({
           where: { id: { in: line.kmEntryIds } },
+          data: { invoiced: true, invoiceLineId: createdLine.id },
+        });
+      }
+      if (line.expenseIds?.length) {
+        await tx.expense.updateMany({
+          where: { id: { in: line.expenseIds } },
           data: { invoiced: true, invoiceLineId: createdLine.id },
         });
       }

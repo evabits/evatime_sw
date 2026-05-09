@@ -17,10 +17,12 @@ model User {
   updatedAt   DateTime    @updatedAt
   timeEntries TimeEntry[]
   kmEntries   KmEntry[]
+  expenses    Expense[]
 }
 
 enum Role {
   ADMIN
+  FINANCE
   EMPLOYEE
 }
 
@@ -55,6 +57,7 @@ model Project {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   activityRates     ProjectActivityRate[]
+  expenses          Expense[]
 }
 
 enum ProjectStatus {
@@ -176,12 +179,44 @@ model InvoiceLine {
   createdAt   DateTime    @default(now())
   timeEntries TimeEntry[]
   kmEntries   KmEntry[]
+  expenses    Expense[]
 }
 
 enum LineType {
   HOURS
   KM
   OTHER
+  EXPENSE
+}
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expenses  Expense[]
+}
+
+model Expense {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id])
+  categoryId    String
+  category      ExpenseCategory  @relation(fields: [categoryId], references: [id])
+  projectId     String?
+  project       Project?         @relation(fields: [projectId], references: [id])
+  date          DateTime         @db.Date
+  description   String?
+  amount        Decimal          @db.Decimal(10, 2)
+  vatRate       Decimal          @db.Decimal(5, 2) @default(21)
+  receiptUrl    String?
+  billable      Boolean          @default(true)
+  reimbursable  Boolean          @default(false)
+  invoiced      Boolean          @default(false)
+  invoiceLineId String?
+  invoiceLine   InvoiceLine?     @relation(fields: [invoiceLineId], references: [id])
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
 model CompanySettings {
