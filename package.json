@@ -12,9 +12,6 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.19.3",
