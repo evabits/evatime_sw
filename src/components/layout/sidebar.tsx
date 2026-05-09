@@ -16,6 +16,7 @@ import {
   Activity,
   UserCog,
   Tag,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ const navGroups: NavGroup[] = [
       { href: "/km", label: "Kilometers", icon: Car },
       { href: "/expenses", label: "Uitgaven", icon: Receipt },
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
+      { href: "/quotes", label: "Offertes", icon: ClipboardList, roles: ["ADMIN"] },
       { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN"] },
     ],
   },

@@ -11,6 +11,8 @@ import { serialize } from "@/lib/utils";
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id ?? "";
+  const role = (session?.user as any)?.role ?? "EMPLOYEE";
+  const isAdmin = role === "ADMIN";
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
@@ -83,7 +85,7 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground">Overzicht voor {now.toLocaleString("nl-NL", { month: "long", year: "numeric" })}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid gap-4 md:grid-cols-2 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Uren deze maand</CardTitle>
@@ -106,16 +108,18 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Omzet deze maand</CardTitle>
-            <Euro className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground">excl. BTW</p>
-          </CardContent>
-        </Card>
+        {isAdmin && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Omzet deze maand</CardTitle>
+              <Euro className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+              <p className="text-xs text-muted-foreground">excl. BTW</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

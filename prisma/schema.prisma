@@ -41,6 +41,7 @@ model Customer {
   updatedAt  DateTime  @updatedAt
   projects   Project[]
   invoices   Invoice[]
+  quotes     Quote[]
 }
 
 model Project {
@@ -234,4 +235,56 @@ model CompanySettings {
   logoUrl      String?
   reminderDays Int      @default(14)
   updatedAt    DateTime @updatedAt
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  CANCELLED
+}
+
+model Quote {
+  id          String            @id @default(cuid())
+  quoteNumber String            @unique
+  customerId  String
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  issueDate   DateTime          @db.Date
+  validUntil  DateTime          @db.Date
+  status      QuoteStatus       @default(DRAFT)
+  reference   String?
+  subject     String?
+  notes       String?
+  subtotal    Decimal           @db.Decimal(10, 2)
+  vatRate     Decimal           @db.Decimal(5, 2) @default(21)
+  vatAmount   Decimal           @db.Decimal(10, 2)
+  total       Decimal           @db.Decimal(10, 2)
+  viewToken   String            @unique @default(dbgenerated("gen_random_uuid()"))
+  sentAt      DateTime?
+  approvedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  lines       QuoteLine[]
+  attachments QuoteAttachment[]
+}
+
+model QuoteLine {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal  @db.Decimal(8, 2)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+}
+
+model QuoteAttachment {
+  id        String   @id @default(cuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  filename  String
+  url       String
+  size      Int
+  createdAt DateTime @default(now())
 }
