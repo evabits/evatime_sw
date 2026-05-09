@@ -13,6 +13,7 @@ export default defineConfig({
   datasource: {
     url: env("DATABASE_URL"),
   },
+  // @ts-expect-error seed is supported at runtime but not yet in the type definitions
   seed: {
     run: "tsx prisma/seed.ts",
   },
