@@ -13,7 +13,7 @@ export default async function AbsencePage() {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31);
 
-  const [requests, budgets, users] = await Promise.all([
+  const [requests, budgets, users, currentUser] = await Promise.all([
     prisma.absenceRequest.findMany({
       where: {
         ...(admin ? {} : { userId }),
@@ -39,6 +39,7 @@ export default async function AbsencePage() {
           orderBy: { name: "asc" },
         })
       : Promise.resolve([]),
+    prisma.user.findUnique({ where: { id: userId }, select: { weeklyHours: true } }),
   ]);
 
   const calendarToken = process.env.VACATION_CALENDAR_TOKEN ?? "";
@@ -52,6 +53,7 @@ export default async function AbsencePage() {
       isAdmin={admin}
       year={year}
       calendarToken={calendarToken}
+      weeklyHours={Number(currentUser?.weeklyHours ?? 40)}
     />
   );
 }

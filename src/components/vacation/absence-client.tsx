@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,23 @@ interface Props {
   isAdmin: boolean;
   year: number;
   calendarToken: string;
+  weeklyHours: number;
+}
+
+function countWorkingHours(startStr: string, endStr: string, weeklyHours: number): number {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+  const dailyHours = weeklyHours / 5;
+  let days = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) days++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  // Round to nearest 0.5
+  return Math.round(days * dailyHours * 2) / 2;
 }
 
 const requestSchema = z.object({
@@ -108,6 +125,7 @@ export function AbsenceClient({
   isAdmin,
   year,
   calendarToken,
+  weeklyHours,
 }: Props) {
   const [requests, setRequests] = useState<AbsenceRequest[]>(initialRequests);
   const [budgets, setBudgets] = useState<VacationBudget[]>(initialBudgets);
@@ -118,6 +136,21 @@ export function AbsenceClient({
   const [editingBudget, setEditingBudget] = useState<VacationBudget | null>(null);
   const [serverError, setServerError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const requestForm = useForm<RequestForm>({
+    resolver: zodResolver(requestSchema),
+    defaultValues: { type: "VACATION", startDate: "", endDate: "", hours: "" as any, description: "" },
+  });
+
+  const budgetForm = useForm<BudgetForm>({
+    resolver: zodResolver(budgetSchema),
+    defaultValues: { userId: "", year, hours: "" as any },
+  });
+
+  const watchedStart = useWatch({ control: requestForm.control, name: "startDate" });
+  const watchedEnd = useWatch({ control: requestForm.control, name: "endDate" });
+  const watchedHours = useWatch({ control: requestForm.control, name: "hours" });
+  const watchedType = useWatch({ control: requestForm.control, name: "type" });
 
   // My vacation balance (only VACATION type counts against budget)
   const myBudget = budgets.find((b) => b.userId === currentUserId);
@@ -131,20 +164,24 @@ export function AbsenceClient({
   const myRemaining = myBudgetHours - myApprovedVacation;
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
+  // Balance preview shown inside the request dialog
+  const dialogRequestedHours = Number(watchedHours) || 0;
+  const isVacationType = watchedType === "VACATION";
+  const editingOwnHours = editingRequest?.type === "VACATION" ? editingRequest.hours : 0;
+  const balanceAfterRequest = isVacationType
+    ? myRemaining - dialogRequestedHours + (editingRequest ? editingOwnHours : 0)
+    : null;
+
   const calendarUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/vacation/calendar?token=${calendarToken}`
       : "";
 
-  const requestForm = useForm<RequestForm>({
-    resolver: zodResolver(requestSchema),
-    defaultValues: { type: "VACATION", startDate: "", endDate: "", hours: "" as any, description: "" },
-  });
-
-  const budgetForm = useForm<BudgetForm>({
-    resolver: zodResolver(budgetSchema),
-    defaultValues: { userId: "", year, hours: "" as any },
-  });
+  useEffect(() => {
+    if (!watchedStart || !watchedEnd) return;
+    const calculated = countWorkingHours(watchedStart, watchedEnd, weeklyHours);
+    if (calculated > 0) requestForm.setValue("hours", calculated, { shouldValidate: false });
+  }, [watchedStart, watchedEnd, weeklyHours, requestForm]);
 
   function openRequestDialog(req?: AbsenceRequest) {
     setServerError("");
@@ -349,6 +386,8 @@ export function AbsenceClient({
           {activeTab === "requests" && (
             <RequestsTable
               requests={requests}
+              allRequests={requests}
+              budgets={budgets}
               isAdmin={isAdmin}
               currentUserId={currentUserId}
               onEdit={openRequestDialog}
@@ -457,6 +496,8 @@ export function AbsenceClient({
       ) : (
         <RequestsTable
           requests={requests}
+          allRequests={requests}
+          budgets={budgets}
           isAdmin={false}
           currentUserId={currentUserId}
           onEdit={openRequestDialog}
@@ -515,6 +556,11 @@ export function AbsenceClient({
               <Input id="hours" type="number" step="0.5" min="0.5" {...requestForm.register("hours")} />
               {requestForm.formState.errors.hours && (
                 <p className="text-xs text-destructive">{requestForm.formState.errors.hours.message}</p>
+              )}
+              {balanceAfterRequest !== null && myBudgetHours > 0 && dialogRequestedHours > 0 && (
+                <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                  Saldo na aanvraag: {balanceAfterRequest}u (van {myBudgetHours}u budget)
+                </p>
               )}
             </div>
             <div className="space-y-1.5">
@@ -595,6 +641,8 @@ export function AbsenceClient({
 
 function RequestsTable({
   requests,
+  allRequests,
+  budgets,
   isAdmin,
   currentUserId,
   onEdit,
@@ -602,6 +650,8 @@ function RequestsTable({
   onReview,
 }: {
   requests: AbsenceRequest[];
+  allRequests: AbsenceRequest[];
+  budgets: VacationBudget[];
   isAdmin: boolean;
   currentUserId: string;
   onEdit: (r: AbsenceRequest) => void;
@@ -627,11 +677,26 @@ function RequestsTable({
             <th className="px-4 py-3 text-right font-medium">Uren</th>
             <th className="px-4 py-3 text-left font-medium">Omschrijving</th>
             <th className="px-4 py-3 text-left font-medium">Status</th>
+            {isAdmin && <th className="px-4 py-3 text-right font-medium">Saldo na</th>}
             <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
-          {requests.map((r) => (
+          {requests.map((r) => {
+            let balanceAfter: number | null = null;
+            if (isAdmin && r.type === "VACATION") {
+              const budget = budgets.find((b) => b.userId === r.userId);
+              if (budget) {
+                const approvedSoFar = allRequests
+                  .filter((x) => x.userId === r.userId && x.status === "APPROVED" && x.type === "VACATION" && x.id !== r.id)
+                  .reduce((s, x) => s + x.hours, 0);
+                const currentRemaining = budget.hours - approvedSoFar;
+                balanceAfter = r.status === "APPROVED"
+                  ? currentRemaining
+                  : currentRemaining - r.hours;
+              }
+            }
+            return (
             <tr key={r.id} className="border-t hover:bg-muted/30">
               {isAdmin && <td className="px-4 py-3">{r.user.name}</td>}
               <td className="px-4 py-3">{typeBadge(r.type)}</td>
@@ -641,6 +706,17 @@ function RequestsTable({
               <td className="px-4 py-3 text-right">{r.hours}u</td>
               <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.description ?? "—"}</td>
               <td className="px-4 py-3">{statusBadge(r.status)}</td>
+              {isAdmin && (
+                <td className="px-4 py-3 text-right">
+                  {balanceAfter !== null ? (
+                    <span className={`font-medium tabular-nums ${balanceAfter < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                      {balanceAfter}u
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              )}
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-1">
                   {isAdmin && r.status === "PENDING" && (
@@ -683,7 +759,8 @@ function RequestsTable({
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
