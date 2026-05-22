@@ -23,6 +23,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params;
 
     const data = schema.parse(await req.json());
+
+    if (!isAdmin(role)) {
+      const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true } });
+      if (!existing || existing.userId !== session.user?.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     let { rateOverride, billable, activityTypeId } = data;
 
     if (!isAdmin(role)) {
@@ -51,7 +59,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
     const { id } = await params;
+
+    if (!isAdmin(role)) {
+      const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true } });
+      if (!existing || existing.userId !== session.user?.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     await prisma.timeEntry.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (e) { return handleError(e); }

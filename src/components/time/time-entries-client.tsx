@@ -45,12 +45,13 @@ interface Props {
   projects: any[];
   activityTypes: any[];
   customers: any[];
+  users: any[];
   initialEntries: any[];
   userId: string;
   role: string;
 }
 
-export function TimeEntriesClient({ projects, activityTypes, customers, initialEntries, role }: Props) {
+export function TimeEntriesClient({ projects, activityTypes, customers, users, initialEntries, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [entries, setEntries] = useState(initialEntries);
@@ -60,6 +61,8 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
   const [filterProject, setFilterProject] = useState("all");
   const [fetching, setFetching] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  const [filterUser, setFilterUser] = useState("all");
 
   // Week view state
   const [viewMode, setViewMode] = useState<"week" | "list">("week");
@@ -138,21 +141,23 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
     return selectedProject.defaultHourlyRate ? Number(selectedProject.defaultHourlyRate) : null;
   }
 
-  async function fetchEntries(month: string, projectId: string) {
+  async function fetchEntries(month: string, projectId: string, userFilter = filterUser) {
     setFetching(true);
     const { from, to } = monthBounds(month);
     const params = new URLSearchParams({ from, to });
     if (projectId !== "all") params.set("projectId", projectId);
+    if (userFilter !== "all") params.set("userId", userFilter);
     const res = await fetch(`/api/time?${params}`);
     if (res.ok) setEntries(await res.json());
     setFetching(false);
   }
 
-  async function fetchWeekEntries(offset: number) {
+  async function fetchWeekEntries(offset: number, userFilter = filterUser) {
     const ws = startOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 1 });
     const we = addDays(ws, 6);
     setFetching(true);
     const params = new URLSearchParams({ from: format(ws, "yyyy-MM-dd"), to: format(we, "yyyy-MM-dd") });
+    if (userFilter !== "all") params.set("userId", userFilter);
     const res = await fetch(`/api/time?${params}`);
     if (res.ok) setEntries(await res.json());
     setFetching(false);
@@ -166,6 +171,12 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
   function handleProjectChange(projectId: string) {
     setFilterProject(projectId);
     fetchEntries(filterMonth, projectId);
+  }
+
+  function handleUserChange(uid: string) {
+    setFilterUser(uid);
+    if (viewMode === "week") fetchWeekEntries(weekOffset, uid);
+    else fetchEntries(filterMonth, filterProject, uid);
   }
 
   async function handleWeekNav(newOffset: number) {
@@ -405,8 +416,19 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
               )}
             </div>
 
-            {/* Right: list filters + view toggle */}
-            <div className="flex items-center gap-2">
+            {/* Right: filters + view toggle */}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {isAdmin && users.length > 0 && (
+                <Select value={filterUser} onValueChange={handleUserChange}>
+                  <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle medewerkers</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {viewMode === "list" && (
                 <div className="flex flex-wrap gap-2">
                   <Input
@@ -520,9 +542,12 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
                       {entry.description && (
                         <div className="text-sm text-muted-foreground mt-0.5 truncate">{entry.description}</div>
                       )}
-                      {!selectedDay && (
-                        <div className="text-xs text-muted-foreground mt-0.5">{formatDate(entry.date)}</div>
-                      )}
+                      <div className="text-xs text-muted-foreground mt-0.5 flex gap-2">
+                        {!selectedDay && <span>{formatDate(entry.date)}</span>}
+                        {isAdmin && filterUser === "all" && entry.user?.name && (
+                          <span className={!selectedDay ? "before:content-['·'] before:mr-2" : ""}>{entry.user.name}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="font-mono text-sm font-medium w-12 text-right">{formatHours(Number(entry.hours))}</span>
@@ -550,6 +575,7 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
                   <TableHead>Project</TableHead>
                   <TableHead>Activiteit</TableHead>
                   <TableHead>Omschrijving</TableHead>
+                  {isAdmin && filterUser === "all" && <TableHead>Medewerker</TableHead>}
                   <TableHead className="text-right">Uren</TableHead>
                   {isAdmin && <TableHead className="text-right">Tarief</TableHead>}
                   <TableHead></TableHead>
@@ -557,10 +583,10 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
               </TableHeader>
               <TableBody>
                 {fetching && (
-                  <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
                 )}
                 {!fetching && entries.length === 0 && (
-                  <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
                 )}
                 {!fetching && entries.map((entry) => (
                   <TableRow key={entry.id}>
@@ -571,6 +597,9 @@ export function TimeEntriesClient({ projects, activityTypes, customers, initialE
                     </TableCell>
                     <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                     <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
+                    {isAdmin && filterUser === "all" && (
+                      <TableCell className="text-sm">{entry.user?.name ?? "—"}</TableCell>
+                    )}
                     <TableCell className="text-right font-mono">{formatHours(Number(entry.hours))}</TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
