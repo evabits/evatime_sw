@@ -59,6 +59,7 @@ model Project {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   activityRates     ProjectActivityRate[]
+  activityLinks     ActivityTypeProject[]
   expenses          Expense[]
   tags              Tag[]
 }
@@ -77,13 +78,26 @@ model Tag {
 }
 
 model ActivityType {
-  id           String                @id @default(cuid())
-  name         String                @unique
-  defaultRate  Decimal?              @db.Decimal(10, 2)
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  timeEntries  TimeEntry[]
-  projectRates ProjectActivityRate[]
+  id                String                @id @default(cuid())
+  name              String                @unique
+  defaultRate       Decimal?              @db.Decimal(10, 2)
+  billable          Boolean               @default(true)
+  showInAllProjects Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  timeEntries       TimeEntry[]
+  kmEntries         KmEntry[]
+  projectRates      ProjectActivityRate[]
+  projects          ActivityTypeProject[]
+}
+
+model ActivityTypeProject {
+  activityTypeId String
+  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([activityTypeId, projectId])
 }
 
 model ProjectActivityRate {
@@ -119,21 +133,23 @@ model TimeEntry {
 }
 
 model KmEntry {
-  id            String       @id @default(cuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id])
-  projectId     String
-  project       Project      @relation(fields: [projectId], references: [id])
-  date          DateTime     @db.Date
-  km            Decimal      @db.Decimal(8, 2)
-  description   String?
-  rateOverride  Decimal?     @db.Decimal(10, 2)
-  billable      Boolean      @default(true)
-  invoiced      Boolean      @default(false)
-  invoiceLineId String?
-  invoiceLine   InvoiceLine? @relation(fields: [invoiceLineId], references: [id])
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id])
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
+  date           DateTime      @db.Date
+  km             Decimal       @db.Decimal(8, 2)
+  description    String?
+  rateOverride   Decimal?      @db.Decimal(10, 2)
+  billable       Boolean       @default(true)
+  invoiced       Boolean       @default(false)
+  invoiceLineId  String?
+  invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Invoice {

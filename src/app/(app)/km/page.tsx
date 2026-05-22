@@ -6,8 +6,9 @@ import { KmEntriesClient } from "@/components/km/km-entries-client";
 export default async function KmPage() {
   const session = await auth();
   const userId = session?.user?.id ?? "";
+  const role = (session?.user as any)?.role ?? "EMPLOYEE";
 
-  const [projects, recentEntries] = await Promise.all([
+  const [projects, activityTypes, customers, recentEntries] = await Promise.all([
     prisma.project.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -15,8 +16,16 @@ export default async function KmPage() {
         id: true,
         name: true,
         defaultKmRate: true,
-        customer: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
       },
+    }),
+    prisma.activityType.findMany({
+      orderBy: { name: "asc" },
+      include: { projects: { select: { projectId: true } } },
+    }),
+    prisma.customer.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     prisma.kmEntry.findMany({
       where: {
@@ -28,10 +37,19 @@ export default async function KmPage() {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { name: true, customer: { select: { name: true } } } },
+        project: { select: { name: true, customer: { select: { id: true, name: true } } } },
+        activityType: { select: { name: true } },
       },
     }),
   ]);
 
-  return <KmEntriesClient projects={serialize(projects)} initialEntries={serialize(recentEntries)} />;
+  return (
+    <KmEntriesClient
+      projects={serialize(projects)}
+      activityTypes={serialize(activityTypes)}
+      customers={serialize(customers)}
+      initialEntries={serialize(recentEntries)}
+      role={role}
+    />
+  );
 }

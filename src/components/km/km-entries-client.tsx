@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,16 +11,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Pencil, Trash2 } from "lucide-react";
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
+  activityTypeId: z.string().optional(),
   date: z.string().min(1, "Verplicht"),
   km: z.coerce.number().positive("Moet positief zijn"),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
-  billable: z.boolean(),
+  billable: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -39,16 +41,22 @@ function monthBounds(ym: string): { from: string; to: string } {
 
 interface Props {
   projects: any[];
+  activityTypes: any[];
+  customers: any[];
   initialEntries: any[];
+  role: string;
 }
 
-export function KmEntriesClient({ projects, initialEntries }: Props) {
+export function KmEntriesClient({ projects, activityTypes, customers, initialEntries, role }: Props) {
+  const isAdmin = role === "ADMIN";
+
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
   const [filterProject, setFilterProject] = useState("all");
   const [fetching, setFetching] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -57,6 +65,29 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const activityTypeId = form.watch("activityTypeId");
+
+  const filteredProjects = selectedCustomerId === ""
+    ? projects
+    : projects.filter((p) => p.customer.id === selectedCustomerId);
+
+  const filteredActivityTypes = activityTypes.filter((a) => {
+    if (a.showInAllProjects) return true;
+    if (!selectedProjectId) return false;
+    return a.projects.some((p: any) => p.projectId === selectedProjectId);
+  });
+
+  useEffect(() => {
+    if (!isAdmin) {
+      const act = activityTypes.find((a) => a.id === activityTypeId);
+      form.setValue("billable", act?.billable ?? true);
+    }
+  }, [activityTypeId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    form.setValue("projectId", "");
+    form.setValue("activityTypeId", undefined);
+  }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchEntries(month: string, projectId: string) {
     setFetching(true);
@@ -83,6 +114,7 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
+      activityTypeId: data.activityTypeId || null,
     };
     try {
       if (editing) {
@@ -126,8 +158,10 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
 
   function startEdit(entry: any) {
     setEditing(entry.id);
+    setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
+      activityTypeId: entry.activityTypeId ?? undefined,
       date: format(new Date(entry.date), "yyyy-MM-dd"),
       km: Number(entry.km),
       description: entry.description ?? "",
@@ -151,17 +185,45 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+
+            <div className="space-y-2">
+              <Label>Klant</Label>
+              <Select value={selectedCustomerId || undefined} onValueChange={(v) => setSelectedCustomerId(v)}>
+                <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Project *</Label>
-              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
+              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
                 <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
+                  {filteredProjects.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Activiteit</Label>
+              <Select
+                onValueChange={(v) => form.setValue("activityTypeId", v)}
+                value={form.watch("activityTypeId") ?? ""}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
+                <SelectContent>
+                  {filteredActivityTypes.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -175,26 +237,30 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
               {form.formState.errors.km && <p className="text-xs text-destructive">{form.formState.errors.km.message}</p>}
             </div>
 
-            <div className="space-y-2">
-              <Label>
-                Tarief override (€/km)
-                {selectedProject?.defaultKmRate && (
-                  <span className="text-muted-foreground font-normal"> · standaard: €{Number(selectedProject.defaultKmRate).toFixed(2)}</span>
-                )}
-              </Label>
-              <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
-            </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>
+                  Tarief override (€/km)
+                  {selectedProject?.defaultKmRate && (
+                    <span className="text-muted-foreground font-normal"> · standaard: €{Number(selectedProject.defaultKmRate).toFixed(2)}</span>
+                  )}
+                </Label>
+                <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label>Factureerbaar</Label>
-              <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Ja</SelectItem>
-                  <SelectItem value="false">Nee</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>Factureerbaar</Label>
+                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Ja</SelectItem>
+                    <SelectItem value="false">Nee</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
@@ -204,7 +270,11 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
             <div className="sm:col-span-2 flex gap-2">
               <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
               {editing && (
-                <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+                <Button type="button" variant="outline" onClick={() => {
+                  setEditing(null);
+                  setSelectedCustomerId("");
+                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+                }}>Annuleren</Button>
               )}
             </div>
           </form>
@@ -245,18 +315,19 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
               <TableRow>
                 <TableHead>Datum</TableHead>
                 <TableHead>Project</TableHead>
+                <TableHead>Activiteit</TableHead>
                 <TableHead>Omschrijving</TableHead>
                 <TableHead className="text-right">Km</TableHead>
-                <TableHead className="text-right">Tarief</TableHead>
+                {isAdmin && <TableHead className="text-right">Tarief</TableHead>}
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fetching && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
               )}
               {!fetching && entries.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
               {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
@@ -265,9 +336,15 @@ export function KmEntriesClient({ projects, initialEntries }: Props) {
                     <div className="font-medium">{entry.project?.name}</div>
                     <div className="text-xs text-muted-foreground">{entry.project?.customer?.name}</div>
                   </TableCell>
+                  <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{Number(entry.km).toFixed(1)}</TableCell>
-                  <TableCell className="text-right">{entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) + "/km" : "—"}</TableCell>
+                  {isAdmin && (
+                    <TableCell className="text-right">
+                      {entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) + "/km" : "—"}
+                      {!entry.billable && <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(entry)} disabled={entry.invoiced}>

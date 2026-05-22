@@ -6,8 +6,9 @@ import { TimeEntriesClient } from "@/components/time/time-entries-client";
 export default async function TimePage() {
   const session = await auth();
   const userId = session?.user?.id ?? "";
+  const role = (session?.user as any)?.role ?? "EMPLOYEE";
 
-  const [projects, activityTypes, recentEntries] = await Promise.all([
+  const [projects, activityTypes, customers, recentEntries] = await Promise.all([
     prisma.project.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -15,11 +16,18 @@ export default async function TimePage() {
         id: true,
         name: true,
         defaultHourlyRate: true,
-        customer: { select: { name: true } },
+        customer: { select: { id: true, name: true } },
         activityRates: { include: { activityType: true } },
       },
     }),
-    prisma.activityType.findMany({ orderBy: { name: "asc" } }),
+    prisma.activityType.findMany({
+      orderBy: { name: "asc" },
+      include: { projects: { select: { projectId: true } } },
+    }),
+    prisma.customer.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     prisma.timeEntry.findMany({
       where: {
         userId,
@@ -30,7 +38,7 @@ export default async function TimePage() {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { name: true, customer: { select: { name: true } } } },
+        project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },
       },
     }),
@@ -40,8 +48,10 @@ export default async function TimePage() {
     <TimeEntriesClient
       projects={serialize(projects)}
       activityTypes={serialize(activityTypes)}
+      customers={serialize(customers)}
       initialEntries={serialize(recentEntries)}
       userId={userId}
+      role={role}
     />
   );
 }

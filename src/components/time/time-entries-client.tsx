@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,7 +22,7 @@ const schema = z.object({
   hours: z.coerce.number().positive("Moet positief zijn"),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
-  billable: z.boolean(),
+  billable: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -42,17 +42,22 @@ function monthBounds(ym: string): { from: string; to: string } {
 interface Props {
   projects: any[];
   activityTypes: any[];
+  customers: any[];
   initialEntries: any[];
   userId: string;
+  role: string;
 }
 
-export function TimeEntriesClient({ projects, activityTypes, initialEntries }: Props) {
+export function TimeEntriesClient({ projects, activityTypes, customers, initialEntries, role }: Props) {
+  const isAdmin = role === "ADMIN";
+
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
   const [filterProject, setFilterProject] = useState("all");
   const [fetching, setFetching] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -61,12 +66,39 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const activityTypeId = form.watch("activityTypeId");
 
-  function getEffectiveRate(activityTypeId?: string): number | null {
+  // Filter projects by selected customer
+  const filteredProjects = selectedCustomerId === ""
+    ? projects
+    : projects.filter((p) => p.customer.id === selectedCustomerId);
+
+  // Filter activity types to those relevant for the selected project
+  const filteredActivityTypes = activityTypes.filter((a) => {
+    if (a.showInAllProjects) return true;
+    if (!selectedProjectId) return false;
+    return a.projects.some((p: any) => p.projectId === selectedProjectId);
+  });
+
+  // Derive billable from selected activity for non-admins
+  useEffect(() => {
+    if (!isAdmin) {
+      const act = activityTypes.find((a) => a.id === activityTypeId);
+      form.setValue("billable", act?.billable ?? true);
+    }
+  }, [activityTypeId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear projectId when customer filter resets available projects
+  useEffect(() => {
+    form.setValue("projectId", "");
+    form.setValue("activityTypeId", undefined);
+  }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function getEffectiveRate(atId?: string): number | null {
     if (!selectedProject) return null;
-    const override = selectedProject.activityRates?.find((r: any) => r.activityTypeId === activityTypeId);
+    const override = selectedProject.activityRates?.find((r: any) => r.activityTypeId === atId);
     if (override) return Number(override.rate);
-    const actType = activityTypes.find((a: any) => a.id === activityTypeId);
+    const actType = activityTypes.find((a: any) => a.id === atId);
     if (actType?.defaultRate) return Number(actType.defaultRate);
     return selectedProject.defaultHourlyRate ? Number(selectedProject.defaultHourlyRate) : null;
   }
@@ -119,7 +151,6 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
         });
         if (res.ok) {
           const created = await res.json();
-          // Only prepend if it falls in the current filter
           const { from, to } = monthBounds(filterMonth);
           const entryDate = data.date;
           if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
@@ -141,6 +172,7 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
 
   function startEdit(entry: any) {
     setEditing(entry.id);
+    setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
       activityTypeId: entry.activityTypeId ?? undefined,
@@ -152,7 +184,6 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
     });
   }
 
-  const activityTypeId = form.watch("activityTypeId");
   const effectiveRate = getEffectiveRate(activityTypeId);
   const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0);
 
@@ -169,12 +200,25 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+
+            <div className="space-y-2">
+              <Label>Klant</Label>
+              <Select value={selectedCustomerId || undefined} onValueChange={(v) => setSelectedCustomerId(v)}>
+                <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Project *</Label>
-              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId")}>
+              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
                 <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                 <SelectContent>
-                  {projects.map((p) => (
+                  {filteredProjects.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -184,12 +228,15 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
 
             <div className="space-y-2">
               <Label>Activiteit</Label>
-              <Select onValueChange={(v) => form.setValue("activityTypeId", v)} value={form.watch("activityTypeId")}>
+              <Select
+                onValueChange={(v) => form.setValue("activityTypeId", v)}
+                value={form.watch("activityTypeId") ?? ""}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
                 <SelectContent>
-                  {activityTypes.map((a) => (
+                  {filteredActivityTypes.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name}{a.defaultRate ? ` (€${Number(a.defaultRate).toFixed(2)}/u)` : ""}
+                      {a.name}{isAdmin && a.defaultRate ? ` (€${Number(a.defaultRate).toFixed(2)}/u)` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -207,24 +254,28 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
               {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
             </div>
 
-            <div className="space-y-2">
-              <Label>
-                Tarief override (€/u)
-                {effectiveRate && <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
-              </Label>
-              <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
-            </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>
+                  Tarief override (€/u)
+                  {effectiveRate && <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
+                </Label>
+                <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label>Factureerbaar</Label>
-              <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Ja</SelectItem>
-                  <SelectItem value="false">Nee</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>Factureerbaar</Label>
+                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Ja</SelectItem>
+                    <SelectItem value="false">Nee</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
@@ -234,7 +285,11 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
             <div className="sm:col-span-2 flex gap-2">
               <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
               {editing && (
-                <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true }); }}>Annuleren</Button>
+                <Button type="button" variant="outline" onClick={() => {
+                  setEditing(null);
+                  setSelectedCustomerId("");
+                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+                }}>Annuleren</Button>
               )}
             </div>
           </form>
@@ -278,16 +333,16 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
                 <TableHead>Activiteit</TableHead>
                 <TableHead>Omschrijving</TableHead>
                 <TableHead className="text-right">Uren</TableHead>
-                <TableHead className="text-right">Tarief</TableHead>
+                {isAdmin && <TableHead className="text-right">Tarief</TableHead>}
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fetching && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
               )}
               {!fetching && entries.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
               {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
@@ -299,10 +354,12 @@ export function TimeEntriesClient({ projects, activityTypes, initialEntries }: P
                   <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatHours(Number(entry.hours))}</TableCell>
-                  <TableCell className="text-right">
-                    {entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) : "—"}
-                    {!entry.billable && <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>}
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell className="text-right">
+                      {entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) : "—"}
+                      {!entry.billable && <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(entry)} disabled={entry.invoiced}>
