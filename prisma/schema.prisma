@@ -8,17 +8,20 @@ datasource db {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  name         String
-  email        String      @unique
-  password     String?
-  role         Role        @default(EMPLOYEE)
-  weeklyHours  Decimal?    @db.Decimal(5, 2)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  timeEntries  TimeEntry[]
-  kmEntries    KmEntry[]
-  expenses     Expense[]
+  id                String            @id @default(cuid())
+  name              String
+  email             String            @unique
+  password          String?
+  role              Role              @default(EMPLOYEE)
+  weeklyHours       Decimal?          @db.Decimal(5, 2)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  timeEntries       TimeEntry[]
+  kmEntries         KmEntry[]
+  expenses          Expense[]
+  vacationBudgets   VacationBudget[]
+  absenceRequests   AbsenceRequest[] @relation("AbsenceRequests")
+  absenceReviews    AbsenceRequest[] @relation("AbsenceReviewer")
 }
 
 enum Role {
@@ -312,4 +315,46 @@ model QuoteAttachment {
   url       String
   size      Int
   createdAt DateTime @default(now())
+}
+
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AbsenceType {
+  VACATION
+  SICK
+  SPECIAL_LEAVE
+  UNPAID_LEAVE
+}
+
+model VacationBudget {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  year      Int
+  hours     Decimal  @db.Decimal(5, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, year])
+}
+
+model AbsenceRequest {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation("AbsenceRequests", fields: [userId], references: [id], onDelete: Cascade)
+  type        AbsenceType   @default(VACATION)
+  startDate   DateTime      @db.Date
+  endDate     DateTime      @db.Date
+  hours       Decimal       @db.Decimal(5, 2)
+  description String?
+  status      AbsenceStatus @default(PENDING)
+  reviewedBy  String?
+  reviewer    User?         @relation("AbsenceReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }

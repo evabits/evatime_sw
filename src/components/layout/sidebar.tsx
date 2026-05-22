@@ -20,6 +20,7 @@ import {
   Tag,
   ClipboardList,
   CalendarCheck,
+  Umbrella,
   Menu,
   X,
 } from "lucide-react";
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
       { href: "/time", label: "Uren", icon: Clock },
       { href: "/km", label: "Kilometers", icon: Car },
       { href: "/expenses", label: "Uitgaven", icon: Receipt },
+      { href: "/absence", label: "Afwezigheid", icon: Umbrella },
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
       { href: "/quotes", label: "Offertes", icon: ClipboardList, roles: ["ADMIN"] },
       { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN"] },

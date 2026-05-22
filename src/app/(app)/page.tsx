@@ -2,11 +2,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatHours } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Car, Euro, TrendingUp } from "lucide-react";
+import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { serialize } from "@/lib/utils";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -17,7 +18,10 @@ export default async function DashboardPage() {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm] = await Promise.all([
+  const currentYear = now.getFullYear();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd } },
       _sum: { hours: true },
@@ -55,10 +59,31 @@ export default async function DashboardPage() {
       take: 5,
       include: { project: { select: { name: true } } },
     }),
+    prisma.vacationBudget.findUnique({
+      where: { userId_year: { userId, year: currentYear } },
+    }),
+    prisma.absenceRequest.aggregate({
+      where: { userId, status: "APPROVED", type: "VACATION", startDate: { gte: new Date(currentYear, 0, 1) } },
+      _sum: { hours: true },
+    }),
+    isAdmin
+      ? prisma.absenceRequest.findMany({
+          where: { status: "APPROVED", endDate: { gte: today } },
+          include: { user: { select: { name: true } } },
+          orderBy: { startDate: "asc" },
+          take: 5,
+        })
+      : Promise.resolve([]),
+    isAdmin
+      ? prisma.absenceRequest.count({ where: { status: "PENDING" } })
+      : Promise.resolve(0),
   ]);
 
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
+  const vacBudgetHours = Number(vacationBudget?.hours ?? 0);
+  const vacUsedHours = Number(vacationApproved._sum.hours ?? 0);
+  const vacRemainingHours = vacBudgetHours - vacUsedHours;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const hourRevenue = project.timeEntries.reduce((s, e) => {
@@ -131,6 +156,70 @@ export default async function DashboardPage() {
             <p className="text-xs text-muted-foreground">lopende projecten</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Vacation summary */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Vakantie resterend {currentYear}</CardTitle>
+            <Umbrella className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${vacRemainingHours < 0 ? "text-red-600" : ""}`}>
+              {vacRemainingHours}u
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {vacUsedHours}u van {vacBudgetHours}u opgenomen
+            </p>
+            <Link href="/absence" className="text-xs text-primary underline-offset-2 hover:underline mt-1 block">
+              Bekijken →
+            </Link>
+          </CardContent>
+        </Card>
+
+        {isAdmin && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Afwezigheidsaanvragen</CardTitle>
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{pendingVacations}</div>
+              <p className="text-xs text-muted-foreground">
+                {pendingVacations === 1 ? "aanvraag wacht" : "aanvragen wachten"} op goedkeuring
+              </p>
+              {pendingVacations > 0 && (
+                <Link href="/absence" className="text-xs text-primary underline-offset-2 hover:underline mt-1 block">
+                  Bekijken →
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && upcomingVacations.length > 0 && (
+          <Card className="lg:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Aankomende afwezigheid</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5">
+                {serialize(upcomingVacations).map((v: any) => (
+                  <li key={v.id} className="text-xs flex justify-between gap-2">
+                    <span className="font-medium truncate">{v.user.name}</span>
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      {new Date(v.startDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                      {v.startDate !== v.endDate && (
+                        <> – {new Date(v.endDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
