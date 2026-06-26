@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Paperclip } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { getEffectiveContract, rangeOverlaps } from "@/lib/contracts";
 
@@ -188,8 +188,49 @@ export function ContractsClient({
                       <TableCell className="font-mono">{c.salaryMonthly != null ? formatCurrency(c.salaryMonthly) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="font-mono">{c.salaryHourly != null ? formatCurrency(c.salaryHourly) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>{c.ftePercentage != null ? `${c.ftePercentage}%` : <span className="text-muted-foreground">—</span>}</TableCell>
-                      {/* ponytail: placeholder for future attachment UI */}
-                      <TableCell><div /></TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {c.attachments.map((att) => (
+                            <span key={att.id} className="inline-flex items-center gap-0.5 text-xs">
+                              <a
+                                href={`/api/contracts/${c.id}/attachments/${att.id}/download`}
+                                className="text-primary hover:underline max-w-[120px] truncate"
+                                title={att.filename}
+                              >
+                                {att.filename}
+                              </a>
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-destructive"
+                                onClick={async () => {
+                                  await fetch(`/api/contracts/${c.id}/attachments/${att.id}`, { method: "DELETE" });
+                                  router.refresh();
+                                }}
+                                title="Verwijderen"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              className="sr-only"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const fd = new FormData();
+                                fd.append("file", file);
+                                await fetch(`/api/contracts/${c.id}/attachments`, { method: "POST", body: fd });
+                                router.refresh();
+                              }}
+                            />
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                              <Paperclip className="h-3 w-3" /> Bijlage
+                            </span>
+                          </label>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1 justify-end">
                           <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
