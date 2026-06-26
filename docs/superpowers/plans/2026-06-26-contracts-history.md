@@ -6,7 +6,9 @@
 
 **Architecture:** A new `Contract` model becomes the single source of truth; a pure, unit-tested helper resolves the contract effective on any date (used by the UI for "current" and by payroll per month). New ADMIN-only `/personeel` pages and `/api/contracts*` routes mirror existing CRUD/attachment/cron patterns. Existing `User` contract columns are backfilled into contracts, then dropped.
 
-**Tech Stack:** Next.js App Router, Prisma (Neon, `prisma db push`), Zod, react-hook-form, `@vercel/blob`, nodemailer/Mailtrap, vitest. **Node 22 for all commands:** prefix with `export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 &&`.
+**Tech Stack:** Next.js App Router, Prisma (Neon, `prisma db push`), Zod, react-hook-form, `@vercel/blob`, nodemailer/Mailtrap. Tests are standalone `node:assert` self-checks run with `npx tsx` (NO vitest). **Node 22 for all commands:** prefix with `export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 &&`.
+
+**DB sync & manual steps are controller-handled, not subagent-run:** Implementers run `npx prisma generate` (offline, builds client types for typecheck) but must NOT run `npx prisma db push` (mutates the remote Neon DB), the backfill `curl`, or dev-server/Mailtrap checks. The controller runs those against Neon between/after the relevant tasks and coordinates the destructive column-drop (Task 9) with the user.
 
 **Spec:** `docs/superpowers/specs/2026-06-26-contracts-history-design.md`
 
@@ -95,76 +97,58 @@ git commit -m "feat: add Contract and ContractAttachment models"
 
 These are string-date helpers (`"YYYY-MM-DD"`, lexicographic = chronological) so both the client (string dates) and payroll (convert Dates) share one implementation.
 
-- [ ] **Step 1: Write failing tests**
+**Testing convention (IMPORTANT):** This repo does NOT use vitest. Its `src/lib/*.test.ts` files are standalone `node:assert` self-check scripts run with `npx tsx <file>` that print a "passed" line on success (see `src/lib/payroll.test.ts`). Match that exact convention.
 
-Create `src/lib/contracts.test.ts`:
+- [ ] **Step 1: Write the failing self-check**
+
+Create `src/lib/contracts.test.ts`, mirroring `src/lib/payroll.test.ts`:
 
 ```ts
-import { describe, it, expect } from "vitest";
+import assert from "node:assert";
 import { getEffectiveContract, fillSalary, rangeOverlaps, WEEKS_PER_MONTH } from "./contracts";
 
-describe("getEffectiveContract", () => {
-  const a = { id: "a", startDate: "2024-01-01", endDate: "2024-12-31" };
-  const b = { id: "b", startDate: "2025-01-01", endDate: null };
+const a = { id: "a", startDate: "2024-01-01", endDate: "2024-12-31" };
+const b = { id: "b", startDate: "2025-01-01", endDate: null };
 
-  it("returns null for no contracts", () => {
-    expect(getEffectiveContract([], "2025-06-01")).toBeNull();
-  });
-  it("picks the contract covering the date", () => {
-    expect(getEffectiveContract([a, b], "2024-06-01")?.id).toBe("a");
-    expect(getEffectiveContract([a, b], "2025-06-01")?.id).toBe("b");
-  });
-  it("returns null before any contract starts", () => {
-    expect(getEffectiveContract([a, b], "2023-06-01")).toBeNull();
-  });
-  it("returns null in a gap between contracts", () => {
-    const c = { id: "c", startDate: "2025-06-01", endDate: null };
-    expect(getEffectiveContract([a, c], "2025-03-01")).toBeNull();
-  });
-  it("treats null startDate as effective from the beginning", () => {
-    const open = { id: "o", startDate: null, endDate: null };
-    expect(getEffectiveContract([open], "1999-01-01")?.id).toBe("o");
-  });
-  it("prefers the latest start when several match", () => {
-    const open = { id: "o", startDate: null, endDate: null };
-    expect(getEffectiveContract([open, b], "2025-06-01")?.id).toBe("b");
-  });
-});
+// getEffectiveContract
+assert.strictEqual(getEffectiveContract([], "2025-06-01"), null, "empty -> null");
+assert.strictEqual(getEffectiveContract([a, b], "2024-06-01")?.id, "a", "covers a");
+assert.strictEqual(getEffectiveContract([a, b], "2025-06-01")?.id, "b", "covers b");
+assert.strictEqual(getEffectiveContract([a, b], "2023-06-01"), null, "before any -> null");
+const c = { id: "c", startDate: "2025-06-01", endDate: null };
+assert.strictEqual(getEffectiveContract([a, c], "2025-03-01"), null, "gap -> null");
+const open = { id: "o", startDate: null, endDate: null };
+assert.strictEqual(getEffectiveContract([open], "1999-01-01")?.id, "o", "null start = from beginning");
+assert.strictEqual(getEffectiveContract([open, b], "2025-06-01")?.id, "b", "latest start wins");
 
-describe("fillSalary", () => {
-  it("derives hourly from monthly using contractHours", () => {
-    const r = fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: 40 });
-    expect(r.salaryHourly).toBeCloseTo(4000 / (40 * WEEKS_PER_MONTH), 2);
-    expect(r.salaryMonthly).toBe(4000);
-  });
-  it("derives monthly from hourly", () => {
-    const r = fillSalary({ salaryMonthly: null, salaryHourly: 25, contractHours: 40 });
-    expect(r.salaryMonthly).toBeCloseTo(25 * 40 * WEEKS_PER_MONTH, 2);
-  });
-  it("leaves both as-is when both provided (manual override)", () => {
-    const r = fillSalary({ salaryMonthly: 4000, salaryHourly: 30, contractHours: 40 });
-    expect(r).toEqual({ salaryMonthly: 4000, salaryHourly: 30 });
-  });
-  it("does not derive when contractHours is null", () => {
-    const r = fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: null });
-    expect(r.salaryHourly).toBeNull();
-  });
-});
+// fillSalary
+const fromMonthly = fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: 40 });
+assert.ok(Math.abs(fromMonthly.salaryHourly! - 4000 / (40 * WEEKS_PER_MONTH)) < 0.01, "hourly from monthly");
+assert.strictEqual(fromMonthly.salaryMonthly, 4000, "monthly kept");
+const fromHourly = fillSalary({ salaryMonthly: null, salaryHourly: 25, contractHours: 40 });
+assert.ok(Math.abs(fromHourly.salaryMonthly! - 25 * 40 * WEEKS_PER_MONTH) < 0.01, "monthly from hourly");
+assert.deepStrictEqual(
+  fillSalary({ salaryMonthly: 4000, salaryHourly: 30, contractHours: 40 }),
+  { salaryMonthly: 4000, salaryHourly: 30 },
+  "both kept (manual override)",
+);
+assert.strictEqual(
+  fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: null }).salaryHourly,
+  null,
+  "no derive without hours",
+);
 
-describe("rangeOverlaps", () => {
-  it("detects overlap with open-ended ranges", () => {
-    expect(rangeOverlaps("2024-01-01", null, "2025-06-01", null)).toBe(true);
-  });
-  it("returns false for adjacent non-overlapping ranges", () => {
-    expect(rangeOverlaps("2024-01-01", "2024-12-31", "2025-01-01", null)).toBe(false);
-  });
-});
+// rangeOverlaps
+assert.strictEqual(rangeOverlaps("2024-01-01", null, "2025-06-01", null), true, "open ranges overlap");
+assert.strictEqual(rangeOverlaps("2024-01-01", "2024-12-31", "2025-01-01", null), false, "adjacent no overlap");
+
+console.log("contracts self-check passed");
 ```
 
-- [ ] **Step 2: Run tests, verify they fail**
+- [ ] **Step 2: Run the self-check, verify it fails**
 
 ```bash
-export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npx vitest run src/lib/contracts.test.ts
+export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npx tsx src/lib/contracts.test.ts
 ```
 
 Expected: FAIL — cannot import from `./contracts` (module/exports missing).
@@ -222,13 +206,13 @@ export function rangeOverlaps(
 }
 ```
 
-- [ ] **Step 4: Run tests, verify they pass**
+- [ ] **Step 4: Run the self-check, verify it passes**
 
 ```bash
-export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npx vitest run src/lib/contracts.test.ts
+export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npx tsx src/lib/contracts.test.ts
 ```
 
-Expected: PASS (all cases).
+Expected: prints `contracts self-check passed` and exits 0.
 
 - [ ] **Step 5: Commit**
 
