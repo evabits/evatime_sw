@@ -35,15 +35,18 @@ const CONTRACT_LABELS: Record<string, string> = {
 
 const schema = z.object({
   contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]),
-  contractHours: z.coerce.number().positive().optional().nullable(),
+  contractHours: z.coerce.number().positive().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  salaryMonthly: z.coerce.number().positive().optional().nullable(),
-  salaryHourly: z.coerce.number().positive().optional().nullable(),
+  salaryMonthly: z.coerce.number().positive().optional(),
+  salaryHourly: z.coerce.number().positive().optional(),
   jobTitle: z.string().optional(),
-  ftePercentage: z.coerce.number().positive().optional().nullable(),
+  ftePercentage: z.coerce.number().positive().optional(),
   notes: z.string().optional(),
 });
+
+// Empty number inputs arrive as "" and coerce to 0 (failing .positive()); map blank → undefined
+const numberField = { setValueAs: (v: string) => (v === "" ? undefined : Number(v)) };
 
 type FormData = z.infer<typeof schema>;
 
@@ -283,22 +286,22 @@ export function ContractsClient({
             </div>
             <div className="space-y-1">
               <Label>Contracturen per week</Label>
-              <Input type="number" step="0.5" min="0" placeholder="bijv. 40" {...form.register("contractHours")} />
+              <Input type="number" step="0.5" min="0" placeholder="bijv. 40" {...form.register("contractHours", numberField)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Maandsalaris</Label>
-                <Input type="number" step="0.01" min="0" placeholder="bijv. 3500" {...form.register("salaryMonthly")} />
+                <Input type="number" step="0.01" min="0" placeholder="bijv. 3500" {...form.register("salaryMonthly", numberField)} />
               </div>
               <div className="space-y-1">
                 <Label>Uursalaris</Label>
-                <Input type="number" step="0.01" min="0" placeholder="bijv. 20.00" {...form.register("salaryHourly")} />
+                <Input type="number" step="0.01" min="0" placeholder="bijv. 20.00" {...form.register("salaryHourly", numberField)} />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Leeg = automatisch berekend uit het andere veld (vereist contracturen)</p>
             <div className="space-y-1">
               <Label>FTE percentage</Label>
-              <Input type="number" step="0.01" min="0" max="100" placeholder="bijv. 100" {...form.register("ftePercentage")} />
+              <Input type="number" step="0.01" min="0" max="100" placeholder="bijv. 100" {...form.register("ftePercentage", numberField)} />
             </div>
             <div className="space-y-1">
               <Label>Notities</Label>

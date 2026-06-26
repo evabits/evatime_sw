@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface Row {
@@ -37,6 +39,7 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                 <TableHead>Functie</TableHead>
                 <TableHead>Salaris</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -47,11 +50,7 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                   row.endDate <= todayPlus30;
                 return (
                   <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/personeel/${row.id}`} className="underline-offset-4 hover:underline">
-                        {row.name}
-                      </Link>
-                    </TableCell>
+                    <TableCell className="font-medium">{row.name}</TableCell>
                     <TableCell>{row.jobTitle ?? <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell className="font-mono">
                       {row.salaryMonthly != null
@@ -66,6 +65,13 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild variant="ghost" size="icon">
+                        <Link href={`/personeel/${row.id}`} aria-label="Bewerken">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
