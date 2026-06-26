@@ -52,10 +52,11 @@ interface Props {
   role: string;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, activityTypes, customers, users, initialEntries, userId, role }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, activityTypes: activityTypesProp, customers, users, initialEntries, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
+  const [activityTypes, setActivityTypes] = useState(activityTypesProp);
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -231,6 +232,14 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes, custo
         ...prev,
         { id: created.id, name: created.name, status: "CONCEPT", defaultHourlyRate: null, customer: null, activityRates: [] },
       ]);
+      // Make the chosen activities selectable for the new project without a reload.
+      setActivityTypes((prev) =>
+        prev.map((a) =>
+          newProjectActivityIds.includes(a.id)
+            ? { ...a, projects: [...a.projects, { projectId: created.id }] }
+            : a,
+        ),
+      );
       form.setValue("projectId", created.id);
       setNewProjectOpen(false);
       setNewProjectName("");
