@@ -19,15 +19,16 @@ const schema = z.object({
   customerId: z.string().min(1, "Verplicht"),
   name: z.string().min(1, "Verplicht"),
   description: z.string().optional(),
-  status: z.enum(["ACTIVE", "INACTIVE", "COMPLETED"]),
+  status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
   defaultHourlyRate: z.coerce.number().positive().optional().or(z.literal("")),
   defaultKmRate: z.coerce.number().positive().optional().or(z.literal("")),
 });
 
 type FormData = z.infer<typeof schema>;
 
-const statusLabel: Record<string, string> = { ACTIVE: "Actief", INACTIVE: "Inactief", COMPLETED: "Afgerond" };
+const statusLabel: Record<string, string> = { CONCEPT: "Concept", ACTIVE: "Actief", INACTIVE: "Inactief", COMPLETED: "Afgerond" };
 const statusVariant: Record<string, "default" | "secondary" | "success"> = {
+  CONCEPT: "secondary",
   ACTIVE: "success",
   INACTIVE: "secondary",
   COMPLETED: "default",
@@ -46,6 +47,7 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
   const [loading, setLoading] = useState(false);
   const [selectedTags, setSelectedTags] = useState<{ name: string }[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -133,9 +135,21 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
           <h1 className="text-2xl font-bold">Projecten</h1>
           <p className="text-muted-foreground">Beheer uw projecten en tarieven</p>
         </div>
-        <Button onClick={() => { form.reset({ status: "ACTIVE" }); setEditing(null); setSelectedTags([]); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Project toevoegen
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select onValueChange={setStatusFilter} value={statusFilter}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle statussen</SelectItem>
+              <SelectItem value="CONCEPT">Concept</SelectItem>
+              <SelectItem value="ACTIVE">Actief</SelectItem>
+              <SelectItem value="INACTIVE">Inactief</SelectItem>
+              <SelectItem value="COMPLETED">Afgerond</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => { form.reset({ status: "ACTIVE" }); setEditing(null); setSelectedTags([]); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> Project toevoegen
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -157,7 +171,9 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
               {projects.length === 0 && (
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
-              {projects.map((p) => (
+              {projects
+              .filter((p) => statusFilter === "all" || p.status === statusFilter)
+              .map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{p.customer?.name}</TableCell>
@@ -271,6 +287,7 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
               <Select onValueChange={(v) => form.setValue("status", v as any)} value={form.watch("status")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="CONCEPT">Concept</SelectItem>
                   <SelectItem value="ACTIVE">Actief</SelectItem>
                   <SelectItem value="INACTIVE">Inactief</SelectItem>
                   <SelectItem value="COMPLETED">Afgerond</SelectItem>
