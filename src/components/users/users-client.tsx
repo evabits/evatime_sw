@@ -20,6 +20,10 @@ const createSchema = z.object({
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]),
+  contractHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  contractStart: z.string().optional(),
+  contractEnd: z.string().optional(),
 });
 
 const editSchema = z.object({
@@ -28,6 +32,10 @@ const editSchema = z.object({
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
   weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]),
+  contractHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  contractStart: z.string().optional(),
+  contractEnd: z.string().optional(),
 });
 
 type CreateData = z.infer<typeof createSchema>;
@@ -39,6 +47,10 @@ interface User {
   email: string;
   role: "ADMIN" | "FINANCE" | "EMPLOYEE";
   weeklyHours: number | null;
+  contractType: "PERMANENT" | "FIXED_TERM" | "ZERO_HOURS";
+  contractHours: number | null;
+  contractStart: string | null;
+  contractEnd: string | null;
   createdAt: string;
 }
 
@@ -65,14 +77,21 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
 
   function openCreate() {
     setEditingId(null);
-    createForm.reset({ role: "EMPLOYEE" });
+    createForm.reset({ role: "EMPLOYEE", contractType: "PERMANENT" });
     setServerError("");
     setDialogOpen(true);
   }
 
   function openEdit(user: User) {
     setEditingId(user.id);
-    editForm.reset({ name: user.name, email: user.email, role: user.role, password: "", weeklyHours: user.weeklyHours ?? undefined });
+    editForm.reset({
+      name: user.name, email: user.email, role: user.role, password: "",
+      weeklyHours: user.weeklyHours ?? undefined,
+      contractType: user.contractType,
+      contractHours: user.contractHours ?? undefined,
+      contractStart: user.contractStart ?? undefined,
+      contractEnd: user.contractEnd ?? undefined,
+    });
     setServerError("");
     setDialogOpen(true);
   }
@@ -233,6 +252,32 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                     <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...editForm.register("weeklyHours")} />
                     {editForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{editForm.formState.errors.weeklyHours.message}</p>}
                   </div>
+                  <div className="space-y-1">
+                    <Label>Contracttype</Label>
+                    <Select value={editForm.watch("contractType")} onValueChange={(v) => editForm.setValue("contractType", v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PERMANENT">Vast</SelectItem>
+                        <SelectItem value="FIXED_TERM">Bepaalde tijd</SelectItem>
+                        <SelectItem value="ZERO_HOURS">0-uren</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Contracturen per week <span className="text-muted-foreground font-normal">(leeg = niet van toepassing)</span></Label>
+                    <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...editForm.register("contractHours")} />
+                    {editForm.formState.errors.contractHours && <p className="text-xs text-destructive">{editForm.formState.errors.contractHours.message}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label>Startdatum</Label>
+                      <Input type="date" {...editForm.register("contractStart")} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Einddatum</Label>
+                      <Input type="date" {...editForm.register("contractEnd")} />
+                    </div>
+                  </div>
                 </>
               )}
               <div className="space-y-1">
@@ -277,6 +322,32 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                 <Label>Uren per week <span className="text-muted-foreground font-normal">(leeg = geen target)</span></Label>
                 <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...createForm.register("weeklyHours")} />
                 {createForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{createForm.formState.errors.weeklyHours.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Contracttype</Label>
+                <Select value={createForm.watch("contractType")} onValueChange={(v) => createForm.setValue("contractType", v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PERMANENT">Vast</SelectItem>
+                    <SelectItem value="FIXED_TERM">Bepaalde tijd</SelectItem>
+                    <SelectItem value="ZERO_HOURS">0-uren</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Contracturen per week <span className="text-muted-foreground font-normal">(leeg = niet van toepassing)</span></Label>
+                <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...createForm.register("contractHours")} />
+                {createForm.formState.errors.contractHours && <p className="text-xs text-destructive">{createForm.formState.errors.contractHours.message}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>Startdatum</Label>
+                  <Input type="date" {...createForm.register("contractStart")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Einddatum</Label>
+                  <Input type="date" {...createForm.register("contractEnd")} />
+                </div>
               </div>
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}
               <DialogFooter>

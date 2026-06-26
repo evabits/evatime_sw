@@ -9,9 +9,20 @@ export default async function UsersPage() {
 
   const rawUsers = await prisma.user.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, role: true, weeklyHours: true, createdAt: true },
+    select: {
+      id: true, name: true, email: true, role: true, weeklyHours: true,
+      contractType: true, contractHours: true, contractStart: true, contractEnd: true,
+      createdAt: true,
+    },
   });
-  const users = rawUsers.map((u) => ({ ...u, weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null, createdAt: u.createdAt.toISOString() }));
+  const users = rawUsers.map((u) => ({
+    ...u,
+    weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null,
+    contractHours: u.contractHours ? Number(u.contractHours) : null,
+    contractStart: u.contractStart ? u.contractStart.toISOString().slice(0, 10) : null,
+    contractEnd: u.contractEnd ? u.contractEnd.toISOString().slice(0, 10) : null,
+    createdAt: u.createdAt.toISOString(),
+  }));
 
   return (
     <UsersClient
