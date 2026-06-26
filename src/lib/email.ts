@@ -229,6 +229,26 @@ export async function sendContractExpiryEmail(
   });
 }
 
+export async function sendReviewPlannedEmail(
+  employee: { name: string; email: string },
+  review: { period: string; plannedDate: string | null },
+  settings: any,
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const when = review.plannedDate ? new Date(review.plannedDate).toLocaleDateString("nl-NL") : "nader te bepalen";
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
+  <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
+    <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
+    <p style="margin:0 0 8px;">Hallo ${employee.name},</p>
+    <p style="margin:0 0 16px;">Er is een beoordelingsgesprek voor je gepland (${review.period}, datum: <strong>${when}</strong>).</p>
+    <p style="margin:0 0 24px;">Vul alvast je zelfbeoordeling in zodat we het gesprek goed kunnen voorbereiden.</p>
+    <a href="${appUrl}/beoordelingen" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Mijn beoordelingen</a>
+    <p style="margin-top:40px;color:#888;font-size:12px;">${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}</p>
+  </div></body></html>`;
+  await transport.sendMail({ from, to: employee.email, subject: `Beoordelingsgesprek gepland (${review.period})`, html });
+}
+
 export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;

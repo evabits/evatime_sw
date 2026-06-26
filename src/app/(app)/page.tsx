@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatHours } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays } from "lucide-react";
+import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -82,6 +82,14 @@ export default async function DashboardPage() {
       : Promise.resolve(0),
   ]);
 
+  const pendingReview = userId
+    ? await prisma.performanceReview.findFirst({
+        where: { userId, status: { in: ["PLANNED", "SELF_COMPLETED"] } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, period: true, status: true },
+      })
+    : null;
+
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
   const vacBudgetHours = Number(vacationBudget?.hours ?? 0);
@@ -112,6 +120,20 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Overzicht voor {now.toLocaleString("nl-NL", { month: "long", year: "numeric" })}</p>
       </div>
+
+      {pendingReview && pendingReview.status === "PLANNED" && (
+        <Link href="/beoordelingen" className="block">
+          <Card className="border-primary/40 bg-primary/5">
+            <CardContent className="p-4 flex items-center gap-3">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              <div>
+                <p className="font-medium">Zelfbeoordeling openstaand ({pendingReview.period})</p>
+                <p className="text-sm text-muted-foreground">Vul je zelfbeoordeling in vóór het gesprek.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       <div className={`grid gap-4 md:grid-cols-2 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <Card>

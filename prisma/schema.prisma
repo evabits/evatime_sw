@@ -28,6 +28,8 @@ model User {
   absenceRequests   AbsenceRequest[] @relation("AbsenceRequests")
   absenceReviews    AbsenceRequest[] @relation("AbsenceReviewer")
   contracts         Contract[]
+  reviews           PerformanceReview[] @relation("ReviewSubject")
+  reviewsGiven      PerformanceReview[] @relation("ReviewReviewer")
 }
 
 enum Role {
@@ -408,6 +410,7 @@ model Contract {
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   attachments          ContractAttachment[]
+  reviewResult         PerformanceReview?   @relation("ReviewResult")
 
   @@index([userId])
 }
@@ -420,4 +423,40 @@ model ContractAttachment {
   url        String
   size       Int
   createdAt  DateTime @default(now())
+}
+
+enum ReviewStatus {
+  PLANNED
+  SELF_COMPLETED
+  COMPLETED
+}
+
+model ReviewTemplate {
+  id         String   @id @default(cuid())
+  definition Json
+  updatedAt  DateTime @updatedAt
+}
+
+model PerformanceReview {
+  id                  String       @id @default(cuid())
+  userId              String
+  user                User         @relation("ReviewSubject", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy          String?
+  reviewer            User?        @relation("ReviewReviewer", fields: [reviewedBy], references: [id])
+  period              String
+  plannedDate         DateTime?    @db.Date
+  status              ReviewStatus @default(PLANNED)
+  formSnapshot        Json
+  selfAnswers         Json?
+  managerAnswers      Json?
+  agreements          Json?
+  resultingContractId String?      @unique
+  resultingContract   Contract?    @relation("ReviewResult", fields: [resultingContractId], references: [id])
+  selfCompletedAt     DateTime?
+  completedAt         DateTime?
+  plannedEmailSentAt  DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([userId])
 }

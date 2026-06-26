@@ -19,6 +19,7 @@ import {
   UserCog,
   Tag,
   ClipboardList,
+  ClipboardCheck,
   CalendarCheck,
   Umbrella,
   Menu,
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/beoordelingen", label: "Mijn beoordelingen", icon: ClipboardCheck },
     ],
   },
   {
@@ -91,6 +93,7 @@ const navGroups: NavGroup[] = [
       { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
       { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag, roles: ["ADMIN"] },
       { href: "/settings", label: "Bedrijfsinstellingen", icon: Settings, roles: ["ADMIN"] },
+      { href: "/settings/beoordelingen", label: "Beoordelingssjabloon", icon: ClipboardList, roles: ["ADMIN"] },
     ],
   },
 ];
@@ -165,9 +168,10 @@ export function Sidebar({ user, role }: SidebarProps) {
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    // ponytail: "/km" needs exact match so /km/templates doesn't light up both items
+                    // ponytail: parents with child routes need exact match so the child
+                    // (e.g. /km/templates, /settings/beoordelingen) doesn't light up both items
                     const active =
-                      item.href === "/" || item.href === "/km"
+                      item.href === "/" || item.href === "/km" || item.href === "/settings"
                         ? pathname === item.href
                         : pathname.startsWith(item.href);
                     return (
