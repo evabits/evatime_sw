@@ -59,6 +59,13 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: "Personeel",
+    roles: ["ADMIN"],
+    items: [
+      { href: "/personeel", label: "Medewerkers", icon: UserCog },
+    ],
+  },
+  {
     label: "Facturatie",
     roles: ["ADMIN", "FINANCE"],
     items: [
