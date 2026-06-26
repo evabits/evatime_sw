@@ -52,3 +52,10 @@ export const REVIEW_TEMPLATE_SEED: ReviewDefinition = {
     ] },
   ],
 };
+
+export function usersMissingReview<T extends { id: string }>(
+  users: T[], reviewedUserIds: Set<string> | string[],
+): T[] {
+  const reviewed = reviewedUserIds instanceof Set ? reviewedUserIds : new Set(reviewedUserIds);
+  return users.filter((u) => !reviewed.has(u.id));
+}

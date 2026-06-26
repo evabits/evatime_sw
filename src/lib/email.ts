@@ -331,3 +331,24 @@ export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
     ],
   });
 }
+
+export async function sendReviewReminderEmail(
+  admin: { name: string; email: string },
+  employees: { name: string }[],
+  quarter: string,
+  settings: any,
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const list = employees.map((e) => `<li style="margin:2px 0;">${e.name}</li>`).join("");
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
+  <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
+    <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
+    <p style="margin:0 0 8px;">Beste ${admin.name},</p>
+    <p style="margin:0 0 16px;">De volgende medewerkers hebben nog geen beoordeling voor ${quarter}:</p>
+    <ul style="margin:0 0 24px;padding-left:20px;">${list}</ul>
+    <a href="${appUrl}/personeel" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Beoordelingen plannen</a>
+    <p style="margin-top:40px;color:#888;font-size:12px;">${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}</p>
+  </div></body></html>`;
+  await transport.sendMail({ from, to: admin.email, subject: `Beoordelingen plannen voor ${quarter}`, html });
+}
