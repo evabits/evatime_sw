@@ -1047,6 +1047,122 @@ git commit -m "feat: contract expiry reminders, Personeel nav, remove backfill e
 
 ---
 
+### Task 11: Adopt vitest as the test runner
+
+**Files:**
+- Modify: `package.json` (add `vitest` devDependency + `test` script)
+- Create: `vitest.config.ts`
+- Modify: `src/lib/contracts.test.ts`, `src/lib/payroll.test.ts`, `src/lib/km-template.test.ts`, `src/lib/projects.test.ts` (convert the `node:assert` self-check scripts to vitest suites)
+
+Until now tests were standalone `npx tsx` self-checks. This task introduces vitest as the project test runner and migrates the existing self-checks to it, so `npm test` runs everything. Equivalent assertions — no behavior change in the code under test.
+
+- [ ] **Step 1: Install vitest**
+
+```bash
+export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npm install -D vitest
+```
+
+Expected: `vitest` added to `devDependencies`.
+
+- [ ] **Step 2: Add config + test script**
+
+Create `vitest.config.ts`:
+
+```ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts"],
+  },
+});
+```
+
+Add to the `scripts` block in `package.json`:
+
+```json
+    "test": "vitest run",
+```
+
+- [ ] **Step 3: Convert the self-check files to vitest suites**
+
+For EACH of `src/lib/contracts.test.ts`, `src/lib/payroll.test.ts`, `src/lib/km-template.test.ts`, `src/lib/projects.test.ts`: replace `import assert from "node:assert"` with `import { describe, it, expect } from "vitest"`, wrap the top-level assertions in `it(...)` blocks inside a `describe(<filename>, ...)`, translate each assertion (`assert.strictEqual(a, b)` → `expect(a).toBe(b)`; `assert.deepStrictEqual` → `toEqual`; `assert.ok(x)` → `expect(x).toBeTruthy()`; `assert.strictEqual(x, null)` → `expect(x).toBeNull()`), and delete the trailing `console.log("... self-check passed")`.
+
+Concrete example — `src/lib/contracts.test.ts` becomes:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { getEffectiveContract, fillSalary, rangeOverlaps, WEEKS_PER_MONTH } from "./contracts";
+
+const a = { id: "a", startDate: "2024-01-01", endDate: "2024-12-31" };
+const b = { id: "b", startDate: "2025-01-01", endDate: null };
+
+describe("getEffectiveContract", () => {
+  it("returns null for no contracts", () => expect(getEffectiveContract([], "2025-06-01")).toBeNull());
+  it("picks the covering contract", () => {
+    expect(getEffectiveContract([a, b], "2024-06-01")?.id).toBe("a");
+    expect(getEffectiveContract([a, b], "2025-06-01")?.id).toBe("b");
+  });
+  it("null before any contract", () => expect(getEffectiveContract([a, b], "2023-06-01")).toBeNull());
+  it("null in a gap", () => {
+    const c = { id: "c", startDate: "2025-06-01", endDate: null };
+    expect(getEffectiveContract([a, c], "2025-03-01")).toBeNull();
+  });
+  it("null startDate = from beginning", () => {
+    const open = { id: "o", startDate: null, endDate: null };
+    expect(getEffectiveContract([open], "1999-01-01")?.id).toBe("o");
+  });
+  it("latest start wins", () => {
+    const open = { id: "o", startDate: null, endDate: null };
+    expect(getEffectiveContract([open, b], "2025-06-01")?.id).toBe("b");
+  });
+});
+
+describe("fillSalary", () => {
+  it("derives hourly from monthly", () => {
+    const r = fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: 40 });
+    expect(r.salaryHourly).toBeCloseTo(4000 / (40 * WEEKS_PER_MONTH), 2);
+    expect(r.salaryMonthly).toBe(4000);
+  });
+  it("derives monthly from hourly", () => {
+    const r = fillSalary({ salaryMonthly: null, salaryHourly: 25, contractHours: 40 });
+    expect(r.salaryMonthly).toBeCloseTo(25 * 40 * WEEKS_PER_MONTH, 2);
+  });
+  it("keeps both when both provided", () => {
+    expect(fillSalary({ salaryMonthly: 4000, salaryHourly: 30, contractHours: 40 }))
+      .toEqual({ salaryMonthly: 4000, salaryHourly: 30 });
+  });
+  it("no derive without hours", () => {
+    expect(fillSalary({ salaryMonthly: 4000, salaryHourly: null, contractHours: null }).salaryHourly).toBeNull();
+  });
+});
+
+describe("rangeOverlaps", () => {
+  it("open ranges overlap", () => expect(rangeOverlaps("2024-01-01", null, "2025-06-01", null)).toBe(true));
+  it("adjacent no overlap", () => expect(rangeOverlaps("2024-01-01", "2024-12-31", "2025-01-01", null)).toBe(false));
+});
+```
+
+Apply the same mechanical conversion to the other three files, preserving their existing assertions exactly. Read each file first; do not change the logic being tested.
+
+- [ ] **Step 4: Run the full suite**
+
+```bash
+export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use 22 && npm test
+```
+
+Expected: all suites pass (contracts, payroll, km-template, projects), exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add package.json package-lock.json vitest.config.ts src/lib/*.test.ts
+git commit -m "test: adopt vitest and migrate self-checks to it"
+```
+
+---
+
 ## Self-Review
 
 **Spec coverage:**
