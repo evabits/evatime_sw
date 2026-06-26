@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { currentQuarter, questionKeys, sanitizeAnswers, REVIEW_TEMPLATE_SEED } from "./reviews";
+import { currentQuarter, questionKeys, sanitizeAnswers, usersMissingReview, REVIEW_TEMPLATE_SEED } from "./reviews";
 
 const def = {
   sections: [
@@ -40,5 +40,16 @@ describe("REVIEW_TEMPLATE_SEED", () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(questionKeys(REVIEW_TEMPLATE_SEED, "SELF").length).toBeGreaterThan(0);
     expect(questionKeys(REVIEW_TEMPLATE_SEED, "MANAGER").length).toBeGreaterThan(0);
+  });
+});
+
+describe("usersMissingReview", () => {
+  it("returns only users without a review", () => {
+    const users = [{ id: "1", name: "A" }, { id: "2", name: "B" }, { id: "3", name: "C" }];
+    expect(usersMissingReview(users, new Set(["2"])).map((u) => u.id)).toEqual(["1", "3"]);
+  });
+  it("accepts an array of ids too", () => {
+    const users = [{ id: "1", name: "A" }, { id: "2", name: "B" }];
+    expect(usersMissingReview(users, ["1"]).map((u) => u.id)).toEqual(["2"]);
   });
 });
