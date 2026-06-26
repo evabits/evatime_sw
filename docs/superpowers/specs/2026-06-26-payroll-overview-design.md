@@ -52,13 +52,15 @@ On `User`:
 
 - `contractType` — new enum `ContractType { PERMANENT FIXED_TERM ZERO_HOURS }`.
   Reasonable default: `PERMANENT`.
-- `contractHours` — `Decimal? @db.Decimal(5, 2)`, per week. This is a **rename of
-  the existing `weeklyHours`** field (preserve data in the migration).
+- `contractHours` — `Decimal? @db.Decimal(5, 2)`, per week, the hours specified
+  in the contract. **New field, separate from `weeklyHours`.**
 - `contractStart` — `DateTime? @db.Date`, optional.
 - `contractEnd` — `DateTime? @db.Date`, optional (relevant for fixed-term).
 
-Consumer to update: `/api/hours-overview/route.ts` currently reads
-`weeklyHours` — switch it to `contractHours`.
+`weeklyHours` stays as-is: it is the employee's **registration target** (how many
+hours they must write down) and can differ from `contractHours`. `/api/hours-overview`
+keeps using `weeklyHours` and is **not** changed. Payroll overtime uses
+`contractHours`.
 
 These fields are edited in the existing `/users` admin page (add contract type
 dropdown, hours input, start/end date inputs).
@@ -107,15 +109,16 @@ Response shape (per user):
 
 ## Files touched
 
-- `prisma/schema.prisma` — `ContractType` enum + `User` fields (rename
-  `weeklyHours` → `contractHours`, add 3 fields).
+- `prisma/schema.prisma` — `ContractType` enum + 4 new `User` fields
+  (`contractType`, `contractHours`, `contractStart`, `contractEnd`).
+  `weeklyHours` is left untouched.
 - new migration.
 - `src/app/api/payroll/route.ts` — new.
 - `src/app/(app)/payroll/page.tsx` — new.
 - `src/components/payroll/payroll-client.tsx` — new.
 - `src/components/layout/sidebar.tsx` — add nav item.
-- `src/app/api/hours-overview/route.ts` — `weeklyHours` → `contractHours`.
-- `/users` page + its API — add contract fields to the employee edit form.
+- `/users` page + its API — add contract fields to the employee edit form
+  (alongside the existing `weeklyHours` target field).
 
 ## Testing
 
