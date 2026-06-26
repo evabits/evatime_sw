@@ -69,7 +69,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
 
   const filteredProjects = selectedCustomerId === ""
     ? projects
-    : projects.filter((p) => p.customer.id === selectedCustomerId);
+    : projects.filter((p) => p.customer?.id === selectedCustomerId);
 
   const filteredActivityTypes = activityTypes.filter((a) => {
     if (a.showInAllProjects) return true;
@@ -204,7 +204,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
                 <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                 <SelectContent>
                   {filteredProjects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -302,7 +302,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
                 <SelectContent>
                   <SelectItem value="all">Alle projecten</SelectItem>
                   {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

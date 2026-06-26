@@ -115,7 +115,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
 
   // Group projects by customer for the multi-select
   const projectsByCustomer = projects.reduce((acc: Record<string, any[]>, p: any) => {
-    const key = p.customer.name;
+    const key = p.customer?.name ?? "Overig";
     if (!acc[key]) acc[key] = [];
     acc[key].push(p);
     return acc;

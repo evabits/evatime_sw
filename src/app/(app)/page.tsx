@@ -100,7 +100,7 @@ export default async function DashboardPage() {
   const projectSummary = projectStats.map((p) => {
     const hours = p.timeEntries.reduce((s, e) => s + Number(e.hours), 0);
     const km = p.kmEntries.reduce((s, e) => s + Number(e.km), 0);
-    return { name: p.name, customer: p.customer.name, hours, km };
+    return { name: p.name, customer: p.customer?.name ?? "—", hours, km };
   });
 
   return (
