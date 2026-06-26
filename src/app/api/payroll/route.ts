@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
 import { buildPayrollRows, weeksInMonth, type PayrollUser } from "@/lib/payroll";
+import { getEffectiveContract } from "@/lib/contracts";
+import { serializeContract, contractSelect } from "@/app/api/contracts/route";
 
 export async function GET(req: Request) {
   try {
@@ -31,7 +33,7 @@ export async function GET(req: Request) {
     const [users, worked, wbso, km] = await Promise.all([
       prisma.user.findMany({
         orderBy: { name: "asc" },
-        select: { id: true, name: true, contractType: true, contractHours: true },
+        select: { id: true, name: true, contracts: { select: contractSelect } },
       }),
       prisma.timeEntry.groupBy({ by: ["userId"], where: { date }, _sum: { hours: true } }),
       prisma.timeEntry.groupBy({
@@ -49,12 +51,16 @@ export async function GET(req: Request) {
     const wbsoMap = new Map(wbso.map((a) => [a.userId, Number(a._sum.hours ?? 0)]));
     const kmMap = new Map(km.map((a) => [a.userId, Number(a._sum.km ?? 0)]));
 
-    const payrollUsers: PayrollUser[] = users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      contractType: u.contractType,
-      contractHours: u.contractHours != null ? Number(u.contractHours) : null,
-    }));
+    const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    const payrollUsers: PayrollUser[] = users.map((u) => {
+      const current = getEffectiveContract(u.contracts.map(serializeContract), monthEnd);
+      return {
+        id: u.id,
+        name: u.name,
+        contractType: (current?.contractType ?? "PERMANENT") as PayrollUser["contractType"],
+        contractHours: current?.contractHours ?? null,
+      };
+    });
 
     const rows = buildPayrollRows(payrollUsers, workedMap, wbsoMap, kmMap, weeksInMonth(year, month));
     return NextResponse.json(rows);
