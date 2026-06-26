@@ -46,15 +46,25 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: "Registratie",
+    items: [
       { href: "/time", label: "Uren", icon: Clock },
       { href: "/km", label: "Kilometers", icon: Car },
-      { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
       { href: "/expenses", label: "Uitgaven", icon: Receipt },
       { href: "/absence", label: "Afwezigheid", icon: Umbrella },
+      { href: "/uren-overzicht", label: "Uren Overzicht", icon: CalendarCheck },
+    ],
+  },
+  {
+    label: "Facturatie",
+    roles: ["ADMIN", "FINANCE"],
+    items: [
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
       { href: "/quotes", label: "Offertes", icon: ClipboardList, roles: ["ADMIN"] },
       { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN"] },
-      { href: "/uren-overzicht", label: "Uren Overzicht", icon: CalendarCheck },
     ],
   },
   {
@@ -64,10 +74,16 @@ const navGroups: NavGroup[] = [
       { href: "/customers", label: "Klanten", icon: Users },
       { href: "/projects", label: "Projecten", icon: FolderOpen },
       { href: "/activity-types", label: "Activiteiten", icon: Activity },
-      { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag },
       { href: "/users", label: "Gebruikers", icon: UserCog },
       { href: "/payroll", label: "Loonverwerking", icon: Wallet },
-      { href: "/settings", label: "Instellingen", icon: Settings },
+    ],
+  },
+  {
+    label: "Instellingen",
+    items: [
+      { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
+      { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag, roles: ["ADMIN"] },
+      { href: "/settings", label: "Bedrijfsinstellingen", icon: Settings, roles: ["ADMIN"] },
     ],
   },
 ];
