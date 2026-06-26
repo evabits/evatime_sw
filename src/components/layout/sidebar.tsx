@@ -91,6 +91,7 @@ const navGroups: NavGroup[] = [
       { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
       { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag, roles: ["ADMIN"] },
       { href: "/settings", label: "Bedrijfsinstellingen", icon: Settings, roles: ["ADMIN"] },
+      { href: "/settings/beoordelingen", label: "Beoordelingssjabloon", icon: ClipboardList, roles: ["ADMIN"] },
     ],
   },
 ];
