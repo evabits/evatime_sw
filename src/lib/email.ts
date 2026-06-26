@@ -205,6 +205,30 @@ export async function sendBookkeepingEmail(invoice: any, settings: any): Promise
   });
 }
 
+export async function sendContractExpiryEmail(
+  admin: { name: string; email: string },
+  contract: { jobTitle: string | null; contractType: string; endDate: string },
+  employee: { name: string },
+  settings: any,
+): Promise<void> {
+  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const end = new Date(contract.endDate).toLocaleDateString("nl-NL");
+  const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
+  <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
+    <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
+    <p style="margin:0 0 8px;">Beste ${admin.name},</p>
+    <p style="margin:0 0 16px;">Het contract van <strong>${employee.name}</strong>${contract.jobTitle ? ` (${contract.jobTitle})` : ""} loopt af op <strong>${end}</strong>.</p>
+    <p style="margin:0 0 16px;">Type: ${contract.contractType}. Plan tijdig een verlenging of vervolggesprek.</p>
+    <p style="margin-top:40px;color:#888;font-size:12px;">${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}</p>
+  </div></body></html>`;
+  await transport.sendMail({
+    from,
+    to: admin.email,
+    subject: `Contract loopt af: ${employee.name} (${end})`,
+    html,
+  });
+}
+
 export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;
