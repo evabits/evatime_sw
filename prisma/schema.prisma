@@ -60,8 +60,8 @@ model Customer {
 
 model Project {
   id                String                @id @default(cuid())
-  customerId        String
-  customer          Customer              @relation(fields: [customerId], references: [id])
+  customerId        String?
+  customer          Customer?             @relation(fields: [customerId], references: [id])
   name              String
   description       String?
   status            ProjectStatus         @default(ACTIVE)
@@ -78,6 +78,7 @@ model Project {
 }
 
 enum ProjectStatus {
+  CONCEPT
   ACTIVE
   INACTIVE
   COMPLETED
