@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Pencil, Trash2 } from "lucide-react";
 
@@ -44,13 +45,22 @@ interface Props {
   activityTypes: any[];
   customers: any[];
   initialEntries: any[];
+  initialTemplates: any[];
   role: string;
 }
 
-export function KmEntriesClient({ projects, activityTypes, customers, initialEntries, role }: Props) {
+export function KmEntriesClient({ projects, activityTypes, customers, initialEntries, initialTemplates, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [entries, setEntries] = useState(initialEntries);
+  const [templates, setTemplates] = useState(initialTemplates);
+  const [appliedTemplate, setAppliedTemplate] = useState("");
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateError, setTemplateError] = useState("");
+  const [pendingTemplate, setPendingTemplate] = useState<any>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
@@ -84,10 +94,22 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
     }
   }, [activityTypeId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
+  function changeCustomer(v: string) {
+    setSelectedCustomerId(v);
     form.setValue("projectId", "");
     form.setValue("activityTypeId", undefined);
-  }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
+
+  function applyTemplate(id: string) {
+    setAppliedTemplate(id);
+    const t = templates.find((t) => t.id === id);
+    if (!t) return;
+    setSelectedCustomerId(t.project?.customer?.id ?? "");
+    form.setValue("projectId", t.projectId);
+    form.setValue("activityTypeId", t.activityTypeId ?? undefined);
+    form.setValue("km", Number(t.km));
+    form.setValue("description", t.description ?? "");
+  }
 
   async function fetchEntries(month: string, projectId: string) {
     setFetching(true);
@@ -142,11 +164,49 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
           if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
             setEntries((prev) => [created, ...prev]);
           }
+          if (saveAsTemplate) {
+            setPendingTemplate({
+              projectId: data.projectId,
+              activityTypeId: data.activityTypeId || null,
+              km: data.km,
+              description: data.description || null,
+            });
+            setTemplateName(data.description || "");
+            setTemplateError("");
+            setTemplateDialogOpen(true);
+          }
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+          setAppliedTemplate("");
         }
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveTemplate() {
+    if (!templateName.trim() || !pendingTemplate) return;
+    setSavingTemplate(true);
+    setTemplateError("");
+    try {
+      const res = await fetch("/api/km/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...pendingTemplate, name: templateName.trim() }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setTemplates((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        setTemplateDialogOpen(false);
+        setSaveAsTemplate(false);
+        setPendingTemplate(null);
+      } else if (res.status === 409) {
+        setTemplateError("Naam bestaat al");
+      } else {
+        setTemplateError("Opslaan mislukt");
+      }
+    } finally {
+      setSavingTemplate(false);
     }
   }
 
@@ -186,9 +246,23 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
 
+            {!editing && templates.length > 0 && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Sjabloon</Label>
+                <Select value={appliedTemplate || undefined} onValueChange={applyTemplate}>
+                  <SelectTrigger><SelectValue placeholder="Kies een opgeslagen rit om in te vullen" /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Klant</Label>
-              <Select value={selectedCustomerId || undefined} onValueChange={(v) => setSelectedCustomerId(v)}>
+              <Select value={selectedCustomerId || undefined} onValueChange={changeCustomer}>
                 <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -267,14 +341,27 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
               <Textarea placeholder="Bijv. bezoek klant Amsterdam" {...form.register("description")} rows={2} />
             </div>
 
-            <div className="sm:col-span-2 flex gap-2">
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-4">
               <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
               {editing && (
                 <Button type="button" variant="outline" onClick={() => {
                   setEditing(null);
                   setSelectedCustomerId("");
+                  setAppliedTemplate("");
+                  setSaveAsTemplate(false);
                   form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
                 }}>Annuleren</Button>
+              )}
+              {!editing && (
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input"
+                    checked={saveAsTemplate}
+                    onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  />
+                  Opslaan als sjabloon
+                </label>
               )}
             </div>
           </form>
@@ -361,6 +448,31 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={templateDialogOpen} onOpenChange={(o) => { if (!o) { setTemplateDialogOpen(false); setSaveAsTemplate(false); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sjabloon opslaan</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Naam</Label>
+            <Input
+              value={templateName}
+              onChange={(e) => { setTemplateName(e.target.value); setTemplateError(""); }}
+              placeholder="Bijv. Thuis–kantoor"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveTemplate(); } }}
+              autoFocus
+            />
+            {templateError && <p className="text-xs text-destructive">{templateError}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setTemplateDialogOpen(false); setSaveAsTemplate(false); }}>Annuleren</Button>
+            <Button type="button" onClick={saveTemplate} disabled={savingTemplate || !templateName.trim()}>
+              {savingTemplate ? "Opslaan..." : "Opslaan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

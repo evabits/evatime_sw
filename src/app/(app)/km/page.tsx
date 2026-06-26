@@ -8,7 +8,7 @@ export default async function KmPage() {
   const userId = session?.user?.id ?? "";
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
 
-  const [projects, activityTypes, customers, recentEntries] = await Promise.all([
+  const [projects, activityTypes, customers, recentEntries, templates] = await Promise.all([
     prisma.project.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -41,6 +41,14 @@ export default async function KmPage() {
         activityType: { select: { name: true } },
       },
     }),
+    prisma.kmTemplate.findMany({
+      where: { userId },
+      orderBy: { name: "asc" },
+      include: {
+        project: { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
+        activityType: { select: { id: true, name: true } },
+      },
+    }),
   ]);
 
   return (
@@ -49,6 +57,7 @@ export default async function KmPage() {
       activityTypes={serialize(activityTypes)}
       customers={serialize(customers)}
       initialEntries={serialize(recentEntries)}
+      initialTemplates={serialize(templates)}
       role={role}
     />
   );

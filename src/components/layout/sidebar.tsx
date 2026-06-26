@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Wallet,
+  BookMarked,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const navGroups: NavGroup[] = [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/time", label: "Uren", icon: Clock },
       { href: "/km", label: "Kilometers", icon: Car },
+      { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
       { href: "/expenses", label: "Uitgaven", icon: Receipt },
       { href: "/absence", label: "Afwezigheid", icon: Umbrella },
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
@@ -140,9 +142,10 @@ export function Sidebar({ user, role }: SidebarProps) {
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
+                    // ponytail: "/km" needs exact match so /km/templates doesn't light up both items
                     const active =
-                      item.href === "/"
-                        ? pathname === "/"
+                      item.href === "/" || item.href === "/km"
+                        ? pathname === item.href
                         : pathname.startsWith(item.href);
                     return (
                       <Link

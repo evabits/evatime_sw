@@ -22,6 +22,7 @@ model User {
   updatedAt         DateTime          @updatedAt
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
+  kmTemplates       KmTemplate[]
   expenses          Expense[]
   vacationBudgets   VacationBudget[]
   absenceRequests   AbsenceRequest[] @relation("AbsenceRequests")
@@ -71,6 +72,7 @@ model Project {
   updatedAt         DateTime              @updatedAt
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
+  kmTemplates       KmTemplate[]
   activityRates     ProjectActivityRate[]
   activityLinks     ActivityTypeProject[]
   expenses          Expense[]
@@ -101,6 +103,7 @@ model ActivityType {
   updatedAt         DateTime              @updatedAt
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
+  kmTemplates       KmTemplate[]
   projectRates      ProjectActivityRate[]
   projects          ActivityTypeProject[]
 }
@@ -164,6 +167,23 @@ model KmEntry {
   invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+}
+
+model KmTemplate {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  name           String
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id])
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
+  km             Decimal       @db.Decimal(8, 2)
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([userId, name])
 }
 
 model Invoice {
