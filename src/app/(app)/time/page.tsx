@@ -12,11 +12,12 @@ export default async function TimePage() {
 
   const [projects, activityTypes, customers, recentEntries, users] = await Promise.all([
     prisma.project.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: { in: ["ACTIVE", "CONCEPT"] } },
       orderBy: { name: "asc" },
       select: {
         id: true,
         name: true,
+        status: true,
         defaultHourlyRate: true,
         customer: { select: { id: true, name: true } },
         activityRates: { include: { activityType: true } },
