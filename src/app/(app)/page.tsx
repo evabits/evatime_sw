@@ -21,14 +21,17 @@ export default async function DashboardPage() {
   const currentYear = now.getFullYear();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  // Employees see only their own totals; admins see company-wide.
+  const ownerFilter = isAdmin ? {} : { userId };
+
   const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations] = await Promise.all([
     prisma.timeEntry.aggregate({
-      where: { date: { gte: monthStart, lte: monthEnd } },
+      where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
       _count: true,
     }),
     prisma.kmEntry.aggregate({
-      where: { date: { gte: monthStart, lte: monthEnd } },
+      where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { km: true },
       _count: true,
     }),
@@ -37,11 +40,11 @@ export default async function DashboardPage() {
       include: {
         customer: { select: { name: true } },
         timeEntries: {
-          where: { date: { gte: monthStart, lte: monthEnd } },
+          where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
           select: { hours: true, rateOverride: true, activityType: { select: { defaultRate: true } } },
         },
         kmEntries: {
-          where: { date: { gte: monthStart, lte: monthEnd } },
+          where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
           select: { km: true, rateOverride: true },
         },
       },
