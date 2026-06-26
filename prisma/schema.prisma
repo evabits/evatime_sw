@@ -27,6 +27,7 @@ model User {
   vacationBudgets   VacationBudget[]
   absenceRequests   AbsenceRequest[] @relation("AbsenceRequests")
   absenceReviews    AbsenceRequest[] @relation("AbsenceReviewer")
+  contracts         Contract[]
 }
 
 enum Role {
@@ -388,4 +389,35 @@ model AbsenceRequest {
   reviewedAt  DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+}
+
+model Contract {
+  id                   String               @id @default(cuid())
+  userId               String
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contractType         ContractType         @default(PERMANENT)
+  contractHours        Decimal?             @db.Decimal(5, 2)
+  startDate            DateTime?            @db.Date
+  endDate              DateTime?            @db.Date
+  salaryMonthly        Decimal?             @db.Decimal(10, 2)
+  salaryHourly         Decimal?             @db.Decimal(10, 2)
+  jobTitle             String?
+  ftePercentage        Decimal?             @db.Decimal(5, 2)
+  notes                String?
+  expiryReminderSentAt DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  attachments          ContractAttachment[]
+
+  @@index([userId])
+}
+
+model ContractAttachment {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  filename   String
+  url        String
+  size       Int
+  createdAt  DateTime @default(now())
 }
