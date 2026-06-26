@@ -11,27 +11,17 @@ const updateSchema = z.object({
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8).optional().or(z.literal("")),
   weeklyHours: z.coerce.number().positive().optional().nullable(),
-  contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]).optional(),
-  contractHours: z.coerce.number().positive().optional().nullable(),
-  contractStart: z.string().optional(),
-  contractEnd: z.string().optional(),
 });
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true,
-  contractType: true, contractHours: true, contractStart: true, contractEnd: true,
   createdAt: true,
 } as const;
 
-function serializeUser(u: {
-  weeklyHours: any; contractHours: any; contractStart: Date | null; contractEnd: Date | null;
-} & Record<string, any>) {
+function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
   return {
     ...u,
     weeklyHours: u.weeklyHours != null ? Number(u.weeklyHours) : null,
-    contractHours: u.contractHours != null ? Number(u.contractHours) : null,
-    contractStart: u.contractStart ? u.contractStart.toISOString().slice(0, 10) : null,
-    contractEnd: u.contractEnd ? u.contractEnd.toISOString().slice(0, 10) : null,
   };
 }
 
@@ -56,10 +46,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (isAdmin) {
       updateData.role = data.role;
       updateData.weeklyHours = data.weeklyHours ?? null;
-      if (data.contractType) updateData.contractType = data.contractType;
-      updateData.contractHours = data.contractHours ?? null;
-      updateData.contractStart = data.contractStart ? new Date(data.contractStart) : null;
-      updateData.contractEnd = data.contractEnd ? new Date(data.contractEnd) : null;
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 

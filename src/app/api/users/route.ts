@@ -11,27 +11,17 @@ const createSchema = z.object({
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]).default("EMPLOYEE"),
   weeklyHours: z.coerce.number().positive().optional().nullable(),
-  contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]).default("PERMANENT"),
-  contractHours: z.coerce.number().positive().optional().nullable(),
-  contractStart: z.string().optional(),
-  contractEnd: z.string().optional(),
 });
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true,
-  contractType: true, contractHours: true, contractStart: true, contractEnd: true,
   createdAt: true,
 } as const;
 
-function serializeUser(u: {
-  weeklyHours: any; contractHours: any; contractStart: Date | null; contractEnd: Date | null;
-} & Record<string, any>) {
+function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
   return {
     ...u,
     weeklyHours: u.weeklyHours != null ? Number(u.weeklyHours) : null,
-    contractHours: u.contractHours != null ? Number(u.contractHours) : null,
-    contractStart: u.contractStart ? u.contractStart.toISOString().slice(0, 10) : null,
-    contractEnd: u.contractEnd ? u.contractEnd.toISOString().slice(0, 10) : null,
   };
 }
 
@@ -52,8 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { weeklyHours, contractHours, contractStart, contractEnd, ...rest } =
-      createSchema.parse(await req.json());
+    const { weeklyHours, ...rest } = createSchema.parse(await req.json());
     const existing = await prisma.user.findUnique({ where: { email: rest.email } });
     if (existing) return NextResponse.json({ error: "E-mailadres al in gebruik" }, { status: 409 });
 
@@ -62,9 +51,6 @@ export async function POST(req: Request) {
         ...rest,
         password: await hash(rest.password, 12),
         weeklyHours: weeklyHours ?? null,
-        contractHours: contractHours ?? null,
-        contractStart: contractStart ? new Date(contractStart) : null,
-        contractEnd: contractEnd ? new Date(contractEnd) : null,
       },
       select: userSelect,
     });
