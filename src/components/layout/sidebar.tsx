@@ -166,9 +166,10 @@ export function Sidebar({ user, role }: SidebarProps) {
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    // ponytail: "/km" needs exact match so /km/templates doesn't light up both items
+                    // ponytail: parents with child routes need exact match so the child
+                    // (e.g. /km/templates, /settings/beoordelingen) doesn't light up both items
                     const active =
-                      item.href === "/" || item.href === "/km"
+                      item.href === "/" || item.href === "/km" || item.href === "/settings"
                         ? pathname === item.href
                         : pathname.startsWith(item.href);
                     return (
