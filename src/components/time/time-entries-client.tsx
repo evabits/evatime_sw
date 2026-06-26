@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatHours, formatCurrency, cn } from "@/lib/utils";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
@@ -51,9 +52,10 @@ interface Props {
   role: string;
 }
 
-export function TimeEntriesClient({ projects, activityTypes, customers, users, initialEntries, userId, role }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, activityTypes, customers, users, initialEntries, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
+  const [projects, setProjects] = useState(projectsProp);
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,6 +63,11 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
   const [filterProject, setFilterProject] = useState("all");
   const [fetching, setFetching] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectActivityIds, setNewProjectActivityIds] = useState<string[]>([]);
+  const [newProjectSaving, setNewProjectSaving] = useState(false);
 
   const [filterUser, setFilterUser] = useState("all");
 
@@ -105,7 +112,7 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
 
   const filteredProjects = selectedCustomerId === ""
     ? projects
-    : projects.filter((p) => p.customer.id === selectedCustomerId);
+    : projects.filter((p) => p.customer?.id === selectedCustomerId);
 
   const filteredActivityTypes = activityTypes.filter((a) => {
     if (a.showInAllProjects) return true;
@@ -199,6 +206,38 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
 
   function toggleDay(dayStr: string) {
     setSelectedDay((prev) => (prev === dayStr ? null : dayStr));
+  }
+
+  async function handleCreateConceptProject() {
+    if (!newProjectName.trim()) return;
+    setNewProjectSaving(true);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProjectName.trim(),
+          status: "CONCEPT",
+          activityTypeIds: newProjectActivityIds,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error ?? "Aanmaken mislukt");
+        return;
+      }
+      const created = await res.json();
+      setProjects((prev) => [
+        ...prev,
+        { id: created.id, name: created.name, status: "CONCEPT", defaultHourlyRate: null, customer: null, activityRates: [] },
+      ]);
+      form.setValue("projectId", created.id);
+      setNewProjectOpen(false);
+      setNewProjectName("");
+      setNewProjectActivityIds([]);
+    } finally {
+      setNewProjectSaving(false);
+    }
   }
 
   async function onSubmit(data: FormData) {
@@ -300,14 +339,21 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
 
             <div className="space-y-2">
               <Label>Project *</Label>
-              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
-                <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
-                <SelectContent>
-                  {filteredProjects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
+                  <SelectContent>
+                    {filteredProjects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.customer ? `${p.customer.name} — ` : ""}{p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" size="sm" onClick={() => setNewProjectOpen(true)}>
+                  + Nieuw project
+                </Button>
+              </div>
               {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
             </div>
 
@@ -442,7 +488,9 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
                     <SelectContent>
                       <SelectItem value="all">Alle projecten</SelectItem>
                       {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.customer ? `${p.customer.name} — ` : ""}{p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -624,6 +672,44 @@ export function TimeEntriesClient({ projects, activityTypes, customers, users, i
           </CardContent>
         )}
       </Card>
+
+      <Dialog open={newProjectOpen} onOpenChange={setNewProjectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nieuw conceptproject</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Naam</Label>
+              <Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Activiteiten</Label>
+              <div className="space-y-1">
+                {activityTypes.map((a) => (
+                  <label key={a.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={newProjectActivityIds.includes(a.id)}
+                      onChange={(e) =>
+                        setNewProjectActivityIds((prev) =>
+                          e.target.checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
+                        )
+                      }
+                    />
+                    {a.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleCreateConceptProject} disabled={newProjectSaving || !newProjectName.trim()}>
+              Aanmaken
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
