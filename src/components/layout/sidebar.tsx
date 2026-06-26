@@ -23,6 +23,7 @@ import {
   Umbrella,
   Menu,
   X,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
       { href: "/activity-types", label: "Activiteiten", icon: Activity },
       { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag },
       { href: "/users", label: "Gebruikers", icon: UserCog },
+      { href: "/payroll", label: "Loonverwerking", icon: Wallet },
       { href: "/settings", label: "Instellingen", icon: Settings },
     ],
   },
