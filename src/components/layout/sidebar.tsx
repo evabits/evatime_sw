@@ -19,6 +19,7 @@ import {
   UserCog,
   Tag,
   ClipboardList,
+  ClipboardCheck,
   CalendarCheck,
   Umbrella,
   Menu,
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/beoordelingen", label: "Mijn beoordelingen", icon: ClipboardCheck },
     ],
   },
   {
