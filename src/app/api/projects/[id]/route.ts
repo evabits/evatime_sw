@@ -8,7 +8,7 @@ const schema = z.object({
   customerId: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
-  status: z.enum(["ACTIVE", "INACTIVE", "COMPLETED"]),
+  status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
   defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),

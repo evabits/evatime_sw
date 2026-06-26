@@ -188,7 +188,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
                   <SelectTrigger><SelectValue placeholder="Geen project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">Geen project</SelectItem>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>)}
+                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -276,7 +276,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
                     <SelectTrigger className="w-48 h-8 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Alle projecten</SelectItem>
-                      {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.customer.name} — {p.name}</SelectItem>)}
+                      {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </>
