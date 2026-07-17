@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 const schema = z.object({
@@ -48,6 +48,17 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
   const [selectedTags, setSelectedTags] = useState<{ name: string }[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showArchived, setShowArchived] = useState(false);
+
+  async function loadProjects(withArchived: boolean) {
+    const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
+    if (res.ok) setProjects(await res.json());
+  }
+
+  async function restoreProject(id: string) {
+    const res = await fetch(`/api/projects/${id}`, { method: "PATCH" });
+    if (res.ok) loadProjects(showArchived);
+  }
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -122,10 +133,10 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
     setDialogOpen(true);
   }
 
-  async function deleteProject(id: string) {
-    if (!confirm("Weet u zeker dat u dit project wilt verwijderen?")) return;
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  async function archiveProject(id: string) {
+    if (!confirm("Weet u zeker dat u dit project wilt archiveren?")) return;
+    const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    if (res.ok) loadProjects(showArchived);
   }
 
   return (
@@ -136,6 +147,12 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
           <p className="text-muted-foreground">Beheer uw projecten en tarieven</p>
         </div>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer mr-1">
+            <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
+              checked={showArchived}
+              onChange={(e) => { setShowArchived(e.target.checked); loadProjects(e.target.checked); }} />
+            Toon gearchiveerd
+          </label>
           <Select onValueChange={setStatusFilter} value={statusFilter}>
             <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -174,8 +191,11 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
               {projects
               .filter((p) => statusFilter === "all" || p.status === statusFilter)
               .map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
+                <TableRow key={p.id} className={p.archivedAt ? "opacity-60" : undefined}>
+                  <TableCell className="font-medium">
+                    {p.name}
+                    {p.archivedAt && <span className="ml-2 text-xs text-muted-foreground">(gearchiveerd)</span>}
+                  </TableCell>
                   <TableCell>{p.customer?.name}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[p.status] as any}>{statusLabel[p.status]}</Badge>
@@ -189,15 +209,23 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
                   </TableCell>
                   <TableCell className="text-right">{p.defaultHourlyRate ? formatCurrency(Number(p.defaultHourlyRate)) : "—"}</TableCell>
                   <TableCell className="text-right">{p.defaultKmRate ? `€${Number(p.defaultKmRate).toFixed(2)}` : "—"}</TableCell>
-                  <TableCell className="text-right">{p._count.timeEntries}</TableCell>
+                  <TableCell className="text-right">{p._count?.timeEntries ?? 0}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(p)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteProject(p.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                      {p.archivedAt ? (
+                        <Button variant="ghost" size="icon" onClick={() => restoreProject(p.id)} title="Herstellen">
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => startEdit(p)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => archiveProject(p.id)} title="Archiveren">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, RotateCcw } from "lucide-react";
 import Link from "next/link";
 
 const schema = z.object({
@@ -42,8 +42,19 @@ export function CustomersClient({ initialCustomers }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: EMPTY });
+
+  async function loadCustomers(withArchived: boolean) {
+    const res = await fetch(`/api/customers${withArchived ? "?includeArchived=1" : ""}`);
+    if (res.ok) setCustomers(await res.json());
+  }
+
+  async function restoreCustomer(id: string) {
+    const res = await fetch(`/api/customers/${id}`, { method: "PATCH" });
+    if (res.ok) loadCustomers(showArchived);
+  }
 
   async function onSubmit(data: FormData) {
     setLoading(true);
@@ -104,10 +115,10 @@ export function CustomersClient({ initialCustomers }: Props) {
     setDialogOpen(true);
   }
 
-  async function deleteCustomer(id: string) {
-    if (!confirm("Weet u zeker dat u deze klant wilt verwijderen?")) return;
+  async function archiveCustomer(id: string) {
+    if (!confirm("Weet u zeker dat u deze klant wilt archiveren?")) return;
     const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    if (res.ok) setCustomers((prev) => prev.filter((c) => c.id !== id));
+    if (res.ok) loadCustomers(showArchived);
   }
 
   return (
@@ -117,9 +128,17 @@ export function CustomersClient({ initialCustomers }: Props) {
           <h1 className="text-2xl font-bold">Klanten</h1>
           <p className="text-muted-foreground">Beheer uw klanten</p>
         </div>
-        <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Klant toevoegen
-        </Button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+            <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
+              checked={showArchived}
+              onChange={(e) => { setShowArchived(e.target.checked); loadCustomers(e.target.checked); }} />
+            Toon gearchiveerd
+          </label>
+          <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> Klant toevoegen
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -145,24 +164,35 @@ export function CustomersClient({ initialCustomers }: Props) {
                 </TableRow>
               )}
               {customers.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                <TableRow key={c.id} className={c.archivedAt ? "opacity-60" : undefined}>
+                  <TableCell className="font-medium">
+                    {c.name}
+                    {c.archivedAt && <span className="ml-2 text-xs text-muted-foreground">(gearchiveerd)</span>}
+                  </TableCell>
                   <TableCell>{c.email || "—"}</TableCell>
                   <TableCell>{c.phone || "—"}</TableCell>
                   <TableCell>{c.city || "—"}</TableCell>
-                  <TableCell className="text-right">{c._count.projects}</TableCell>
-                  <TableCell className="text-right">{c._count.invoices}</TableCell>
+                  <TableCell className="text-right">{c._count?.projects ?? 0}</TableCell>
+                  <TableCell className="text-right">{c._count?.invoices ?? 0}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/customers/${c.id}`}><ExternalLink className="h-3.5 w-3.5" /></Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(c)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteCustomer(c.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                      {c.archivedAt ? (
+                        <Button variant="ghost" size="icon" onClick={() => restoreCustomer(c.id)} title="Herstellen">
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link href={`/customers/${c.id}`}><ExternalLink className="h-3.5 w-3.5" /></Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => startEdit(c)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => archiveCustomer(c.id)} title="Archiveren">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

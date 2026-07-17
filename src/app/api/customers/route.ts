@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const customers = await prisma.customer.findMany({
       where: archivedWhere(includeArchived),
       orderBy: { name: "asc" },
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { projects: true, invoices: true } } },
     });
     return NextResponse.json(customers);
   } catch (e) {
