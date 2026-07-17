@@ -22,15 +22,28 @@ they throw. Deleting is also undesirable — history must be preserved.
   COMPLETED), untouched.
 - **List/GET endpoints** default to `where: { archivedAt: null }`. Accept
   `?includeArchived=1` to include archived rows.
-- **All pickers/selectors** exclude archived: project dropdowns, customer
-  dropdowns, activity-type dropdowns, the employee filter on the time page.
 - **DELETE handlers become archive:** each existing DELETE handler sets
   `archivedAt = now()` instead of `prisma.delete`. Add an unarchive path
   (PATCH or a `?unarchive` flag). Hard-delete is dropped entirely (YAGNI).
+  Safe: existing delete callers (customers/projects/activity-types/users
+  clients) only `fetch(DELETE)` then drop the row from local state — none read
+  the response body.
+
+**Every read site that must exclude archived** — the sweep is wider than the
+four list pages. Each `prisma.{customer,project,activityType,user}.findMany`
+needs an `archivedAt: null` decision:
+- Pickers/lists: `time/page.tsx` (employee filter), `invoices/new`,
+  `quotes/new`, `expenses`, `km`, `personeel`, `reports`, `(app)/page.tsx`
+  (dashboard), `api/hours-overview/route.ts`, `api/payroll/route.ts`.
+- **Cron/background jobs must skip archived users too** (else archived staff
+  get emailed/paid): `cron/hours-reminder`, `cron/review-reminder`,
+  `cron/contract-expiry`, `payroll`.
+
 - **User archive:** reuse the existing "cannot delete/archive own account"
-  guard. Archived users are blocked at login (add `archivedAt: null` to the
-  credentials lookup in `@/lib/auth`) and excluded from staff lists and the
-  time-page employee filter.
+  guard. Block archived users at login — add `archivedAt: null` to the
+  credentials lookup in `@/lib/auth` **and** verify the Google-provider path
+  (upsert around `auth.ts:44`) also rejects archived users (it does not
+  `findUnique` on `archivedAt` today).
 - **UI:** "Archiveren" / "Herstellen" buttons on each entity; a "Toon
   gearchiveerd" toggle per list page. Archived rows render muted.
 
@@ -40,9 +53,12 @@ they throw. Deleting is also undesirable — history must be preserved.
 - `src/app/api/projects/[id]/route.ts`, `src/app/api/projects/route.ts`
 - `src/app/api/activity-types/[id]/route.ts`, `src/app/api/activity-types/route.ts`
 - `src/app/api/users/[id]/route.ts`, `src/app/api/users/route.ts`
-- `src/lib/auth.ts` (login block)
-- list pages under `src/app/(app)/{customers,projects,activity-types,users}`
-  and any shared picker components.
+- `src/lib/auth.ts` (credentials + Google login block)
+- the read sites listed above (list pages, pickers, cron, payroll,
+  hours-overview) and any shared picker components.
+- **Serialization note:** `customers/[id]` returns the model directly via
+  `NextResponse.json(customer)` (not `serialize`), so the new `archivedAt` Date
+  is emitted raw — fine, but consumers must handle a Date/ISO string.
 
 **Test:** a query-level check that an archived row is excluded from the default
 list query and included with `includeArchived`.
@@ -88,11 +104,17 @@ Concrete data paths that make entries "vanish":
 - Small count endpoint returns, for an activity type, the number of
   `TimeEntry` + `KmEntry` referencing it (and total hours), optionally split by
   project.
+- **On edit that removes a project-link** (`activity-types/[id]/route.ts:28`,
+  the `deleteMany` of `activityTypeProject`): if entries are booked on a project
+  being unlinked, warn before saving. **This is the primary path** — see note.
 - **On delete:** if count > 0, the UI shows a confirm dialog —
   *"N registraties (X uur) gebruiken deze activiteit. Verwijderen ontkoppelt
   ze."* — and the delete only proceeds with an explicit confirmed flag.
-- **On edit that removes a project-link:** if entries are booked on a project
-  being unlinked, warn before saving.
+
+**Interaction with #1:** once #1 turns activity-type DELETE into archive, the
+"hours vanish on hard-delete" path largely disappears (archived types keep
+their FK links). The warning then centers on the edit/project-unlink path. If
+#1 ships first, the delete-confirm becomes an archive-confirm.
 
 **Affected files:**
 - `src/app/api/activity-types/[id]/route.ts` (count + confirmed-delete guard)
@@ -120,17 +142,29 @@ not own/edit it, while still keeping their own templates for other activities.
 - **Employee** GET returns their own templates (self + admin-managed). They can
   apply any template; they can create/edit/delete only their own non-managed
   ones. Admin-managed templates render read-only (locked).
-- New `src/app/api/km/templates/[id]/route.ts` (PUT/DELETE) enforces the
-  admin-vs-owner rules; `km/templates` POST accepts an optional target `userId`
-  + `managedByAdmin` when the caller is admin.
+
+**`km/templates/[id]/route.ts` already exists — REWRITE, not add.** Current
+state (blocker to reconcile):
+- Both PUT and DELETE are owner-scoped via `where: { id, userId }`
+  (`updateMany`/`deleteMany` → `count === 0` → 404). An admin editing *another*
+  user's template would silently 404. New authorization: allow the row's owner
+  **or** an admin; when `managedByAdmin === true`, block the non-admin owner.
+- PUT today only accepts `{ name }`. It must accept the full managed-template
+  fields (project/activityType/km/description) when the caller is admin.
+- `km-templates-client.tsx` already calls these endpoints — its calls and the
+  new locked-state UI must stay in sync.
+- POST (`km/templates/route.ts`) accepts an optional target `userId` +
+  `managedByAdmin` when the caller is admin.
+- `@@unique([userId, name])` (schema:189): a managed and a self template for the
+  same user can't share a name — the 409 handler must surface this clearly.
 
 **Affected files:**
 - `prisma/schema.prisma`
 - `src/app/api/km/templates/route.ts`
-- `src/app/api/km/templates/[id]/route.ts` (new)
+- `src/app/api/km/templates/[id]/route.ts` (rewrite existing)
 - `src/lib/km-template.ts` (schema)
-- `src/app/(app)/personeel/[id]` (admin block), km template list UI (locked
-  state).
+- `src/app/(app)/personeel/[id]` (admin block), `km-templates-client.tsx`
+  (locked state).
 
 **Test:** authorization logic — admin may write another user's managed
 template; a non-admin may not edit/delete a managed template.
@@ -157,11 +191,18 @@ const weeklyHours = z.preprocess(
 - `"0"` → clear validation error.
 - `"40"` → 40.
 
-Confirm the client user form does not itself block an empty value.
+**The client form has the identical bug and blocks first** —
+`users-client.tsx:22` (create) and `:30` (edit) both use
+`z.coerce.number().positive().optional().nullable()`, so validation fails in
+the browser before any request is sent. The same `preprocess` field MUST be
+applied to both client schemas, or the bug persists in the UI regardless of the
+server fix. (The inputs also carry `min="1"` at `:236`/`:282`; harmless — HTML
+`min` doesn't reject an empty field.)
 
 **Affected files:**
 - shared schema (co-locate near the user routes or in a small `src/lib`
-  helper), `src/app/api/users/route.ts`, `src/app/api/users/[id]/route.ts`.
+  helper), `src/app/api/users/route.ts`, `src/app/api/users/[id]/route.ts`,
+  **and `src/components/users/users-client.tsx` (both schemas)**.
 
 **Test:** schema test — `""` → null/undefined, `"0"` → error, `"40"` → 40.
 
