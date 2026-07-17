@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { removedProjectIds } from "@/lib/activity-impact";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
@@ -33,6 +34,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [editOriginalProjectIds, setEditOriginalProjectIds] = useState<string[]>([]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -48,6 +50,18 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
   }
 
   async function onSubmit(data: FormData) {
+    if (editing && !data.showInAllProjects) {
+      const removed = removedProjectIds(editOriginalProjectIds, selectedProjectIds);
+      if (removed.length > 0) {
+        const impRes = await fetch(`/api/activity-types/${editing}/impact`);
+        const impact = impRes.ok ? await impRes.json() : { projectIds: [] };
+        const affected = removed.filter((pid: string) => impact.projectIds?.includes(pid));
+        if (affected.length > 0 &&
+            !confirm(`Er zijn uren geboekt op ${affected.length} project(en) die je loskoppelt van dit activiteittype. Toch opslaan?`)) {
+          return;
+        }
+      }
+    }
     setLoading(true);
     const payload = {
       ...data,
@@ -87,6 +101,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
     setDialogOpen(false);
     setEditing(null);
     setSelectedProjectIds([]);
+    setEditOriginalProjectIds([]);
     form.reset({ billable: true, showInAllProjects: false });
   }
 
@@ -97,7 +112,9 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
 
   function startEdit(type: any) {
     setEditing(type.id);
-    setSelectedProjectIds(type.projects?.map((p: any) => p.projectId) ?? []);
+    const original = type.projects?.map((p: any) => p.projectId) ?? [];
+    setSelectedProjectIds(original);
+    setEditOriginalProjectIds(original);
     form.reset({
       name: type.name,
       defaultRate: type.defaultRate ? Number(type.defaultRate) : "",
@@ -108,8 +125,14 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
   }
 
   async function deleteType(id: string) {
-    if (!confirm("Weet u zeker dat u dit activiteittype wilt verwijderen?")) return;
-    await fetch(`/api/activity-types/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/activity-types/${id}/impact`);
+    const impact = res.ok ? await res.json() : { timeEntries: 0, kmEntries: 0, hours: 0 };
+    const booked = impact.timeEntries + impact.kmEntries;
+    const msg = booked > 0
+      ? `${booked} registratie(s) (${impact.hours} uur) gebruiken dit activiteittype. Verwijderen ontkoppelt ze. Doorgaan?`
+      : "Weet u zeker dat u dit activiteittype wilt verwijderen?";
+    if (!confirm(msg)) return;
+    await fetch(`/api/activity-types/${id}?confirm=1`, { method: "DELETE" });
     setTypes((prev) => prev.filter((t) => t.id !== id));
   }
 
