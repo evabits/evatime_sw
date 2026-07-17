@@ -38,9 +38,10 @@ interface Props {
   initialProjects: any[];
   customers: any[];
   allTags: { id: string; name: string }[];
+  initialNoCustomerOnly?: boolean;
 }
 
-export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
+export function ProjectsClient({ initialProjects, customers, allTags, initialNoCustomerOnly = false }: Props) {
   const [projects, setProjects] = useState(initialProjects);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -49,6 +50,8 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
   const [tagInput, setTagInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
+  const [noCustomerOnly, setNoCustomerOnly] = useState(initialNoCustomerOnly);
+  const customerlessCount = projects.filter((p) => !p.customer && !p.archivedAt).length;
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -153,6 +156,15 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
               onChange={(e) => { setShowArchived(e.target.checked); loadProjects(e.target.checked); }} />
             Toon gearchiveerd
           </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer mr-1">
+            <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
+              checked={noCustomerOnly}
+              onChange={(e) => setNoCustomerOnly(e.target.checked)} />
+            Zonder klant
+            {customerlessCount > 0 && (
+              <Badge variant="secondary" className="ml-1">{customerlessCount}</Badge>
+            )}
+          </label>
           <Select onValueChange={setStatusFilter} value={statusFilter}>
             <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -190,6 +202,7 @@ export function ProjectsClient({ initialProjects, customers, allTags }: Props) {
               )}
               {projects
               .filter((p) => statusFilter === "all" || p.status === statusFilter)
+              .filter((p) => !noCustomerOnly || !p.customer)
               .map((p) => (
                 <TableRow key={p.id} className={p.archivedAt ? "opacity-60" : undefined}>
                   <TableCell className="font-medium">
