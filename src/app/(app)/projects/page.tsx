@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { serialize } from "@/lib/utils";
 import { ProjectsClient } from "@/components/projects/projects-client";
 
 export default async function ProjectsPage() {
+  const session = await auth();
+  if ((session?.user as any)?.role !== "ADMIN") redirect("/");
+
   const [projects, customers, allTags] = await Promise.all([
     prisma.project.findMany({
       where: { archivedAt: null },
