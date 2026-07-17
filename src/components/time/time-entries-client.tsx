@@ -72,6 +72,31 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const [filterUser, setFilterUser] = useState("all");
 
+  const filtersKey = `time-filters:${userId}`;
+
+  // Hydrate saved filters once on mount (client-only; avoids SSR mismatch).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(filtersKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { filterUser?: string; filterProject?: string };
+      if (saved.filterUser) setFilterUser(saved.filterUser);
+      if (saved.filterProject) setFilterProject(saved.filterProject);
+    } catch {
+      /* ignore malformed storage */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(filtersKey, JSON.stringify({ filterUser, filterProject }));
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [filtersKey, filterUser, filterProject]);
+
   // Week view state
   const [viewMode, setViewMode] = useState<"week" | "list">("week");
   const [weekOffset, setWeekOffset] = useState(0);
