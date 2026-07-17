@@ -72,6 +72,41 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const [filterUser, setFilterUser] = useState("all");
 
+  const filtersKey = `time-filters:${userId}`;
+
+  // Hydrate saved filters once on mount, then re-fetch to match (client-only; avoids SSR mismatch).
+  useEffect(() => {
+    let savedUser: string | undefined;
+    let savedProject: string | undefined;
+    try {
+      const raw = localStorage.getItem(filtersKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as { filterUser?: string; filterProject?: string };
+        savedUser = saved.filterUser;
+        savedProject = saved.filterProject;
+      }
+    } catch {
+      /* ignore malformed storage */
+    }
+    if (savedUser) setFilterUser(savedUser);
+    if (savedProject) setFilterProject(savedProject);
+    // initialEntries were fetched with the default "all" filters; re-fetch if we restored anything.
+    if (savedUser || savedProject) {
+      if (viewMode === "week") fetchWeekEntries(weekOffset, savedUser ?? "all");
+      else fetchEntries(filterMonth, savedProject ?? "all", savedUser ?? "all");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(filtersKey, JSON.stringify({ filterUser, filterProject }));
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [filtersKey, filterUser, filterProject]);
+
   // Week view state
   const [viewMode, setViewMode] = useState<"week" | "list">("week");
   const [weekOffset, setWeekOffset] = useState(0);

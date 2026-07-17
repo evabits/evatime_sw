@@ -13,13 +13,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { weeklyHoursField } from "@/lib/user-schema";
 
 const createSchema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres"),
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
-  weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  weeklyHours: weeklyHoursField,
 });
 
 const editSchema = z.object({
@@ -27,7 +28,7 @@ const editSchema = z.object({
   email: z.string().email("Ongeldig e-mailadres"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
-  weeklyHours: z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+  weeklyHours: weeklyHoursField,
 });
 
 type CreateData = z.infer<typeof createSchema>;
