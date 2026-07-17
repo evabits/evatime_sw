@@ -307,7 +307,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          form.reset({ date: selectedDay ?? today, billable: true });
+          form.reset({ date: data.date, billable: true });
           if (viewMode === "week") {
             await fetchWeekEntries(weekOffset);
           } else {
