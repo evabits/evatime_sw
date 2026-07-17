@@ -41,7 +41,7 @@ export const ROLES = {
       manageAllExpenses: false,
       createEditInvoices: false,
       viewInvoices: "sent_paid" as const,
-      viewReports: false,
+      viewReports: true,
     },
   },
   EMPLOYEE: {
@@ -77,6 +77,10 @@ export function isAdminOrFinance(role: string): boolean {
 }
 
 export function canViewInvoices(role: string): boolean {
+  return role === "ADMIN" || role === "FINANCE";
+}
+
+export function canViewReports(role: string): boolean {
   return role === "ADMIN" || role === "FINANCE";
 }
 
