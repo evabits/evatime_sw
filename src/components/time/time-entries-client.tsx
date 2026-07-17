@@ -157,13 +157,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
   });
 
   useEffect(() => {
-    if (!isAdmin) {
-      const act = activityTypes.find((a) => a.id === activityTypeId);
-      form.setValue("billable", act?.billable ?? true);
-    }
-  }, [activityTypeId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     form.setValue("projectId", "");
     form.setValue("activityTypeId", undefined);
   }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -314,7 +307,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          form.reset({ date: selectedDay ?? today, billable: true });
+          form.reset({ date: data.date, billable: true });
           if (viewMode === "week") {
             await fetchWeekEntries(weekOffset);
           } else {
@@ -414,7 +407,11 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
             <div className="space-y-2">
               <Label>Activiteit</Label>
               <Select
-                onValueChange={(v) => form.setValue("activityTypeId", v)}
+                onValueChange={(v) => {
+                  form.setValue("activityTypeId", v);
+                  const act = activityTypes.find((a) => a.id === v);
+                  form.setValue("billable", act?.billable ?? true);
+                }}
                 value={form.watch("activityTypeId") ?? ""}
               >
                 <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>

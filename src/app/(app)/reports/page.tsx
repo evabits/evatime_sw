@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { canViewReports } from "@/lib/roles";
 import { ReportsClient } from "@/components/reports/reports-client";
 
 export default async function ReportsPage() {
   const session = await auth();
+  if (!canViewReports((session?.user as any)?.role ?? "EMPLOYEE")) redirect("/");
   const [customers, projects, users, tags] = await Promise.all([
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.project.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, customerId: true } }),

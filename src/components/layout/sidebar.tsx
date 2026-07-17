@@ -73,7 +73,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/invoices", label: "Facturen", icon: FileText, roles: ["ADMIN", "FINANCE"] },
       { href: "/quotes", label: "Offertes", icon: ClipboardList, roles: ["ADMIN"] },
-      { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN"] },
+      { href: "/reports", label: "Rapporten", icon: BarChart3, roles: ["ADMIN", "FINANCE"] },
     ],
   },
   {

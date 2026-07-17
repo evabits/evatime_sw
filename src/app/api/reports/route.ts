@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { canViewReports } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
@@ -7,6 +8,8 @@ export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!canViewReports(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");
