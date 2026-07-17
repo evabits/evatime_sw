@@ -12,14 +12,14 @@ export async function GET(req: Request) {
   const quarter = currentQuarter();
 
   const [users, reviewed] = await Promise.all([
-    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.performanceReview.findMany({ where: { period: quarter }, select: { userId: true } }),
   ]);
 
   const missing = usersMissingReview(users, new Set(reviewed.map((r) => r.userId)));
   if (missing.length === 0) return NextResponse.json({ reminded: 0, missing: 0 });
 
-  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { name: true, email: true } });
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN", archivedAt: null }, select: { name: true, email: true } });
   const settings = await prisma.companySettings.findFirst();
 
   let reminded = 0;

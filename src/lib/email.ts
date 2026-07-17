@@ -10,6 +10,8 @@ const transport = nodemailer.createTransport(
   MailtrapTransport({ token: process.env.MAILTRAP_API_TOKEN! })
 );
 
+const FROM_ADDRESS = "no-reply@time.evabits.work"; // ponytail: single source; was inline ×8
+
 function fmt(date: string) {
   return new Date(date).toLocaleDateString("nl-NL");
 }
@@ -76,7 +78,7 @@ function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
 
 export async function sendInvoiceEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
   const publicUrl = `${appUrl}/invoice/${invoice.viewToken}`;
 
   const [pdfBuffer, ...blobAttachments] = await Promise.all([
@@ -107,7 +109,7 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
 export async function sendReminderEmail(invoice: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/invoice/${invoice.viewToken}`;
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -147,7 +149,7 @@ export async function sendHoursReminderEmail(
   settings: any
 ): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -192,7 +194,7 @@ export async function sendHoursReminderEmail(
 
 export async function sendBookkeepingEmail(invoice: any, settings: any): Promise<void> {
   const to = process.env.BOOKKEEPING_EMAIL!;
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
 
   const pdfBuffer = await renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any);
 
@@ -211,7 +213,7 @@ export async function sendContractExpiryEmail(
   employee: { name: string },
   settings: any,
 ): Promise<void> {
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
   const end = new Date(contract.endDate).toLocaleDateString("nl-NL");
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
@@ -235,7 +237,7 @@ export async function sendReviewPlannedEmail(
   settings: any,
 ): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
   const when = review.plannedDate ? new Date(review.plannedDate).toLocaleDateString("nl-NL") : "nader te bepalen";
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
@@ -252,7 +254,7 @@ export async function sendReviewPlannedEmail(
 export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
 
   const linesHtml = quote.lines
     .map((l: any) => `
@@ -339,7 +341,7 @@ export async function sendReviewReminderEmail(
   settings: any,
 ): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = `"${settings?.name ?? "EVAbits"}" <no-reply@time.evabits.dev>`;
+  const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
   const list = employees.map((e) => `<li style="margin:2px 0;">${e.name}</li>`).join("");
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">

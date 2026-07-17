@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const elapsedDays = Math.min(Math.max(dayOfWeek === 0 ? 5 : dayOfWeek, 1), 5);
 
   const users = await prisma.user.findMany({
-    where: { weeklyHours: { not: null } },
+    where: { weeklyHours: { not: null }, archivedAt: null },
     select: { id: true, name: true, email: true, weeklyHours: true },
   });
 

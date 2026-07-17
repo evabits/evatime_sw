@@ -16,7 +16,7 @@ export default async function ExpensesPage() {
   const [categories, projects, initialExpenses] = await Promise.all([
     prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
     prisma.project.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, customer: { select: { name: true } } },
     }),

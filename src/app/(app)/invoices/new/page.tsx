@@ -4,6 +4,7 @@ import { NewInvoiceClient } from "@/components/invoices/new-invoice-client";
 
 export default async function NewInvoicePage() {
   const customers = await prisma.customer.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

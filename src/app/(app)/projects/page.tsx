@@ -5,6 +5,7 @@ import { ProjectsClient } from "@/components/projects/projects-client";
 export default async function ProjectsPage() {
   const [projects, customers, allTags] = await Promise.all([
     prisma.project.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       include: {
         customer: { select: { id: true, name: true } },
@@ -12,7 +13,7 @@ export default async function ProjectsPage() {
         tags: { select: { id: true, name: true } },
       },
     }),
-    prisma.customer.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 

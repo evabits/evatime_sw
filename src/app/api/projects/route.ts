@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { projectCreateDenialReason } from "@/lib/projects";
+import { archivedWhere } from "@/lib/archive";
 
 const schema = z.object({
   customerId: z.string().min(1).optional().nullable(),
@@ -23,10 +24,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
+    const includeArchived = searchParams.get("includeArchived") === "1";
     const projects = await prisma.project.findMany({
       where: {
         ...(customerId ? { customerId } : {}),
         ...(status ? { status: status as any } : {}),
+        ...archivedWhere(includeArchived),
       },
       orderBy: { name: "asc" },
       include: {

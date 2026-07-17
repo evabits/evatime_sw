@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { archivedWhere } from "@/lib/archive";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -13,11 +14,13 @@ const schema = z.object({
   projectIds: z.array(z.string()).default([]),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "1";
     const types = await prisma.activityType.findMany({
+      where: archivedWhere(includeArchived),
       orderBy: { name: "asc" },
       include: { projects: { select: { projectId: true } } },
     });

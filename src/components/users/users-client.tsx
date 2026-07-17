@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { weeklyHoursField } from "@/lib/user-schema";
 
@@ -41,6 +41,7 @@ interface User {
   role: "ADMIN" | "FINANCE" | "EMPLOYEE";
   weeklyHours: number | null;
   createdAt: string;
+  archivedAt?: string | null;
 }
 
 interface Props {
@@ -126,12 +127,22 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
     }
   }
 
-  async function deleteUser(id: string) {
-    if (!confirm("Weet u zeker dat u deze gebruiker wilt verwijderen?")) return;
+  const [showArchived, setShowArchived] = useState(false);
+
+  async function loadUsers(withArchived: boolean) {
+    const res = await fetch(`/api/users${withArchived ? "?includeArchived=1" : ""}`);
+    if (res.ok) setUsers(await res.json());
+  }
+
+  async function restoreUser(id: string) {
+    const res = await fetch(`/api/users/${id}`, { method: "PATCH" });
+    if (res.ok) loadUsers(showArchived);
+  }
+
+  async function archiveUser(id: string) {
+    if (!confirm("Weet u zeker dat u deze gebruiker wilt archiveren?")) return;
     const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-    }
+    if (res.ok) loadUsers(showArchived);
   }
 
   return (
@@ -142,9 +153,17 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
           <p className="text-muted-foreground">Beheer accounts en wachtwoorden</p>
         </div>
         {isAdmin && (
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Gebruiker toevoegen
-          </Button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+              <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
+                checked={showArchived}
+                onChange={(e) => { setShowArchived(e.target.checked); loadUsers(e.target.checked); }} />
+              Toon gearchiveerd
+            </label>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-2" /> Gebruiker toevoegen
+            </Button>
+          </div>
         )}
       </div>
 
@@ -163,12 +182,13 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className={user.archivedAt ? "opacity-60" : undefined}>
                   <TableCell className="font-medium">
                     {user.name}
                     {user.id === currentUserId && (
                       <Badge variant="secondary" className="ml-2 text-xs">Uzelf</Badge>
                     )}
+                    {user.archivedAt && <span className="ml-2 text-xs text-muted-foreground">(gearchiveerd)</span>}
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
@@ -182,15 +202,25 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
-                      {(isAdmin || user.id === currentUserId) && (
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {isAdmin && user.id !== currentUserId && (
-                        <Button variant="ghost" size="icon" onClick={() => deleteUser(user.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
+                      {user.archivedAt ? (
+                        isAdmin && (
+                          <Button variant="ghost" size="icon" onClick={() => restoreUser(user.id)} title="Herstellen">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )
+                      ) : (
+                        <>
+                          {(isAdmin || user.id === currentUserId) && (
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {isAdmin && user.id !== currentUserId && (
+                            <Button variant="ghost" size="icon" onClick={() => archiveUser(user.id)} title="Archiveren">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </TableCell>

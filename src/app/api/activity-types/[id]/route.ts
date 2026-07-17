@@ -40,7 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   } catch (e) { return handleError(e); }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,7 +48,29 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { id } = await params;
-    await prisma.activityType.delete({ where: { id } });
+    const confirmed = new URL(req.url).searchParams.get("confirm") === "1";
+    if (!confirmed) {
+      const booked =
+        (await prisma.timeEntry.count({ where: { activityTypeId: id } })) +
+        (await prisma.kmEntry.count({ where: { activityTypeId: id } }));
+      if (booked > 0) {
+        return NextResponse.json({ error: "IN_USE", booked }, { status: 409 });
+      }
+    }
+    await prisma.activityType.update({ where: { id }, data: { archivedAt: new Date() } });
+    return NextResponse.json({ success: true });
+  } catch (e) { return handleError(e); }
+}
+
+export async function PATCH(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { id } = await params;
+    await prisma.activityType.update({ where: { id }, data: { archivedAt: null } });
     return NextResponse.json({ success: true });
   } catch (e) { return handleError(e); }
 }
