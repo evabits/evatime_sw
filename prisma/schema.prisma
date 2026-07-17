@@ -20,6 +20,7 @@ model User {
   contractEnd       DateTime?         @db.Date
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -57,6 +58,7 @@ model Customer {
   notes      String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
   projects   Project[]
   invoices   Invoice[]
   quotes     Quote[]
@@ -73,6 +75,7 @@ model Project {
   defaultKmRate     Decimal?              @db.Decimal(10, 2)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -104,6 +107,7 @@ model ActivityType {
   showInAllProjects Boolean               @default(false)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
