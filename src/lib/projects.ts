@@ -20,3 +20,23 @@ export function projectCreateDenialReason(role: string, input: NewProjectInput):
     return "Een conceptproject kan geen tarieven hebben";
   return null;
 }
+
+export type ProjectLike = { customer?: { id: string } | null };
+
+/**
+ * Splits projects for the time-entry dropdown. `matched` is the projects that
+ * belong to the selected customer (or all customer-bearing projects when no
+ * customer is selected); `customerless` is every project with no customer and
+ * is ALWAYS returned so those projects stay bookable regardless of the filter.
+ */
+export function partitionProjectsByCustomer<T extends ProjectLike>(
+  projects: T[],
+  selectedCustomerId: string,
+): { matched: T[]; customerless: T[] } {
+  const customerless = projects.filter((p) => !p.customer);
+  const matched =
+    selectedCustomerId === ""
+      ? projects.filter((p) => p.customer)
+      : projects.filter((p) => p.customer?.id === selectedCustomerId);
+  return { matched, customerless };
+}
