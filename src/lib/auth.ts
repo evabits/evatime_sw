@@ -35,8 +35,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    signIn({ user }) {
-      return user.email?.endsWith("@evabits.com") ?? false;
+    signIn({ user, account }) {
+      // Restrict self-provisioning via Google to the company domain.
+      // Credentials users already exist in the DB and passed authorize().
+      if (account?.provider === "google") {
+        return user.email?.endsWith("@evabits.com") ?? false;
+      }
+      return true;
     },
     async jwt({ token, user, account }) {
       if (user) {
