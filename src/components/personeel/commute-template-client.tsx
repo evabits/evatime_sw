@@ -121,8 +121,8 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
 
   async function deleteTemplate(id: string) {
     if (!confirm("Weet u zeker dat u dit woon-werk sjabloon wilt verwijderen?")) return;
-    await fetch(`/api/km/templates/${id}`, { method: "DELETE" });
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    const res = await fetch(`/api/km/templates/${id}`, { method: "DELETE" });
+    if (res.ok) setTemplates((prev) => prev.filter((t) => t.id !== id));
   }
 
   return (
