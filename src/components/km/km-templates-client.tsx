@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Pencil, Trash2 } from "lucide-react";
+import { Lock, Pencil, Trash2 } from "lucide-react";
 
 interface Props {
   initialTemplates: any[];
@@ -93,14 +93,21 @@ export function KmTemplatesClient({ initialTemplates }: Props) {
                   <TableCell>{t.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{Number(t.km).toFixed(1)}</TableCell>
                   <TableCell>
-                    <div className="flex gap-1 justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => startRename(t)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteTemplate(t.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </div>
+                    {t.managedByAdmin ? (
+                      <div className="flex items-center gap-1 justify-end text-muted-foreground">
+                        <Lock className="h-3.5 w-3.5" />
+                        <span className="text-xs">Beheerd door admin</span>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" onClick={() => startRename(t)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteTemplate(t.id)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
