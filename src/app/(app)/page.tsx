@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatHours } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck } from "lucide-react";
+import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   // Employees see only their own totals; admins see company-wide.
   const ownerFilter = isAdmin ? {} : { userId };
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations] = await Promise.all([
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -80,6 +80,9 @@ export default async function DashboardPage() {
     isAdmin
       ? prisma.absenceRequest.count({ where: { status: "PENDING" } })
       : Promise.resolve(0),
+    isAdmin
+      ? prisma.project.count({ where: { customerId: null, archivedAt: null } })
+      : Promise.resolve(0),
   ]);
 
   const pendingReview = userId
@@ -129,6 +132,22 @@ export default async function DashboardPage() {
               <div>
                 <p className="font-medium">Zelfbeoordeling openstaand ({pendingReview.period})</p>
                 <p className="text-sm text-muted-foreground">Vul je zelfbeoordeling in vóór het gesprek.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
+      {isAdmin && customerlessProjects > 0 && (
+        <Link href="/projects?filter=no-customer" className="block">
+          <Card className="border-amber-500/40 bg-amber-500/5">
+            <CardContent className="p-4 flex items-center gap-3">
+              <FolderOpen className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-medium">
+                  {customerlessProjects} {customerlessProjects === 1 ? "project" : "projecten"} zonder klant
+                </p>
+                <p className="text-sm text-muted-foreground">Koppel een klant zodat ze gefactureerd kunnen worden.</p>
               </div>
             </CardContent>
           </Card>
