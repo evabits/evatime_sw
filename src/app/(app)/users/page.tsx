@@ -12,13 +12,14 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, email: true, role: true, weeklyHours: true,
-      createdAt: true,
+      createdAt: true, archivedAt: true,
     },
   });
   const users = rawUsers.map((u) => ({
     ...u,
     weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null,
     createdAt: u.createdAt.toISOString(),
+    archivedAt: u.archivedAt ? u.archivedAt.toISOString() : null,
   }));
 
   return (
