@@ -35,8 +35,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    signIn({ user }) {
-      return user.email?.endsWith("@evabits.com") ?? false;
+    async signIn({ user }) {
+      if (!user.email?.endsWith("@evabits.com")) return false;
+      const dbUser = await prisma.user.findUnique({
+        where: { email: user.email },
+        select: { archivedAt: true },
+      });
+      if (dbUser?.archivedAt) return false; // archived users cannot sign in
+      return true;
     },
     async jwt({ token, user, account }) {
       if (user) {
