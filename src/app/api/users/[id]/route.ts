@@ -16,7 +16,7 @@ const updateSchema = z.object({
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true,
-  createdAt: true,
+  createdAt: true, archivedAt: true,
 } as const;
 
 function serializeUser(u: { weeklyHours: any } & Record<string, any>) {

@@ -33,7 +33,14 @@ export function KmTemplatesClient({ initialTemplates }: Props) {
       const res = await fetch(`/api/km/templates/${renaming.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        // PUT now validates the full template; resend the unchanged fields alongside the new name.
+        body: JSON.stringify({
+          name: name.trim(),
+          projectId: renaming.projectId ?? renaming.project?.id,
+          activityTypeId: renaming.activityTypeId ?? renaming.activityType?.id ?? null,
+          km: Number(renaming.km),
+          description: renaming.description ?? null,
+        }),
       });
       if (res.ok) {
         const updated = await res.json();
