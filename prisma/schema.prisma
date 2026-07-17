@@ -183,6 +183,7 @@ model KmTemplate {
   activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   km             Decimal       @db.Decimal(8, 2)
   description    String?
+  managedByAdmin Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
