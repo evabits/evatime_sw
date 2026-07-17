@@ -51,7 +51,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [noCustomerOnly, setNoCustomerOnly] = useState(initialNoCustomerOnly);
-  const customerlessCount = projects.filter((p) => !p.customer && !p.archivedAt).length;
+  const customerlessCount = projects.filter((p) => !p.customer).length;
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
