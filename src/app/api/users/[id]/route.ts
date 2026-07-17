@@ -69,7 +69,19 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if ((session.user as any)?.id === id) {
       return NextResponse.json({ error: "Kan eigen account niet verwijderen" }, { status: 400 });
     }
-    await prisma.user.delete({ where: { id } });
+    await prisma.user.update({ where: { id }, data: { archivedAt: new Date() } });
+    return NextResponse.json({ success: true });
+  } catch (e) { return handleError(e); }
+}
+
+export async function PATCH(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await auth();
+    if (!session || (session.user as any)?.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const { id } = await params;
+    await prisma.user.update({ where: { id }, data: { archivedAt: null } });
     return NextResponse.json({ success: true });
   } catch (e) { return handleError(e); }
 }
