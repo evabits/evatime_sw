@@ -32,7 +32,14 @@ export async function GET(req: Request) {
 
     const [users, worked, wbso, km] = await Promise.all([
       prisma.user.findMany({
-        where: { archivedAt: null },
+        // active users, plus archived users who still have entries in this month
+        where: {
+          OR: [
+            { archivedAt: null },
+            { timeEntries: { some: { date } } },
+            { kmEntries: { some: { date } } },
+          ],
+        },
         orderBy: { name: "asc" },
         select: { id: true, name: true, contracts: { select: contractSelect } },
       }),

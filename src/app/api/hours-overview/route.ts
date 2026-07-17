@@ -23,7 +23,10 @@ export async function GET(req: Request) {
     const weeks = days / 7;
 
     const users = await prisma.user.findMany({
-      where: isAdmin ? { archivedAt: null } : { id: currentUser.id },
+      // admins see active staff plus archived staff who logged hours in this range
+      where: isAdmin
+        ? { OR: [{ archivedAt: null }, { timeEntries: { some: { date: { gte: fromDate, lte: toDate } } } }] }
+        : { id: currentUser.id },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true, weeklyHours: true },
     });
