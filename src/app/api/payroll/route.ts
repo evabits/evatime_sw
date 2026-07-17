@@ -32,6 +32,7 @@ export async function GET(req: Request) {
 
     const [users, worked, wbso, km] = await Promise.all([
       prisma.user.findMany({
+        where: { archivedAt: null },
         orderBy: { name: "asc" },
         select: { id: true, name: true, contracts: { select: contractSelect } },
       }),

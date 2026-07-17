@@ -8,6 +8,7 @@ export default async function UsersPage() {
   const currentUserRole = (session?.user as any)?.role ?? "EMPLOYEE";
 
   const rawUsers = await prisma.user.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, email: true, role: true, weeklyHours: true,

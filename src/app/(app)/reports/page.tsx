@@ -5,9 +5,9 @@ import { ReportsClient } from "@/components/reports/reports-client";
 export default async function ReportsPage() {
   const session = await auth();
   const [customers, projects, users, tags] = await Promise.all([
-    prisma.customer.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.project.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, customerId: true } }),
-    prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, weeklyHours: true } }),
+    prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.project.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, customerId: true } }),
+    prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, weeklyHours: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 

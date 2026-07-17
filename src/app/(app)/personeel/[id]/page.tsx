@@ -32,10 +32,12 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
 
   const [projects, activityTypes] = await Promise.all([
     prisma.project.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, customer: { select: { name: true } } },
     }),
     prisma.activityType.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

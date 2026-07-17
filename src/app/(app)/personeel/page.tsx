@@ -10,6 +10,7 @@ export default async function PersoneelPage() {
   if ((session?.user as any)?.role !== "ADMIN") redirect("/");
 
   const users = await prisma.user.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true, email: true, role: true, contracts: { select: contractSelect } },
   });

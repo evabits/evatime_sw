@@ -36,7 +36,7 @@ export default async function DashboardPage() {
       _count: true,
     }),
     prisma.project.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", archivedAt: null },
       include: {
         customer: { select: { name: true } },
         timeEntries: {

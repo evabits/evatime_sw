@@ -5,11 +5,12 @@ import { ActivityTypesClient } from "@/components/activity-types/activity-types-
 export default async function ActivityTypesPage() {
   const [types, projects] = await Promise.all([
     prisma.activityType.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       include: { projects: { select: { projectId: true } } },
     }),
     prisma.project.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, customer: { select: { name: true } } },
     }),

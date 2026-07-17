@@ -35,6 +35,7 @@ export default async function AbsencePage() {
     }),
     admin
       ? prisma.user.findMany({
+          where: { archivedAt: null },
           select: { id: true, name: true },
           orderBy: { name: "asc" },
         })
