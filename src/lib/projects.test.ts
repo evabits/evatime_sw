@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectCreateDenialReason } from "./projects";
+import { projectCreateDenialReason, partitionProjectsByCustomer } from "./projects";
 
 describe("projects", () => {
   it("admins may create anything (active with customer)", () => {
@@ -25,5 +25,32 @@ describe("projects", () => {
   });
   it("FINANCE is not admin -> same restriction as employees", () => {
     expect(projectCreateDenialReason("FINANCE", { status: "ACTIVE", customerId: "c1" })).toBeTruthy();
+  });
+});
+
+describe("partitionProjectsByCustomer", () => {
+  const p = (id: string, customerId: string | null) => ({
+    id,
+    customer: customerId ? { id: customerId } : null,
+  });
+
+  it("no customer selected: splits into projects-with-customer and customerless", () => {
+    const projects = [p("a", "c1"), p("b", null), p("c", "c2")];
+    const { matched, customerless } = partitionProjectsByCustomer(projects, "");
+    expect(matched.map((x) => x.id)).toEqual(["a", "c"]);
+    expect(customerless.map((x) => x.id)).toEqual(["b"]);
+  });
+
+  it("customer selected: matched is that customer's projects, customerless always included", () => {
+    const projects = [p("a", "c1"), p("b", null), p("c", "c2")];
+    const { matched, customerless } = partitionProjectsByCustomer(projects, "c1");
+    expect(matched.map((x) => x.id)).toEqual(["a"]);
+    expect(customerless.map((x) => x.id)).toEqual(["b"]);
+  });
+
+  it("customerless is empty when every project has a customer", () => {
+    const projects = [p("a", "c1"), p("c", "c2")];
+    const { customerless } = partitionProjectsByCustomer(projects, "c1");
+    expect(customerless).toEqual([]);
   });
 });

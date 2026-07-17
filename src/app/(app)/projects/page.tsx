@@ -4,10 +4,15 @@ import { redirect } from "next/navigation";
 import { serialize } from "@/lib/utils";
 import { ProjectsClient } from "@/components/projects/projects-client";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   const session = await auth();
   if ((session?.user as any)?.role !== "ADMIN") redirect("/");
 
+  const { filter } = await searchParams;
   const [projects, customers, allTags] = await Promise.all([
     prisma.project.findMany({
       where: { archivedAt: null },
@@ -27,6 +32,7 @@ export default async function ProjectsPage() {
       initialProjects={serialize(projects)}
       customers={serialize(customers)}
       allTags={serialize(allTags)}
+      initialNoCustomerOnly={filter === "no-customer"}
     />
   );
 }
