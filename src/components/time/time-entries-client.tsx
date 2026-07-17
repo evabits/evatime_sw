@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatHours, formatCurrency, cn } from "@/lib/utils";
+import { partitionProjectsByCustomer } from "@/lib/projects";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
 const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
@@ -146,9 +147,8 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
   const activityTypeId = form.watch("activityTypeId");
 
-  const filteredProjects = selectedCustomerId === ""
-    ? projects
-    : projects.filter((p) => p.customer?.id === selectedCustomerId);
+  const { matched: matchedProjects, customerless: customerlessProjects } =
+    partitionProjectsByCustomer(projects, selectedCustomerId);
 
   const filteredActivityTypes = activityTypes.filter((a) => {
     if (a.showInAllProjects) return true;
@@ -387,11 +387,21 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
                   <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                   <SelectContent>
-                    {filteredProjects.map((p) => (
+                    {matchedProjects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.customer ? `${p.customer.name} — ` : ""}{p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
                       </SelectItem>
                     ))}
+                    {customerlessProjects.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Zonder klant</SelectLabel>
+                        {customerlessProjects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
                 <Button type="button" variant="outline" size="sm" onClick={() => setNewProjectOpen(true)}>
