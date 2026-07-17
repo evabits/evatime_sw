@@ -462,3 +462,4 @@ Expected: clean.
 - No change to `projectCreateDenialReason`, the Prisma schema, or the concept-creation dialog. Employees still cannot attach customers or set rates.
 - Sidebar nav badge deliberately skipped — the dashboard banner + projects badge cover visibility without wiring a count through the layout into the client `Sidebar`. Add later if a persistent nav indicator is wanted.
 - Invoicing is unaffected: it filters to ACTIVE projects, so customerless concepts never surface there.
+- **Known, deliberately out of scope:** the kilometer entry form (`src/components/km/km-entries-client.tsx`) has the identical customerless-hiding behaviour — customerless projects disappear from its project dropdown once a customer is selected. The user scoped this batch to the hours form only. If mileage-on-concept-projects becomes a complaint, apply the same `partitionProjectsByCustomer` + "Zonder klant" group treatment there (one-for-one with Task 2).
