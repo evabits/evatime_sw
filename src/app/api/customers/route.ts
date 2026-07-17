@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
+import { archivedWhere } from "@/lib/archive";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -16,12 +17,14 @@ const schema = z.object({
   notes: z.string().optional(),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "1";
     const customers = await prisma.customer.findMany({
+      where: archivedWhere(includeArchived),
       orderBy: { name: "asc" },
       include: { _count: { select: { projects: true } } },
     });

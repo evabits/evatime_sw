@@ -5,6 +5,7 @@ import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
 import { weeklyHoursField } from "@/lib/user-schema";
+import { archivedWhere } from "@/lib/archive";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -16,7 +17,7 @@ const createSchema = z.object({
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true,
-  createdAt: true,
+  createdAt: true, archivedAt: true,
 } as const;
 
 function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
@@ -26,12 +27,17 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const users = await prisma.user.findMany({ orderBy: { name: "asc" }, select: userSelect });
+    const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "1";
+    const users = await prisma.user.findMany({
+      where: archivedWhere(includeArchived),
+      orderBy: { name: "asc" },
+      select: userSelect,
+    });
     return NextResponse.json(users.map(serializeUser));
   } catch (e) { return handleError(e); }
 }
