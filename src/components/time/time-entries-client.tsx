@@ -74,16 +74,26 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const filtersKey = `time-filters:${userId}`;
 
-  // Hydrate saved filters once on mount (client-only; avoids SSR mismatch).
+  // Hydrate saved filters once on mount, then re-fetch to match (client-only; avoids SSR mismatch).
   useEffect(() => {
+    let savedUser: string | undefined;
+    let savedProject: string | undefined;
     try {
       const raw = localStorage.getItem(filtersKey);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { filterUser?: string; filterProject?: string };
-      if (saved.filterUser) setFilterUser(saved.filterUser);
-      if (saved.filterProject) setFilterProject(saved.filterProject);
+      if (raw) {
+        const saved = JSON.parse(raw) as { filterUser?: string; filterProject?: string };
+        savedUser = saved.filterUser;
+        savedProject = saved.filterProject;
+      }
     } catch {
       /* ignore malformed storage */
+    }
+    if (savedUser) setFilterUser(savedUser);
+    if (savedProject) setFilterProject(savedProject);
+    // initialEntries were fetched with the default "all" filters; re-fetch if we restored anything.
+    if (savedUser || savedProject) {
+      if (viewMode === "week") fetchWeekEntries(weekOffset, savedUser ?? "all");
+      else fetchEntries(filterMonth, savedProject ?? "all", savedUser ?? "all");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
