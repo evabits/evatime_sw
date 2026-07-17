@@ -28,12 +28,19 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session!.user as any)?.role ?? "EMPLOYEE";
+    const admin = role === "ADMIN";
 
-    const data = schema.parse(await req.json());
+    const body = await req.json();
+    const data = schema.parse(body);
+    // Admins may create a managed template for a target user; everyone else creates their own.
+    const targetUserId = admin && typeof body.userId === "string" ? body.userId : currentUserId;
+    const managedByAdmin = admin && body.managedByAdmin === true;
+
     const template = await prisma.kmTemplate.create({
-      data: { ...data, userId },
+      data: { ...data, userId: targetUserId, managedByAdmin },
       include,
     });
     return NextResponse.json(serialize(template), { status: 201 });

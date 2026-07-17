@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { removedProjectIds } from "@/lib/activity-impact";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
@@ -33,6 +34,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [editOriginalProjectIds, setEditOriginalProjectIds] = useState<string[]>([]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -48,6 +50,18 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
   }
 
   async function onSubmit(data: FormData) {
+    if (editing && !data.showInAllProjects) {
+      const removed = removedProjectIds(editOriginalProjectIds, selectedProjectIds);
+      if (removed.length > 0) {
+        const impRes = await fetch(`/api/activity-types/${editing}/impact`);
+        const impact = impRes.ok ? await impRes.json() : { projectIds: [] };
+        const affected = removed.filter((pid: string) => impact.projectIds?.includes(pid));
+        if (affected.length > 0 &&
+            !confirm(`Er zijn uren geboekt op ${affected.length} project(en) die je loskoppelt van dit activiteittype. Toch opslaan?`)) {
+          return;
+        }
+      }
+    }
     setLoading(true);
     const payload = {
       ...data,
@@ -87,6 +101,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
     setDialogOpen(false);
     setEditing(null);
     setSelectedProjectIds([]);
+    setEditOriginalProjectIds([]);
     form.reset({ billable: true, showInAllProjects: false });
   }
 
@@ -97,7 +112,9 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
 
   function startEdit(type: any) {
     setEditing(type.id);
-    setSelectedProjectIds(type.projects?.map((p: any) => p.projectId) ?? []);
+    const original = type.projects?.map((p: any) => p.projectId) ?? [];
+    setSelectedProjectIds(original);
+    setEditOriginalProjectIds(original);
     form.reset({
       name: type.name,
       defaultRate: type.defaultRate ? Number(type.defaultRate) : "",
@@ -107,10 +124,28 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
     setDialogOpen(true);
   }
 
+  const [showArchived, setShowArchived] = useState(false);
+
+  async function loadTypes(withArchived: boolean) {
+    const res = await fetch(`/api/activity-types${withArchived ? "?includeArchived=1" : ""}`);
+    if (res.ok) setTypes(await res.json());
+  }
+
+  async function restoreType(id: string) {
+    const res = await fetch(`/api/activity-types/${id}`, { method: "PATCH" });
+    if (res.ok) loadTypes(showArchived);
+  }
+
   async function deleteType(id: string) {
-    if (!confirm("Weet u zeker dat u dit activiteittype wilt verwijderen?")) return;
-    await fetch(`/api/activity-types/${id}`, { method: "DELETE" });
-    setTypes((prev) => prev.filter((t) => t.id !== id));
+    const res = await fetch(`/api/activity-types/${id}/impact`);
+    const impact = res.ok ? await res.json() : { timeEntries: 0, kmEntries: 0, hours: 0 };
+    const booked = impact.timeEntries + impact.kmEntries;
+    const msg = booked > 0
+      ? `${booked} registratie(s) (${impact.hours} uur) gebruiken dit activiteittype. Archiveren verbergt het uit de keuzelijsten. Doorgaan?`
+      : "Weet u zeker dat u dit activiteittype wilt archiveren?";
+    if (!confirm(msg)) return;
+    await fetch(`/api/activity-types/${id}?confirm=1`, { method: "DELETE" });
+    loadTypes(showArchived);
   }
 
   // Group projects by customer for the multi-select
@@ -135,9 +170,17 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
               <CardTitle>Activiteittypes</CardTitle>
               <CardDescription>Standaardtarieven kunnen per project worden overschreven</CardDescription>
             </div>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" /> Toevoegen
-            </Button>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
+                  checked={showArchived}
+                  onChange={(e) => { setShowArchived(e.target.checked); loadTypes(e.target.checked); }} />
+                Toon gearchiveerd
+              </label>
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-2" /> Toevoegen
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -158,8 +201,11 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
               {types.map((t) => {
                 const linkedCount = t.projects?.length ?? 0;
                 return (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableRow key={t.id} className={t.archivedAt ? "opacity-60" : undefined}>
+                    <TableCell className="font-medium">
+                      {t.name}
+                      {t.archivedAt && <span className="ml-2 text-xs text-muted-foreground">(gearchiveerd)</span>}
+                    </TableCell>
                     <TableCell>{t.billable ? "Ja" : "Nee"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {t.showInAllProjects ? "Alle projecten" : linkedCount === 0 ? "Geen projecten" : `${linkedCount} project${linkedCount !== 1 ? "en" : ""}`}
@@ -167,12 +213,20 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
                     <TableCell className="text-right">{t.defaultRate ? formatCurrency(Number(t.defaultRate)) + "/u" : "—"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => startEdit(t)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteType(t.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
+                        {t.archivedAt ? (
+                          <Button variant="ghost" size="icon" onClick={() => restoreType(t.id)} title="Herstellen">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => startEdit(t)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteType(t.id)} title="Archiveren">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

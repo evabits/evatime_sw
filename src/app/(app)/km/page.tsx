@@ -10,7 +10,7 @@ export default async function KmPage() {
 
   const [projects, activityTypes, customers, recentEntries, templates] = await Promise.all([
     prisma.project.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", archivedAt: null },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -20,10 +20,12 @@ export default async function KmPage() {
       },
     }),
     prisma.activityType.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       include: { projects: { select: { projectId: true } } },
     }),
     prisma.customer.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

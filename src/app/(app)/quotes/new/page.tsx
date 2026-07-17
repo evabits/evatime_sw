@@ -9,6 +9,7 @@ export default async function NewQuotePage() {
   if ((session?.user as any)?.role !== "ADMIN") redirect("/");
 
   const customers = await prisma.customer.findMany({
+    where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   if (contracts.length === 0) return NextResponse.json({ reminded: 0 });
 
   const admins = await prisma.user.findMany({
-    where: { role: "ADMIN" },
+    where: { role: "ADMIN", archivedAt: null },
     select: { name: true, email: true },
   });
   const settings = await prisma.companySettings.findFirst();

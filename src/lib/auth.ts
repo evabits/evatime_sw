@@ -35,11 +35,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    signIn({ user, account }) {
+    async signIn({ user, account }) {
       // Restrict self-provisioning via Google to the company domain.
       // Credentials users already exist in the DB and passed authorize().
-      if (account?.provider === "google") {
-        return user.email?.endsWith("@evabits.com") ?? false;
+      if (account?.provider === "google" && !(user.email?.endsWith("@evabits.com") ?? false)) {
+        return false;
+      }
+      // Block archived users from signing in (both providers). A brand-new
+      // Google user has no row yet -> allowed, then created by the jwt upsert.
+      if (user.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+          select: { archivedAt: true },
+        });
+        if (dbUser?.archivedAt) return false;
       }
       return true;
     },

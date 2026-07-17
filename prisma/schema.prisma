@@ -16,6 +16,7 @@ model User {
   weeklyHours       Decimal?          @db.Decimal(5, 2)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -53,6 +54,7 @@ model Customer {
   notes      String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
   projects   Project[]
   invoices   Invoice[]
   quotes     Quote[]
@@ -69,6 +71,7 @@ model Project {
   defaultKmRate     Decimal?              @db.Decimal(10, 2)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -100,6 +103,7 @@ model ActivityType {
   showInAllProjects Boolean               @default(false)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  archivedAt        DateTime?
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -179,6 +183,7 @@ model KmTemplate {
   activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   km             Decimal       @db.Decimal(8, 2)
   description    String?
+  managedByAdmin Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

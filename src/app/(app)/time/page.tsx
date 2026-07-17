@@ -12,7 +12,7 @@ export default async function TimePage() {
 
   const [projects, activityTypes, customers, recentEntries, users] = await Promise.all([
     prisma.project.findMany({
-      where: { status: { in: ["ACTIVE", "CONCEPT"] } },
+      where: { status: { in: ["ACTIVE", "CONCEPT"] }, archivedAt: null },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -24,10 +24,12 @@ export default async function TimePage() {
       },
     }),
     prisma.activityType.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       include: { projects: { select: { projectId: true } } },
     }),
     prisma.customer.findMany({
+      where: { archivedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -47,7 +49,7 @@ export default async function TimePage() {
       },
     }),
     admin
-      ? prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+      ? prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } })
       : Promise.resolve([]),
   ]);
 
