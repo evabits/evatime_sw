@@ -5,4 +5,4 @@ import { z } from "zod";
 export const weeklyHoursField = z.preprocess(
   (v) => (v === "" || v == null ? undefined : v),
   z.coerce.number().positive("Moet groter zijn dan 0").optional(),
-);
+) as z.ZodType<number | undefined>;
