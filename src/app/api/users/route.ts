@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
+import { weeklyHoursField } from "@/lib/user-schema";
 
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]).default("EMPLOYEE"),
-  weeklyHours: z.coerce.number().positive().optional().nullable(),
+  weeklyHours: weeklyHoursField,
 });
 
 const userSelect = {
