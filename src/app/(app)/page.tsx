@@ -130,8 +130,8 @@ export default async function DashboardPage() {
             <CardContent className="p-4 flex items-center gap-3">
               <ClipboardCheck className="h-5 w-5 text-primary" />
               <div>
-                <p className="font-medium">Zelfbeoordeling openstaand ({pendingReview.period})</p>
-                <p className="text-sm text-muted-foreground">Vul je zelfbeoordeling in vóór het gesprek.</p>
+                <p className="font-medium">Zelfreflectie openstaand ({pendingReview.period})</p>
+                <p className="text-sm text-muted-foreground">Vul je zelfreflectie in vóór het gesprek.</p>
               </div>
             </CardContent>
           </Card>

@@ -47,7 +47,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/beoordelingen", label: "Mijn beoordelingen", icon: ClipboardCheck },
+      { href: "/beoordelingen", label: "Mijn functioneringsgesprekken", icon: ClipboardCheck },
     ],
   },
   {
@@ -93,7 +93,7 @@ const navGroups: NavGroup[] = [
       { href: "/km/templates", label: "Km-sjablonen", icon: BookMarked },
       { href: "/expense-categories", label: "Uitgavencategorieën", icon: Tag, roles: ["ADMIN"] },
       { href: "/settings", label: "Bedrijfsinstellingen", icon: Settings, roles: ["ADMIN"] },
-      { href: "/settings/beoordelingen", label: "Beoordelingssjabloon", icon: ClipboardList, roles: ["ADMIN"] },
+      { href: "/settings/beoordelingen", label: "Functioneringssjabloon", icon: ClipboardList, roles: ["ADMIN"] },
     ],
   },
 ];

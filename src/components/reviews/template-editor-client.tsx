@@ -91,9 +91,9 @@ export function TemplateEditorClient({ initialDefinition }: { initialDefinition:
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Beoordelingssjabloon</h1>
+        <h1 className="text-2xl font-bold">Functioneringssjabloon</h1>
         <p className="text-muted-foreground">
-          Wijzigingen gelden alleen voor nieuwe beoordelingen — lopende beoordelingen behouden hun eigen snapshot.
+          Wijzigingen gelden alleen voor nieuwe functioneringsgesprekken — lopende functioneringsgesprekken behouden hun eigen snapshot.
         </p>
       </div>
 
