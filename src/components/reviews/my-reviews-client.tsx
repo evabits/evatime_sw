@@ -28,7 +28,7 @@ interface Review {
 }
 
 const STATUS_LABELS: Record<ReviewStatus, string> = {
-  PLANNED: "Zelfbeoordeling invullen",
+  PLANNED: "Zelfreflectie invullen",
   SELF_COMPLETED: "Ingediend",
   COMPLETED: "Afgerond",
 };
@@ -59,7 +59,7 @@ function ReviewCard({ review }: { review: Review }) {
   const [error, setError] = useState("");
 
   async function save(submit?: boolean) {
-    if (submit && !confirm("Zelfbeoordeling indienen? Je kunt daarna niets meer aanpassen.")) return;
+    if (submit && !confirm("Zelfreflectie indienen? Je kunt daarna niets meer aanpassen.")) return;
     setSaving(true);
     setError("");
     const res = await fetch(`/api/reviews/${review.id}`, {
@@ -92,7 +92,7 @@ function ReviewCard({ review }: { review: Review }) {
       <CardContent className="space-y-6">
         {isEditable && (
           <div className="space-y-4">
-            <h3 className="font-medium text-sm">Jouw zelfbeoordeling</h3>
+            <h3 className="font-medium text-sm">Jouw zelfreflectie</h3>
             {selfQuestions.map((q) => (
               <div key={q.key} className="space-y-1">
                 <Label>{q.label}</Label>
@@ -122,7 +122,7 @@ function ReviewCard({ review }: { review: Review }) {
           <>
             {selfQuestions.length > 0 && (
               <div className="space-y-3">
-                <h3 className="font-medium text-sm">Jouw zelfbeoordeling</h3>
+                <h3 className="font-medium text-sm">Jouw zelfreflectie</h3>
                 {selfQuestions.map((q) => (
                   <div key={q.key} className="space-y-1">
                     <p className="text-sm font-medium">{q.label}</p>
@@ -136,7 +136,7 @@ function ReviewCard({ review }: { review: Review }) {
 
             {managerQuestions.length > 0 && (
               <div className="space-y-3">
-                <h3 className="font-medium text-sm">Beoordeling leidinggevende</h3>
+                <h3 className="font-medium text-sm">Feedback leidinggevende</h3>
                 {managerQuestions.map((q) => (
                   <div key={q.key} className="space-y-1">
                     <p className="text-sm font-medium">{q.label}</p>
@@ -164,7 +164,7 @@ function ReviewCard({ review }: { review: Review }) {
 
             {review.resultingContractId && (
               <p className="text-sm text-muted-foreground border-t pt-3">
-                Je salaris is aangepast naar aanleiding van deze beoordeling.
+                Je salaris is aangepast naar aanleiding van dit functioneringsgesprek.
               </p>
             )}
           </>
@@ -177,9 +177,9 @@ function ReviewCard({ review }: { review: Review }) {
 export function MyReviewsClient({ initialReviews }: { initialReviews: Review[] }) {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Mijn beoordelingen</h1>
+      <h1 className="text-2xl font-bold">Mijn functioneringsgesprekken</h1>
       {initialReviews.length === 0 ? (
-        <p className="text-muted-foreground">Je hebt nog geen beoordelingen.</p>
+        <p className="text-muted-foreground">Je hebt nog geen functioneringsgesprekken.</p>
       ) : (
         <div className="space-y-4">
           {initialReviews.map((r) => (

@@ -25,7 +25,7 @@ export function sanitizeAnswers(
 
 export const REVIEW_TEMPLATE_SEED: ReviewDefinition = {
   sections: [
-    { title: "Zelfbeoordeling medewerker", questions: [
+    { title: "Zelfreflectie medewerker", questions: [
       { key: "satisfied", label: "Waar ben je tevreden over?", hint: "Behaalde resultaten, afgeronde opdrachten, opgeloste problemen of positieve samenwerking.", respondent: "SELF" },
       { key: "learned", label: "Wat ging minder goed en wat heb je daarvan geleerd?", hint: "Werk niet op tijd af, eerder hulp kunnen vragen, andere aanpak kunnen kiezen.", respondent: "SELF" },
       { key: "techDevelopment", label: "Hoe heb je jezelf technisch ontwikkeld?", hint: "Nieuwe kennis, vaardigheden, werkzaamheden of verantwoordelijkheden.", respondent: "SELF" },

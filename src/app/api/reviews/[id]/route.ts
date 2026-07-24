@@ -56,7 +56,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     if (isSubject && !isAdmin) {
       if (review.status === "COMPLETED")
-        return NextResponse.json({ error: "Beoordeling is afgerond" }, { status: 403 });
+        return NextResponse.json({ error: "Functioneringsgesprek is afgerond" }, { status: 403 });
       if (body.selfAnswers !== undefined) data.selfAnswers = sanitizeAnswers(def, "SELF", body.selfAnswers);
       if (body.submit && review.status === "PLANNED") {
         data.status = "SELF_COMPLETED";

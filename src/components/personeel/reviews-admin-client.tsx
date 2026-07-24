@@ -45,7 +45,7 @@ interface Review {
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNED: "Gepland",
-  SELF_COMPLETED: "Zelfbeoordeling ingediend",
+  SELF_COMPLETED: "Zelfreflectie ingediend",
   COMPLETED: "Afgerond",
 };
 
@@ -110,7 +110,7 @@ function ReviewEditor({ review, onClose }: { review: Review; onClose: () => void
       {/* Self eval (read-only) */}
       {selfQuestions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-sm">Zelfbeoordeling medewerker</h3>
+          <h3 className="font-semibold text-sm">Zelfreflectie medewerker</h3>
           {selfQuestions.map((q) => (
             <div key={q.key} className="space-y-1">
               <p className="text-sm font-medium">{q.label}</p>
@@ -126,7 +126,7 @@ function ReviewEditor({ review, onClose }: { review: Review; onClose: () => void
       {/* Manager eval */}
       {managerQuestions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-sm">Beoordeling manager</h3>
+          <h3 className="font-semibold text-sm">Feedback manager</h3>
           {managerQuestions.map((q) => (
             <div key={q.key} className="space-y-1">
               <Label className="text-sm">{q.label}</Label>
@@ -246,7 +246,7 @@ function ReviewEditor({ review, onClose }: { review: Review; onClose: () => void
             type="button"
             disabled={loading}
             onClick={() => {
-              if (confirm("Beoordeling afronden? Dit kan niet ongedaan worden gemaakt.")) handleFinalize();
+              if (confirm("Functioneringsgesprek afronden? Dit kan niet ongedaan worden gemaakt.")) handleFinalize();
             }}
           >
             {loading ? "Afronden..." : "Bevestig afronden"}
@@ -287,7 +287,7 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
   }
 
   async function deleteReview(id: string) {
-    if (!confirm("Beoordeling verwijderen?")) return;
+    if (!confirm("Functioneringsgesprek verwijderen?")) return;
     const res = await fetch(`/api/reviews/${id}`, { method: "DELETE" });
     if (res.ok) router.refresh();
   }
@@ -297,16 +297,16 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Beoordelingen</h2>
+        <h2 className="text-xl font-semibold">Functioneringsgesprekken</h2>
         <Button onClick={() => { setPlanOpen(true); setPlanError(""); }}>
-          <Plus className="h-4 w-4 mr-2" /> Nieuwe beoordeling plannen
+          <Plus className="h-4 w-4 mr-2" /> Nieuw functioneringsgesprek plannen
         </Button>
       </div>
 
       {initialReviews.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground text-sm">
-            Nog geen beoordelingen
+            Nog geen functioneringsgesprekken
           </CardContent>
         </Card>
       ) : (
@@ -355,7 +355,7 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Nieuwe beoordeling plannen</DialogTitle>
+            <DialogTitle>Nieuw functioneringsgesprek plannen</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
@@ -392,7 +392,7 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              Beoordeling {editorReview?.period}
+              Functioneringsgesprek {editorReview?.period}
               {editorReview && (
                 <Badge variant={STATUS_VARIANTS[editorReview.status] ?? "outline"} className="ml-2">
                   {STATUS_LABELS[editorReview.status] ?? editorReview.status}

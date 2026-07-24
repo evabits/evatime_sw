@@ -243,12 +243,12 @@ export async function sendReviewPlannedEmail(
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
     <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
     <p style="margin:0 0 8px;">Hallo ${employee.name},</p>
-    <p style="margin:0 0 16px;">Er is een beoordelingsgesprek voor je gepland (${review.period}, datum: <strong>${when}</strong>).</p>
-    <p style="margin:0 0 24px;">Vul alvast je zelfbeoordeling in zodat we het gesprek goed kunnen voorbereiden.</p>
-    <a href="${appUrl}/beoordelingen" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Mijn beoordelingen</a>
+    <p style="margin:0 0 16px;">Er is een functioneringsgesprek voor je gepland (${review.period}, datum: <strong>${when}</strong>).</p>
+    <p style="margin:0 0 24px;">Vul alvast je zelfreflectie in zodat we het gesprek goed kunnen voorbereiden.</p>
+    <a href="${appUrl}/beoordelingen" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Mijn functioneringsgesprekken</a>
     <p style="margin-top:40px;color:#888;font-size:12px;">${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}</p>
   </div></body></html>`;
-  await transport.sendMail({ from, to: employee.email, subject: `Beoordelingsgesprek gepland (${review.period})`, html });
+  await transport.sendMail({ from, to: employee.email, subject: `Functioneringsgesprek gepland (${review.period})`, html });
 }
 
 export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
@@ -347,10 +347,10 @@ export async function sendReviewReminderEmail(
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
     <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
     <p style="margin:0 0 8px;">Beste ${admin.name},</p>
-    <p style="margin:0 0 16px;">De volgende medewerkers hebben nog geen beoordeling voor ${quarter}:</p>
+    <p style="margin:0 0 16px;">De volgende medewerkers hebben nog geen functioneringsgesprek voor ${quarter}:</p>
     <ul style="margin:0 0 24px;padding-left:20px;">${list}</ul>
-    <a href="${appUrl}/personeel" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Beoordelingen plannen</a>
+    <a href="${appUrl}/personeel" style="display:inline-block;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Functioneringsgesprekken plannen</a>
     <p style="margin-top:40px;color:#888;font-size:12px;">${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}</p>
   </div></body></html>`;
-  await transport.sendMail({ from, to: admin.email, subject: `Beoordelingen plannen voor ${quarter}`, html });
+  await transport.sendMail({ from, to: admin.email, subject: `Functioneringsgesprekken plannen voor ${quarter}`, html });
 }
