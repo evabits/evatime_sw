@@ -11,11 +11,15 @@ interface Props {
   entries: any[];
   total: number;
   canEdit: boolean;
+  selected: Set<string>;
+  selectableIds: string[];
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
   onEdit: (entry: any) => void;
   onDelete: (entry: any) => void;
 }
 
-export function TimeRows({ entries, total, canEdit, onEdit, onDelete }: Props) {
+export function TimeRows({ entries, total, canEdit, selected, selectableIds, onToggle, onToggleAll, onEdit, onDelete }: Props) {
   return (
     <Card>
       <CardHeader><CardTitle>Uren ({entries.length})</CardTitle></CardHeader>
@@ -23,6 +27,16 @@ export function TimeRows({ entries, total, canEdit, onEdit, onDelete }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
+              {canEdit && (
+                <TableHead className="w-8">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    checked={selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))}
+                    onChange={onToggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Datum</TableHead>
               <TableHead>Medewerker</TableHead>
               <TableHead>Klant / Project</TableHead>
@@ -41,6 +55,18 @@ export function TimeRows({ entries, total, canEdit, onEdit, onDelete }: Props) {
               const amount = Number(e.hours) * rate;
               return (
                 <TableRow key={e.id}>
+                  {canEdit && (
+                    <TableCell>
+                      {!e.invoiced && (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input accent-primary"
+                          checked={selected.has(e.id)}
+                          onChange={() => onToggle(e.id)}
+                        />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                   <TableCell>{e.user?.name}</TableCell>
                   <TableCell>
@@ -74,6 +100,7 @@ export function TimeRows({ entries, total, canEdit, onEdit, onDelete }: Props) {
           </TableBody>
           <TableFooter>
             <TableRow>
+              {canEdit && <TableCell />}
               <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
               <TableCell className="text-right font-mono font-medium">{formatHours(total)}</TableCell>
               <TableCell />

@@ -9,8 +9,9 @@ import { ReportFilters, type FilterState } from "@/components/reports/report-fil
 import { TimeRows } from "@/components/reports/time-rows";
 import { KmRows } from "@/components/reports/km-rows";
 import { ExpenseRows } from "@/components/reports/expense-rows";
-import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
+import { ENTRY_ENDPOINT, type BulkKind, type BulkAction } from "@/lib/bulk-entries";
 import { EntryEditDialog } from "./entry-edit-dialog";
+import { BulkBar } from "./bulk-bar";
 
 interface Props {
   customers: any[];
@@ -45,6 +46,10 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
   const [data, setData] = useState<ReportData | null>(null);
   const canEdit = role === "ADMIN";
   const [editing, setEditing] = useState<{ kind: BulkKind; entry: any } | null>(null);
+  const [selected, setSelected] = useState<Record<BulkKind, Set<string>>>({
+    time: new Set(), km: new Set(), expense: new Set(),
+  });
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function deleteEntry(kind: BulkKind, entry: any) {
     if (!confirm("Weet u zeker dat u deze registratie wilt verwijderen?")) return;
@@ -57,8 +62,53 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
     await loadReport();
   }
 
+  function toggle(kind: BulkKind, id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev[kind]);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return { ...prev, [kind]: next };
+    });
+  }
+
+  function toggleAll(kind: BulkKind, ids: string[]) {
+    setSelected((prev) => {
+      const allSelected = ids.length > 0 && ids.every((id) => prev[kind].has(id));
+      return { ...prev, [kind]: allSelected ? new Set<string>() : new Set(ids) };
+    });
+  }
+
+  async function applyBulk(kind: BulkKind, action: BulkAction) {
+    const ids = Array.from(selected[kind]);
+    if (ids.length === 0) return;
+    if (action.type === "delete" && !confirm(`Weet u zeker dat u ${ids.length} registratie(s) wilt verwijderen?`)) return;
+
+    setBulkBusy(true);
+    const res = await fetch("/api/entries/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, ids, action }),
+    });
+    setBulkBusy(false);
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      alert(payload.error ?? "Bulkactie mislukt");
+      return;
+    }
+    const { count } = await res.json();
+    if (count < ids.length) {
+      alert(`${count} van de ${ids.length} regels bijgewerkt, gefactureerde regels overgeslagen`);
+    }
+    setSelected((prev) => ({ ...prev, [kind]: new Set<string>() }));
+    await loadReport();
+  }
+
   async function loadReport() {
     setLoading(true);
+    // Elke nieuwe rapportlading maakt de vorige selectie ongeldig (andere filters, andere
+    // rijen) — wissen vóór de fetch zodat een trage fetch nooit een bulkactie op
+    // onzichtbare, oude ids toestaat.
+    setSelected({ time: new Set(), km: new Set(), expense: new Set() });
     const params = new URLSearchParams();
     if (filters.from) params.set("from", filters.from);
     if (filters.to) params.set("to", filters.to);
@@ -77,6 +127,12 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
   const { hours: totalHours, km: totalKm, expenses: totalExpenses, revenue: totalRevenue } = totals;
 
   const employeeGroups = useMemo(() => (data ? groupEntriesByEmployee(data, users) : []), [data, users]);
+
+  const selectableIds = {
+    time: data?.timeEntries.filter((e) => !e.invoiced).map((e) => e.id) ?? [],
+    km: data?.kmEntries.filter((e) => !e.invoiced).map((e) => e.id) ?? [],
+    expense: data?.expenses.filter((e) => !e.invoiced).map((e) => e.id) ?? [],
+  };
 
   return (
     <div className="space-y-6">
@@ -189,32 +245,59 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
           ) : (
             <>
               {data.timeEntries.length > 0 && (
-                <TimeRows
-                  entries={data.timeEntries}
-                  total={totalHours}
-                  canEdit={canEdit}
-                  onEdit={(e) => setEditing({ kind: "time", entry: e })}
-                  onDelete={(e) => deleteEntry("time", e)}
-                />
+                <div>
+                  {canEdit && selected.time.size > 0 && (
+                    <BulkBar kind="time" count={selected.time.size} projects={projects} users={users} busy={bulkBusy} onApply={(a) => applyBulk("time", a)} />
+                  )}
+                  <TimeRows
+                    entries={data.timeEntries}
+                    total={totalHours}
+                    canEdit={canEdit}
+                    selected={selected.time}
+                    selectableIds={selectableIds.time}
+                    onToggle={(id) => toggle("time", id)}
+                    onToggleAll={() => toggleAll("time", selectableIds.time)}
+                    onEdit={(e) => setEditing({ kind: "time", entry: e })}
+                    onDelete={(e) => deleteEntry("time", e)}
+                  />
+                </div>
               )}
 
               {data.kmEntries.length > 0 && (
-                <KmRows
-                  entries={data.kmEntries}
-                  canEdit={canEdit}
-                  onEdit={(e) => setEditing({ kind: "km", entry: e })}
-                  onDelete={(e) => deleteEntry("km", e)}
-                />
+                <div>
+                  {canEdit && selected.km.size > 0 && (
+                    <BulkBar kind="km" count={selected.km.size} projects={projects} users={users} busy={bulkBusy} onApply={(a) => applyBulk("km", a)} />
+                  )}
+                  <KmRows
+                    entries={data.kmEntries}
+                    canEdit={canEdit}
+                    selected={selected.km}
+                    selectableIds={selectableIds.km}
+                    onToggle={(id) => toggle("km", id)}
+                    onToggleAll={() => toggleAll("km", selectableIds.km)}
+                    onEdit={(e) => setEditing({ kind: "km", entry: e })}
+                    onDelete={(e) => deleteEntry("km", e)}
+                  />
+                </div>
               )}
 
               {data.expenses.length > 0 && (
-                <ExpenseRows
-                  entries={data.expenses}
-                  total={totalExpenses}
-                  canEdit={canEdit}
-                  onEdit={(e) => setEditing({ kind: "expense", entry: e })}
-                  onDelete={(e) => deleteEntry("expense", e)}
-                />
+                <div>
+                  {canEdit && selected.expense.size > 0 && (
+                    <BulkBar kind="expense" count={selected.expense.size} projects={projects} users={users} busy={bulkBusy} onApply={(a) => applyBulk("expense", a)} />
+                  )}
+                  <ExpenseRows
+                    entries={data.expenses}
+                    total={totalExpenses}
+                    canEdit={canEdit}
+                    selected={selected.expense}
+                    selectableIds={selectableIds.expense}
+                    onToggle={(id) => toggle("expense", id)}
+                    onToggleAll={() => toggleAll("expense", selectableIds.expense)}
+                    onEdit={(e) => setEditing({ kind: "expense", entry: e })}
+                    onDelete={(e) => deleteEntry("expense", e)}
+                  />
+                </div>
               )}
 
               {data.timeEntries.length === 0 && data.kmEntries.length === 0 && data.expenses.length === 0 && (

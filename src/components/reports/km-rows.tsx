@@ -10,11 +10,15 @@ import { kmRate } from "@/lib/report-totals";
 interface Props {
   entries: any[];
   canEdit: boolean;
+  selected: Set<string>;
+  selectableIds: string[];
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
   onEdit: (entry: any) => void;
   onDelete: (entry: any) => void;
 }
 
-export function KmRows({ entries, canEdit, onEdit, onDelete }: Props) {
+export function KmRows({ entries, canEdit, selected, selectableIds, onToggle, onToggleAll, onEdit, onDelete }: Props) {
   return (
     <Card>
       <CardHeader><CardTitle>Kilometers ({entries.length})</CardTitle></CardHeader>
@@ -22,6 +26,16 @@ export function KmRows({ entries, canEdit, onEdit, onDelete }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
+              {canEdit && (
+                <TableHead className="w-8">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    checked={selectableIds.length > 0 && selectableIds.every((id) => selected.has(id))}
+                    onChange={onToggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Datum</TableHead>
               <TableHead>Medewerker</TableHead>
               <TableHead>Klant / Project</TableHead>
@@ -39,6 +53,18 @@ export function KmRows({ entries, canEdit, onEdit, onDelete }: Props) {
               const amount = Number(e.km) * rate;
               return (
                 <TableRow key={e.id}>
+                  {canEdit && (
+                    <TableCell>
+                      {!e.invoiced && (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input accent-primary"
+                          checked={selected.has(e.id)}
+                          onChange={() => onToggle(e.id)}
+                        />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                   <TableCell>{e.user?.name}</TableCell>
                   <TableCell>
