@@ -41,9 +41,15 @@ export async function GET(req: Request) {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { id: true, name: true, defaultHourlyRate: true, customer: { select: { id: true, name: true } } } },
+        project: {
+          select: {
+            id: true, name: true,
+            levelRates: true,
+            customer: { select: { id: true, name: true, levelRates: true } },
+          },
+        },
         activityType: { select: { id: true, name: true, defaultRate: true } },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, workLevel: true } },
       },
     });
     return NextResponse.json(entries);

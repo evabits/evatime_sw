@@ -18,9 +18,8 @@ export default async function TimePage() {
         id: true,
         name: true,
         status: true,
-        defaultHourlyRate: true,
-        customer: { select: { id: true, name: true } },
-        activityRates: { include: { activityType: true } },
+        levelRates: true,
+        customer: { select: { id: true, name: true, levelRates: true } },
       },
     }),
     prisma.activityType.findMany({
@@ -49,9 +48,13 @@ export default async function TimePage() {
       },
     }),
     admin
-      ? prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      ? prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, workLevel: true } })
       : Promise.resolve([]),
   ]);
+
+  const currentUserLevel = admin
+    ? (users.find((u) => u.id === userId)?.workLevel ?? null)
+    : ((await prisma.user.findUnique({ where: { id: userId }, select: { workLevel: true } }))?.workLevel ?? null);
 
   return (
     <TimeEntriesClient
@@ -62,6 +65,7 @@ export default async function TimePage() {
       initialEntries={serialize(recentEntries)}
       userId={userId}
       role={role}
+      currentUserLevel={currentUserLevel}
     />
   );
 }
