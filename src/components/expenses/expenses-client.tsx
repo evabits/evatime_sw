@@ -24,6 +24,7 @@ const schema = z.object({
   vatRate: z.coerce.number().min(0).max(100),
   billable: z.boolean(),
   reimbursable: z.boolean(),
+  userId: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -39,11 +40,14 @@ interface Props {
   categories: any[];
   projects: any[];
   initialExpenses: any[];
+  users: any[];
+  userId: string;
   role: string;
   canViewReimbursements: boolean;
 }
 
-export function ExpensesClient({ categories, projects, initialExpenses, role, canViewReimbursements }: Props) {
+export function ExpensesClient({ categories, projects, initialExpenses, users, userId, role, canViewReimbursements }: Props) {
+  const isAdmin = role === "ADMIN";
   const [expenses, setExpenses] = useState(initialExpenses);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,7 +61,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21 },
+    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId },
   });
 
   async function fetchExpenses(month: string, projectId: string, reimbursable: boolean) {
@@ -100,7 +104,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
           const updated = await res.json();
           setExpenses((prev) => prev.map((e) => (e.id === editing ? updated : e)));
           setEditing(null);
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21 });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId });
         }
       } else {
         const res = await fetch("/api/expenses", {
@@ -114,7 +118,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
           if (data.date >= from && data.date <= to && (filterProject === "all" || data.projectId === filterProject)) {
             setExpenses((prev) => [created, ...prev]);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21 });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId: data.userId ?? userId });
         }
       }
     } finally { setLoading(false); }
@@ -137,6 +141,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
       vatRate: Number(expense.vatRate),
       billable: expense.billable,
       reimbursable: expense.reimbursable,
+      userId: expense.userId,
     });
   }
 
@@ -156,7 +161,6 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
     if (receiptRef.current) receiptRef.current.value = "";
   }
 
-  const isReadOnly = (expense: any) => showReimbursements && expense.userId !== (expenses[0]?.userId);
   const totalAmount = expenses.reduce((s, e) => s + Number(e.amount), 0);
 
   return (
@@ -171,6 +175,20 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
           <CardHeader><CardTitle>{editing ? "Uitgaven aanpassen" : "Uitgaven toevoegen"}</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+              {isAdmin && users.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Medewerker</Label>
+                  <Select onValueChange={(v) => form.setValue("userId", v)} value={form.watch("userId") ?? userId}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Categorie *</Label>
                 <Select onValueChange={(v) => form.setValue("categoryId", v)} value={form.watch("categoryId")}>
@@ -239,7 +257,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
               <div className="sm:col-span-2 flex gap-2">
                 <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
                 {editing && (
-                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21 }); }}>Annuleren</Button>
+                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId }); }}>Annuleren</Button>
                 )}
               </div>
             </form>
@@ -290,7 +308,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
             <TableHeader>
               <TableRow>
                 <TableHead>Datum</TableHead>
-                {showReimbursements && <TableHead>Medewerker</TableHead>}
+                {(showReimbursements || isAdmin) && <TableHead>Medewerker</TableHead>}
                 <TableHead>Categorie</TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Omschrijving</TableHead>
@@ -300,14 +318,14 @@ export function ExpensesClient({ categories, projects, initialExpenses, role, ca
               </TableRow>
             </TableHeader>
             <TableBody>
-              {fetching && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>}
-              {!fetching && expenses.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen uitgaven gevonden</TableCell></TableRow>}
+              {fetching && <TableRow><TableCell colSpan={showReimbursements || isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>}
+              {!fetching && expenses.length === 0 && <TableRow><TableCell colSpan={showReimbursements || isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">Geen uitgaven gevonden</TableCell></TableRow>}
               {!fetching && expenses.map((expense) => {
                 const readOnly = showReimbursements;
                 return (
                   <TableRow key={expense.id}>
                     <TableCell className="whitespace-nowrap">{formatDate(expense.date)}</TableCell>
-                    {showReimbursements && <TableCell>{expense.user?.name}</TableCell>}
+                    {(showReimbursements || isAdmin) && <TableCell>{expense.user?.name}</TableCell>}
                     <TableCell>{expense.category?.name}</TableCell>
                     <TableCell>
                       {expense.project ? (

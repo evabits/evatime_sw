@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { serialize } from "@/lib/utils";
 import { ExpensesClient } from "@/components/expenses/expenses-client";
-import { canViewReimbursements, canViewAllEntries } from "@/lib/roles";
+import { canViewReimbursements, canViewAllEntries, isAdmin } from "@/lib/roles";
 
 export default async function ExpensesPage() {
   const session = await auth();
@@ -13,7 +13,7 @@ export default async function ExpensesPage() {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [categories, projects, initialExpenses] = await Promise.all([
+  const [categories, projects, initialExpenses, users] = await Promise.all([
     prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
     prisma.project.findMany({
       where: { status: "ACTIVE", archivedAt: null },
@@ -32,6 +32,9 @@ export default async function ExpensesPage() {
         user: { select: { id: true, name: true } },
       },
     }),
+    isAdmin(role)
+      ? prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -39,6 +42,8 @@ export default async function ExpensesPage() {
       categories={serialize(categories)}
       projects={serialize(projects)}
       initialExpenses={serialize(initialExpenses)}
+      users={serialize(users)}
+      userId={userId}
       role={role}
       canViewReimbursements={canViewReimbursements(role)}
     />
