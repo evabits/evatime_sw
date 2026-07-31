@@ -17,8 +17,9 @@
 - **Gefactureerde regels (`invoiced: true`) zijn nooit muteerbaar,** niet via losse edit en niet via bulk.
 - **Tests staan naast de code in `src/lib/*.test.ts`** en testen pure functies. Geen API- of componenttests; die zijn er in deze repo niet en die conventie blijft.
 - **Route params zijn een Promise:** `{ params }: { params: Promise<{ id: string }> }`, dus `const { id } = await params`.
-- Testcommando: `npm test`. Losse suite: `npx vitest run src/lib/<naam>.test.ts`.
-- Lint: `npm run lint`.
+- **Node 20 is vereist.** De actieve node in deze shell is v16 en daar weigert npm te draaien. Zet vóór élk npm-commando de versie: `source ~/.nvm/nvm.sh && nvm use 20`. De `.nvmrc` vraagt om 24, maar die staat niet geïnstalleerd; 20 draait de suite en de linter zonder problemen. Installeer geen andere node-versie.
+- Testcommando: `npm test`. Losse suite: `npx vitest run src/lib/<naam>.test.ts`. Baseline op deze branch: 9 bestanden, 63 tests groen.
+- Lint: `npm run lint`. **De baseline is niet schoon:** 262 errors en 24 warnings, vrijwel allemaal `@typescript-eslint/no-explicit-any`, want deze codebase gebruikt `any` overal in props en entry-objecten. De gate is dus *geen nieuwe soorten lint-fouten*, niet nul. Dat je nieuwe code ook `any` gebruikt waar de omringende code dat doet is correct en verwacht; ga bestaande `any`-fouten niet opruimen, dat valt buiten deze batch.
 
 ---
 
@@ -326,8 +327,8 @@ import { checkEntryMutation } from "@/lib/entry-owner";
 
 - [ ] **Step 4: Controleer dat alles compileert en de bestaande tests groen blijven**
 
-Run: `npm run lint && npm test`
-Expected: geen lint-fouten, alle bestaande suites PASS.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`
+Expected: alle tests groen; lint niet meer dan de 262 baseline-errors (zie Global Constraints).
 
 - [ ] **Step 5: Handmatige controle**
 
@@ -416,8 +417,8 @@ Exact hetzelfde patroon, met de juiste modelnaam:
 
 - [ ] **Step 4: Controleer dat het compileert**
 
-Run: `npm run lint && npm test`
-Expected: schoon.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`
+Expected: alle tests groen; lint niet meer dan de 262 baseline-errors (zie Global Constraints).
 
 - [ ] **Step 5: Handmatige controle**
 
@@ -691,7 +692,7 @@ De Medewerker-kolom staat er nu alleen bij `showReimbursements`. Vervang die con
 
 - [ ] **Step 5: Controleer**
 
-Run: `npm run lint && npm test`, daarna `npm run dev`. Als admin op `/expenses`: de select staat er, een uitgave voor een collega verschijnt onder diens naam in de lijst. Als medewerker: geen select, geen Medewerker-kolom.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`, daarna `npm run dev`. Als admin op `/expenses`: de select staat er, een uitgave voor een collega verschijnt onder diens naam in de lijst. Als medewerker: geen select, geen Medewerker-kolom.
 
 - [ ] **Step 6: Commit**
 
@@ -885,8 +886,8 @@ De `as any` op `model` is nodig omdat de drie prisma-delegates verschillende gen
 
 - [ ] **Step 2: Controleer dat het compileert**
 
-Run: `npm run lint && npm test`
-Expected: schoon.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`
+Expected: alle tests groen; lint niet meer dan de 262 baseline-errors (zie Global Constraints).
 
 - [ ] **Step 3: Handmatige controle**
 
@@ -1125,7 +1126,7 @@ De lokale `EmployeeSummary`-type-definitie (regels 27-35) kan weg; importeer hem
 
 - [ ] **Step 6: Controleer**
 
-Run: `npm run lint && npm test`, daarna `npm run dev` en open `/reports`. Haal een rapport op over een maand met uren. De totalen moeten identiek zijn aan vóór deze taak; het enige verschil is dat de tarief-kolom in de urenlijst nu een projecttarief toont waar eerst "—" stond.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`, daarna `npm run dev` en open `/reports`. Haal een rapport op over een maand met uren. De totalen moeten identiek zijn aan vóór deze taak; het enige verschil is dat de tarief-kolom in de urenlijst nu een projecttarief toont waar eerst "—" stond.
 
 - [ ] **Step 7: Commit**
 
@@ -1210,7 +1211,7 @@ Wat overblijft in `reports-client.tsx`: de `FilterState`, `data`, `loading`, `lo
 
 - [ ] **Step 4: Controleer dat er niets veranderd is**
 
-Run: `npm run lint && npm test`, daarna `npm run dev`. Open `/reports`, haal hetzelfde rapport op als in Task 9 Step 6 en vergelijk: filters, totalen en de drie tabellen moeten er identiek uitzien.
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm run lint && npm test`, daarna `npm run dev`. Open `/reports`, haal hetzelfde rapport op als in Task 9 Step 6 en vergelijk: filters, totalen en de drie tabellen moeten er identiek uitzien.
 
 - [ ] **Step 5: Commit**
 
@@ -1761,6 +1762,6 @@ git commit -m "feat: bulk actions on selected entries in the reports overview"
 ## Verificatie na afloop
 
 - [ ] `npm test` — alle suites groen, inclusief de drie nieuwe.
-- [ ] `npm run lint` — schoon.
-- [ ] `npm run build` — compileert.
+- [ ] `npm run lint` — niet meer errors dan de 262 van de baseline.
+- [ ] `npm run build` — compileert (met node 20).
 - [ ] De handmatige lijst uit de spec, sectie "Testen": boeken namens een collega voor alle drie de soorten, een regel naar een ander project verplaatsen, een bulkselectie met een gefactureerde regel ertussen, en de rolcontrole als medewerker en als finance.
