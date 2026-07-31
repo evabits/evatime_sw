@@ -9,6 +9,8 @@ import { ReportFilters, type FilterState } from "@/components/reports/report-fil
 import { TimeRows } from "@/components/reports/time-rows";
 import { KmRows } from "@/components/reports/km-rows";
 import { ExpenseRows } from "@/components/reports/expense-rows";
+import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
+import { EntryEditDialog } from "./entry-edit-dialog";
 
 interface Props {
   customers: any[];
@@ -16,6 +18,9 @@ interface Props {
   users: { id: string; name: string; weeklyHours: number | null }[];
   currentUserId: string;
   tags: { id: string; name: string }[];
+  activityTypes: any[];
+  categories: any[];
+  role: string;
 }
 
 type ReportData = {
@@ -24,7 +29,7 @@ type ReportData = {
   expenses: any[];
 };
 
-export function ReportsClient({ customers, projects, users, tags }: Props) {
+export function ReportsClient({ customers, projects, users, tags, activityTypes, categories, role }: Props) {
   const now = new Date();
   const [filters, setFilters] = useState<FilterState>({
     from: format(startOfMonth(now), "yyyy-MM-dd"),
@@ -38,6 +43,19 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
   });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
+  const canEdit = role === "ADMIN";
+  const [editing, setEditing] = useState<{ kind: BulkKind; entry: any } | null>(null);
+
+  async function deleteEntry(kind: BulkKind, entry: any) {
+    if (!confirm("Weet u zeker dat u deze registratie wilt verwijderen?")) return;
+    const res = await fetch(`${ENTRY_ENDPOINT[kind]}/${entry.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      alert(payload.error ?? "Verwijderen mislukt");
+      return;
+    }
+    await loadReport();
+  }
 
   async function loadReport() {
     setLoading(true);
@@ -171,15 +189,32 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
           ) : (
             <>
               {data.timeEntries.length > 0 && (
-                <TimeRows entries={data.timeEntries} total={totalHours} />
+                <TimeRows
+                  entries={data.timeEntries}
+                  total={totalHours}
+                  canEdit={canEdit}
+                  onEdit={(e) => setEditing({ kind: "time", entry: e })}
+                  onDelete={(e) => deleteEntry("time", e)}
+                />
               )}
 
               {data.kmEntries.length > 0 && (
-                <KmRows entries={data.kmEntries} />
+                <KmRows
+                  entries={data.kmEntries}
+                  canEdit={canEdit}
+                  onEdit={(e) => setEditing({ kind: "km", entry: e })}
+                  onDelete={(e) => deleteEntry("km", e)}
+                />
               )}
 
               {data.expenses.length > 0 && (
-                <ExpenseRows entries={data.expenses} total={totalExpenses} />
+                <ExpenseRows
+                  entries={data.expenses}
+                  total={totalExpenses}
+                  canEdit={canEdit}
+                  onEdit={(e) => setEditing({ kind: "expense", entry: e })}
+                  onDelete={(e) => deleteEntry("expense", e)}
+                />
               )}
 
               {data.timeEntries.length === 0 && data.kmEntries.length === 0 && data.expenses.length === 0 && (
@@ -193,6 +228,17 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
           )}
         </>
       )}
+
+      <EntryEditDialog
+        kind={editing?.kind ?? null}
+        entry={editing?.entry ?? null}
+        projects={projects}
+        activityTypes={activityTypes}
+        categories={categories}
+        users={users}
+        onClose={() => setEditing(null)}
+        onSaved={async () => { setEditing(null); await loadReport(); }}
+      />
     </div>
   );
 }

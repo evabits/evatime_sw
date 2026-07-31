@@ -1,15 +1,20 @@
 "use client";
+import { Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { kmRate } from "@/lib/report-totals";
 
 interface Props {
   entries: any[];
+  canEdit: boolean;
+  onEdit: (entry: any) => void;
+  onDelete: (entry: any) => void;
 }
 
-export function KmRows({ entries }: Props) {
+export function KmRows({ entries, canEdit, onEdit, onDelete }: Props) {
   return (
     <Card>
       <CardHeader><CardTitle>Kilometers ({entries.length})</CardTitle></CardHeader>
@@ -25,6 +30,7 @@ export function KmRows({ entries }: Props) {
               <TableHead className="text-right">Tarief</TableHead>
               <TableHead className="text-right">Bedrag</TableHead>
               <TableHead></TableHead>
+              {canEdit && <TableHead></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -46,6 +52,18 @@ export function KmRows({ entries }: Props) {
                   <TableCell>
                     {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
                   </TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(e)} disabled={e.invoiced}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(e)} disabled={e.invoiced}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

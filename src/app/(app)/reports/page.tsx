@@ -1,28 +1,42 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { serialize } from "@/lib/utils";
 import { canViewReports } from "@/lib/roles";
 import { ReportsClient } from "@/components/reports/reports-client";
 
 export default async function ReportsPage() {
   const session = await auth();
   if (!canViewReports((session?.user as any)?.role ?? "EMPLOYEE")) redirect("/");
-  const [customers, projects, users, tags] = await Promise.all([
+  const [customers, projects, users, tags, activityTypes, categories] = await Promise.all([
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.project.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, customerId: true } }),
+    prisma.project.findMany({
+      where: { archivedAt: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, customerId: true, customer: { select: { name: true } } },
+    }),
     prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, weeklyHours: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.activityType.findMany({
+      where: { archivedAt: null },
+      orderBy: { name: "asc" },
+      include: { projects: { select: { projectId: true } } },
+    }),
+    prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   const serializedUsers = users.map((u) => ({ ...u, weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null }));
 
   return (
     <ReportsClient
-      customers={customers}
-      projects={projects}
+      customers={serialize(customers)}
+      projects={serialize(projects)}
       users={serializedUsers}
       currentUserId={session?.user?.id ?? ""}
-      tags={tags}
+      tags={serialize(tags)}
+      activityTypes={serialize(activityTypes)}
+      categories={serialize(categories)}
+      role={(session?.user as any)?.role ?? "EMPLOYEE"}
     />
   );
 }
