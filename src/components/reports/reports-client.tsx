@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
+import { reportTotals, groupByEmployee as groupEntriesByEmployee, timeRate, kmRate } from "@/lib/report-totals";
 import { Search } from "lucide-react";
 
 interface Props {
@@ -23,16 +24,6 @@ type ReportData = {
   timeEntries: any[];
   kmEntries: any[];
   expenses: any[];
-};
-
-type EmployeeSummary = {
-  userId: string;
-  name: string;
-  hours: number;
-  km: number;
-  expenses: number;
-  revenue: number;
-  weeklyHours: number | null;
 };
 
 export function ReportsClient({ customers, projects, users, tags }: Props) {
@@ -70,55 +61,10 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
     setLoading(false);
   }
 
-  const totalHours = data?.timeEntries.reduce((s, e) => s + Number(e.hours), 0) ?? 0;
-  const totalKm = data?.kmEntries.reduce((s, e) => s + Number(e.km), 0) ?? 0;
-  const totalExpenses = data?.expenses.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
-  const totalRevenue = data
-    ? data.timeEntries.reduce((s, e) => {
-        const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
-        return s + Number(e.hours) * rate;
-      }, 0) +
-      data.kmEntries.reduce((s, e) => {
-        const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
-        return s + Number(e.km) * rate;
-      }, 0) +
-      data.expenses.filter((e) => e.billable).reduce((s, e) => s + Number(e.amount), 0)
-    : 0;
+  const totals = data ? reportTotals(data) : { hours: 0, km: 0, expenses: 0, revenue: 0 };
+  const { hours: totalHours, km: totalKm, expenses: totalExpenses, revenue: totalRevenue } = totals;
 
-  const employeeGroups = useMemo<EmployeeSummary[]>(() => {
-    if (!data) return [];
-    const map = new Map<string, EmployeeSummary>();
-    const userWeeklyHours = new Map(users.map((u) => [u.id, u.weeklyHours]));
-
-    function getOrCreate(userId: string, name: string): EmployeeSummary {
-      if (!map.has(userId)) {
-        map.set(userId, { userId, name, hours: 0, km: 0, expenses: 0, revenue: 0, weeklyHours: userWeeklyHours.get(userId) ?? null });
-      }
-      return map.get(userId)!;
-    }
-
-    for (const e of data.timeEntries) {
-      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
-      const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
-      entry.hours += Number(e.hours);
-      entry.revenue += Number(e.hours) * rate;
-    }
-
-    for (const e of data.kmEntries) {
-      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
-      const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
-      entry.km += Number(e.km);
-      entry.revenue += Number(e.km) * rate;
-    }
-
-    for (const e of data.expenses) {
-      const entry = getOrCreate(e.user?.id ?? "unknown", e.user?.name ?? "Onbekend");
-      entry.expenses += Number(e.amount);
-      if (e.billable) entry.revenue += Number(e.amount);
-    }
-
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [data, users]);
+  const employeeGroups = useMemo(() => (data ? groupEntriesByEmployee(data, users) : []), [data, users]);
 
   return (
     <div className="space-y-6">
@@ -330,7 +276,7 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                       </TableHeader>
                       <TableBody>
                         {data.timeEntries.map((e) => {
-                          const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? 0);
+                          const rate = timeRate(e);
                           const amount = Number(e.hours) * rate;
                           return (
                             <TableRow key={e.id}>
@@ -359,10 +305,7 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                           <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
                           <TableCell />
                           <TableCell className="text-right font-medium">
-                            {formatCurrency(data.timeEntries.reduce((s, e) => {
-                              const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? e.project?.defaultHourlyRate ?? 0);
-                              return s + Number(e.hours) * rate;
-                            }, 0))}
+                            {formatCurrency(data.timeEntries.reduce((s, e) => s + Number(e.hours) * timeRate(e), 0))}
                           </TableCell>
                           <TableCell />
                         </TableRow>
@@ -391,7 +334,7 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                       </TableHeader>
                       <TableBody>
                         {data.kmEntries.map((e) => {
-                          const rate = Number(e.rateOverride ?? e.project?.defaultKmRate ?? 0);
+                          const rate = kmRate(e);
                           const amount = Number(e.km) * rate;
                           return (
                             <TableRow key={e.id}>
