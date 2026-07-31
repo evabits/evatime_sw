@@ -30,12 +30,12 @@ ontwerp aanraakt. Ze worden meegenomen, zie "Beveiliging".
 
 | Onderwerp | Keuze |
 |---|---|
-| Namens boeken geldt voor | Uren en ritten. Niet voor uitgaven. |
+| Namens boeken geldt voor | Uren, ritten en uitgaven. |
 | Wie mag het | Alleen ADMIN. |
 | Vastleggen wie het invoerde | Nee. Geen `createdById`-kolom, geen migratie. |
 | Waar het overzicht landt | `/reports` wordt bewerkbaar. Geen nieuwe pagina. |
 | Bewerken | Losse regels én bulkacties. |
-| Bulkacties | Verplaats naar project, factureerbaar aan/uit, toewijzen aan andere medewerker (uren en ritten), verwijderen. |
+| Bulkacties | Verplaats naar project, factureerbaar aan/uit, toewijzen aan andere medewerker, verwijderen. |
 
 Overwogen en verworpen: een aparte pagina naast `/reports` (dupliceert de filterset en de API,
 twee schermen die grotendeels hetzelfde doen), en filters toevoegen aan `/time`, `/km` en
@@ -46,8 +46,8 @@ twee schermen die grotendeels hetzelfde doen), en filters toevoegen aan `/time`,
 
 ### API
 
-`POST /api/time` en `POST /api/km` krijgen een optioneel `userId` in het zod-schema. De
-server bepaalt de eigenaar met een gedeelde helper:
+`POST /api/time`, `POST /api/km` en `POST /api/expenses` krijgen een optioneel `userId` in het
+zod-schema. De server bepaalt de eigenaar met een gedeelde helper:
 
 ```ts
 // src/lib/entry-owner.ts
@@ -63,25 +63,34 @@ Geeft `requestedUserId` terug als de rol ADMIN is en er een waarde is meegestuur
 als `rateOverride` vandaag al volgt. Bestaat het opgegeven user-ID niet, dan antwoordt de route
 met 400.
 
-`PUT /api/time/[id]` en `PUT /api/km/[id]` krijgen hetzelfde optionele veld, langs dezelfde
-helper, zodat een admin een losse regel naar de juiste medewerker kan verplaatsen.
-
-`/api/expenses` blijft ongewijzigd op dit punt.
+`PUT /api/time/[id]`, `PUT /api/km/[id]` en `PUT /api/expenses/[id]` krijgen hetzelfde
+optionele veld, langs dezelfde helper, zodat een admin een losse regel naar de juiste
+medewerker kan verplaatsen.
 
 ### UI
 
-Op `/time` en `/km` komt boven in het invoerformulier een **Medewerker**-select, alleen
-zichtbaar voor admins, standaard de ingelogde gebruiker. Gearchiveerde medewerkers staan er
-niet in. `/time` laadt de gebruikerslijst al voor admins; `/km` gaat dat ook doen.
+Op `/time`, `/km` en `/expenses` komt boven in het invoerformulier een **Medewerker**-select,
+alleen zichtbaar voor admins, standaard de ingelogde gebruiker. Gearchiveerde medewerkers staan
+er niet in. `/time` laadt de gebruikerslijst al voor admins; `/km` en `/expenses` gaan dat ook
+doen.
 
 `/km` heeft nu geen medewerkersfilter en toont hard de eigen ritten, terwijl `/time` dat
 allebei wel heeft. Zonder aanpassing verdwijnt een rit die je voor een collega boekt uit beeld.
 `/km` krijgt daarom dezelfde behandeling als `/time`: een admin ziet alle ritten, met hetzelfde
 medewerkersfilter erboven.
 
-Na het opslaan van een entry voor een andere medewerker zet het formulier het medewerkersfilter
-op die medewerker, zodat de zojuist geboekte regel zichtbaar is in plaats van uit de lijst te
-vallen.
+Op `/time` en `/km` zet het formulier na het opslaan van een entry voor een andere medewerker
+het medewerkersfilter op die medewerker, zodat de zojuist geboekte regel zichtbaar is in plaats
+van uit de lijst te vallen.
+
+`/expenses` krijgt géén medewerkersfilter: een admin ziet daar al de uitgaven van iedereen, dus
+een uitgave die je voor een collega invoert komt vanzelf in beeld.
+
+Bij het aanpassen van `expenses-client.tsx` wordt en passant `isReadOnly` gerepareerd. Die
+bepaalt nu of een regel van jezelf is met `expense.userId !== expenses[0]?.userId`, dus door
+hem te vergelijken met de eigenaar van de eerste rij in de lijst. Staat die eerste rij op naam
+van iemand anders, dan lijken je eigen regels ineens read-only. Het wordt een vergelijking met
+de daadwerkelijk ingelogde gebruiker, die als prop wordt doorgegeven.
 
 ## Deel 2: `/reports` bewerkbaar maken
 
@@ -92,7 +101,7 @@ de velden van die soort:
 
 - uren: project, activiteit, datum, uren, omschrijving, tarief-override, factureerbaar, medewerker
 - ritten: project, activiteit, datum, km, omschrijving, tarief-override, factureerbaar, medewerker
-- uitgaven: categorie, project, datum, omschrijving, bedrag, btw-tarief, factureerbaar, declarabel
+- uitgaven: categorie, project, datum, omschrijving, bedrag, btw-tarief, factureerbaar, declarabel, medewerker
 
 Gefactureerde regels (`invoiced`) tonen geen knoppen maar een badge, zoals `/time` dat nu al
 doet. FINANCE ziet geen knoppen en geen selectievakjes; de server weigert de mutaties
@@ -123,8 +132,9 @@ of uitgaven, en krijgt de bulkbalk van die soort. Dat vermijdt acties die maar v
 een gemengde selectie geldig zijn. Elke tabel heeft een "alles selecteren" in de kop, die alleen
 niet-gefactureerde regels aanvinkt.
 
-De bulkbalk verschijnt zodra er iets geselecteerd is en toont het aantal. Verwijderen vraagt om
-bevestiging met dat aantal erin.
+De bulkbalk verschijnt zodra er iets geselecteerd is en toont het aantal. De vier acties —
+verplaats naar project, factureerbaar aan/uit, toewijzen aan andere medewerker, verwijderen —
+gelden voor alle drie de soorten. Verwijderen vraagt om bevestiging met dat aantal erin.
 
 ### API
 
@@ -136,7 +146,7 @@ Eén nieuwe route, `POST /api/entries/bulk`, alleen voor ADMIN:
   action:
     | { type: "project",  projectId: string }
     | { type: "billable", billable: boolean }
-    | { type: "user",     userId: string }   // alleen kind time of km
+    | { type: "user",     userId: string }
     | { type: "delete" } }
 ```
 
@@ -149,8 +159,6 @@ export function buildBulkMutation(
   action: BulkAction,
 ): { data: Record<string, unknown> } | { delete: true }
 ```
-
-`{ type: "user" }` in combinatie met `kind: "expense"` is ongeldig en levert een 400 op.
 
 Uitgevoerd als `updateMany` of `deleteMany` met `where: { id: { in: ids }, invoiced: false }`.
 Gefactureerde regels vallen daarmee structureel buiten de mutatie, ook als de client ze toch
@@ -186,14 +194,14 @@ componenttests.
 
 - `src/lib/entry-owner.test.ts` — admin met `userId`, admin zonder, medewerker die een `userId`
   meestuurt (moet zichzelf houden).
-- `src/lib/bulk-entries.test.ts` — toewijzen-aan-medewerker voor uitgaven wordt geweigerd; de
-  `invoiced: false`-guard zit altijd in de `where`; elke actie levert het verwachte fragment.
+- `src/lib/bulk-entries.test.ts` — de `invoiced: false`-guard zit altijd in de `where`; elke
+  actie levert per soort het verwachte fragment.
 - Tests op de totalen- en groeperingslogica die uit `reports-client.tsx` verhuist.
 
 Handmatig na te lopen bij oplevering:
 
 - als admin uren boeken voor een collega, controleren dat ze onder diens naam staan
-- hetzelfde voor een rit
+- hetzelfde voor een rit en voor een uitgave
 - in het overzicht een regel naar een ander project verplaatsen en de wijziging terugzien
 - een bulkselectie waar een gefactureerde regel tussen zit, en de "X van Y"-melding controleren
 - inloggen als medewerker en bevestigen dat de medewerkerskeuze en de bulkbalk nergens opduiken
@@ -201,7 +209,6 @@ Handmatig na te lopen bij oplevering:
 
 ## Buiten scope
 
-- Namens iemand anders uitgaven indienen.
 - Vastleggen wie een entry namens een ander invoerde.
 - Opruimen van bonnetjes in blob-opslag bij verwijderen.
 - Bulkacties over meerdere soorten tegelijk.
