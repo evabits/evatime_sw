@@ -32,7 +32,6 @@ export default async function ReportsPage() {
       customers={serialize(customers)}
       projects={serialize(projects)}
       users={serializedUsers}
-      currentUserId={session?.user?.id ?? ""}
       tags={serialize(tags)}
       activityTypes={serialize(activityTypes)}
       categories={serialize(categories)}

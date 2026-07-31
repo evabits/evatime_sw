@@ -4,7 +4,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { formatHours, formatCurrency } from "@/lib/utils";
-import { reportTotals, groupByEmployee as groupEntriesByEmployee } from "@/lib/report-totals";
+import { reportTotals, groupByEmployee as groupEntriesByEmployee, type ReportData } from "@/lib/report-totals";
 import { ReportFilters, type FilterState } from "@/components/reports/report-filters";
 import { TimeRows } from "@/components/reports/time-rows";
 import { KmRows } from "@/components/reports/km-rows";
@@ -17,18 +17,11 @@ interface Props {
   customers: any[];
   projects: any[];
   users: { id: string; name: string; weeklyHours: number | null }[];
-  currentUserId: string;
   tags: { id: string; name: string }[];
   activityTypes: any[];
   categories: any[];
   role: string;
 }
-
-type ReportData = {
-  timeEntries: any[];
-  kmEntries: any[];
-  expenses: any[];
-};
 
 export function ReportsClient({ customers, projects, users, tags, activityTypes, categories, role }: Props) {
   const now = new Date();
