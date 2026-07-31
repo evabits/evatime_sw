@@ -192,7 +192,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
             setTemplateError("");
             setTemplateDialogOpen(true);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId: data.userId ?? userId });
           setAppliedTemplate("");
         }
       }
