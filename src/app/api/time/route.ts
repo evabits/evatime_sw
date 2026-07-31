@@ -73,13 +73,14 @@ export async function POST(req: Request) {
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, userId, requestedUserId);
-    if (ownerId !== userId) {
-      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
-      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
-    }
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true, workLevel: true },
+    });
+    if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
 
     const entry = await prisma.timeEntry.create({
-      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },

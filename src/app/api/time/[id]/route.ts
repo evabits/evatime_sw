@@ -26,9 +26,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!sessionUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true } });
+    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, workLevel: true } });
     const error = entryMutationError(checkEntryMutation(role, sessionUserId, existing));
-    if (error) return error;
+    if (error || !existing) return error ?? NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const data = schema.parse(await req.json());
 
@@ -46,14 +46,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, sessionUserId, requestedUserId);
-    if (ownerId !== sessionUserId) {
-      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
-      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    let workLevel = existing.workLevel;
+    if (ownerId !== existing.userId) {
+      const owner = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, workLevel: true },
+      });
+      if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+      workLevel = owner.workLevel;
     }
 
     const entry = await prisma.timeEntry.update({
       where: { id },
-      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId, workLevel },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },
