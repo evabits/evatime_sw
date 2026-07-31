@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search } from "lucide-react";
+import { resolvePeriod, PERIOD_LABELS, PERIOD_ORDER, type PeriodPreset } from "@/lib/periods";
 
 export type FilterState = {
+  period: PeriodPreset;
   from: string;
   to: string;
   customerId: string;
@@ -33,6 +35,11 @@ export function ReportFilters({ customers, projects, users, tags, value, onChang
   const set = <K extends keyof FilterState>(key: K, v: FilterState[K]) => onChange({ ...value, [key]: v });
   const filteredProjects = value.customerId ? projects.filter((p) => p.customerId === value.customerId) : projects;
 
+  function handlePeriodChange(preset: PeriodPreset) {
+    const range = resolvePeriod(preset, new Date());
+    onChange(range ? { ...value, period: preset, ...range } : { ...value, period: preset });
+  }
+
   function toggleTag(id: string) {
     set("tagIds", value.tagIds.includes(id) ? value.tagIds.filter((t) => t !== id) : [...value.tagIds, id]);
   }
@@ -43,13 +50,29 @@ export function ReportFilters({ customers, projects, users, tags, value, onChang
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1">
-            <Label>Van</Label>
-            <Input type="date" value={value.from} onChange={(e) => set("from", e.target.value)} />
+            <Label>Periode</Label>
+            <Select value={value.period} onValueChange={(v) => handlePeriodChange(v as PeriodPreset)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PERIOD_ORDER.map((p) => (
+                  <SelectItem key={p} value={p}>{PERIOD_LABELS[p]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="space-y-1">
-            <Label>Tot</Label>
-            <Input type="date" value={value.to} onChange={(e) => set("to", e.target.value)} />
-          </div>
+
+          {value.period === "custom" && (
+            <>
+              <div className="space-y-1">
+                <Label>Van</Label>
+                <Input type="date" value={value.from} onChange={(e) => set("from", e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Tot</Label>
+                <Input type="date" value={value.to} onChange={(e) => set("to", e.target.value)} />
+              </div>
+            </>
+          )}
           <div className="space-y-1">
             <Label>Klant</Label>
             <Select value={value.customerId} onValueChange={(v) => onChange({ ...value, customerId: v === "_all" ? "" : v, projectId: "" })}>

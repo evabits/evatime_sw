@@ -1,6 +1,5 @@
 "use client";
 import { useState, useMemo } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { formatHours, formatCurrency } from "@/lib/utils";
@@ -10,6 +9,7 @@ import { TimeRows } from "@/components/reports/time-rows";
 import { KmRows } from "@/components/reports/km-rows";
 import { ExpenseRows } from "@/components/reports/expense-rows";
 import { ENTRY_ENDPOINT, type BulkKind, type BulkAction } from "@/lib/bulk-entries";
+import { resolvePeriod } from "@/lib/periods";
 import { EntryEditDialog } from "./entry-edit-dialog";
 import { BulkBar } from "./bulk-bar";
 
@@ -24,16 +24,19 @@ interface Props {
 }
 
 export function ReportsClient({ customers, projects, users, tags, activityTypes, categories, role }: Props) {
-  const now = new Date();
-  const [filters, setFilters] = useState<FilterState>({
-    from: format(startOfMonth(now), "yyyy-MM-dd"),
-    to: format(endOfMonth(now), "yyyy-MM-dd"),
-    customerId: "",
-    projectId: "",
-    userId: "",
-    billable: "",
-    tagIds: [],
-    groupByEmployee: false,
+  const [filters, setFilters] = useState<FilterState>(() => {
+    const range = resolvePeriod("this-month", new Date())!;
+    return {
+      period: "this-month",
+      from: range.from,
+      to: range.to,
+      customerId: "",
+      projectId: "",
+      userId: "",
+      billable: "",
+      tagIds: [],
+      groupByEmployee: false,
+    };
   });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
