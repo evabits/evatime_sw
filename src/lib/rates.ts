@@ -1,4 +1,15 @@
-import type { WorkLevel } from "./work-levels";
+import { z } from "zod";
+import { WORK_LEVEL_ORDER, type WorkLevel } from "./work-levels";
+
+/** De payload-vorm voor tarieven per niveau op een klant of project. */
+export const levelRatesField = z
+  .array(
+    z.object({
+      level: z.enum(WORK_LEVEL_ORDER as [string, ...string[]]),
+      rate: z.number().positive(),
+    }),
+  )
+  .optional();
 
 export type LevelRate = { level: WorkLevel; rate: number | string };
 

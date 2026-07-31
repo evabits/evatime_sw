@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { archivedWhere } from "@/lib/archive";
+import { levelRatesField } from "@/lib/rates";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -15,6 +16,7 @@ const schema = z.object({
   country: z.string().optional(),
   vatNumber: z.string().optional(),
   notes: z.string().optional(),
+  levelRates: levelRatesField,
 });
 
 export async function GET(req: Request) {
@@ -26,7 +28,7 @@ export async function GET(req: Request) {
     const customers = await prisma.customer.findMany({
       where: archivedWhere(includeArchived),
       orderBy: { name: "asc" },
-      include: { _count: { select: { projects: true, invoices: true } } },
+      include: { _count: { select: { projects: true, invoices: true } }, levelRates: true },
     });
     return NextResponse.json(customers);
   } catch (e) {
@@ -40,11 +42,21 @@ export async function POST(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const data = schema.parse(body);
+    const { levelRates, ...data } = schema.parse(body);
     const customer = await prisma.customer.create({
       data: { ...data, email: data.email || null },
     });
-    return NextResponse.json(customer, { status: 201 });
+    if (levelRates) {
+      await prisma.$transaction([
+        prisma.customerLevelRate.deleteMany({ where: { customerId: customer.id } }),
+        ...levelRates.map((r) =>
+          prisma.customerLevelRate.create({
+            data: { customerId: customer.id, level: r.level as any, rate: r.rate },
+          }),
+        ),
+      ]);
+    }
+    return NextResponse.json({ ...customer, ...(levelRates ? { levelRates } : {}) }, { status: 201 });
   } catch (e) {
     return handleError(e);
   }
