@@ -1,16 +1,14 @@
 "use client";
 import { useState, useMemo } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
-import { reportTotals, groupByEmployee as groupEntriesByEmployee, timeRate, kmRate } from "@/lib/report-totals";
-import { Search } from "lucide-react";
+import { formatHours, formatCurrency } from "@/lib/utils";
+import { reportTotals, groupByEmployee as groupEntriesByEmployee } from "@/lib/report-totals";
+import { ReportFilters, type FilterState } from "@/components/reports/report-filters";
+import { TimeRows } from "@/components/reports/time-rows";
+import { KmRows } from "@/components/reports/km-rows";
+import { ExpenseRows } from "@/components/reports/expense-rows";
 
 interface Props {
   customers: any[];
@@ -28,33 +26,29 @@ type ReportData = {
 
 export function ReportsClient({ customers, projects, users, tags }: Props) {
   const now = new Date();
-  const [from, setFrom] = useState(format(startOfMonth(now), "yyyy-MM-dd"));
-  const [to, setTo] = useState(format(endOfMonth(now), "yyyy-MM-dd"));
-  const [customerId, setCustomerId] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [userId, setUserId] = useState("");
-  const [billable, setBillable] = useState("");
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-  const [groupByEmployee, setGroupByEmployee] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    from: format(startOfMonth(now), "yyyy-MM-dd"),
+    to: format(endOfMonth(now), "yyyy-MM-dd"),
+    customerId: "",
+    projectId: "",
+    userId: "",
+    billable: "",
+    tagIds: [],
+    groupByEmployee: false,
+  });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
-
-  const filteredProjects = customerId ? projects.filter((p) => p.customerId === customerId) : projects;
-
-  function toggleTag(id: string) {
-    setSelectedTagIds((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
-  }
 
   async function loadReport() {
     setLoading(true);
     const params = new URLSearchParams();
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    if (customerId) params.set("customerId", customerId);
-    if (projectId) params.set("projectId", projectId);
-    if (userId) params.set("userId", userId);
-    if (billable) params.set("billable", billable);
-    if (selectedTagIds.length > 0) params.set("tags", selectedTagIds.join(","));
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.customerId) params.set("customerId", filters.customerId);
+    if (filters.projectId) params.set("projectId", filters.projectId);
+    if (filters.userId) params.set("userId", filters.userId);
+    if (filters.billable) params.set("billable", filters.billable);
+    if (filters.tagIds.length > 0) params.set("tags", filters.tagIds.join(","));
 
     const res = await fetch(`/api/reports?${params}`);
     if (res.ok) setData(await res.json());
@@ -73,96 +67,16 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
         <p className="text-muted-foreground">Gedetailleerd overzicht met filters</p>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1">
-              <Label>Van</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Tot</Label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Klant</Label>
-              <Select value={customerId} onValueChange={(v) => { setCustomerId(v === "_all" ? "" : v); setProjectId(""); }}>
-                <SelectTrigger><SelectValue placeholder="Alle klanten" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Alle klanten</SelectItem>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Project</Label>
-              <Select value={projectId} onValueChange={(v) => setProjectId(v === "_all" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Alle projecten" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Alle projecten</SelectItem>
-                  {filteredProjects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Medewerker</Label>
-              <Select value={userId} onValueChange={(v) => setUserId(v === "_all" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Alle medewerkers" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Alle medewerkers</SelectItem>
-                  {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Factureerbaar</Label>
-              <Select value={billable} onValueChange={(v) => setBillable(v === "_all" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Alles" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Alles</SelectItem>
-                  <SelectItem value="true">Factureerbaar</SelectItem>
-                  <SelectItem value="false">Niet factureerbaar</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {tags.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <Label>Tags</Label>
-              <div className="flex flex-wrap gap-2 mt-1">
-                {tags.map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant={selectedTagIds.includes(tag.id) ? "default" : "outline"}
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleTag(tag.id)}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-4 flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="group-by-employee"
-              checked={groupByEmployee}
-              onChange={(e) => setGroupByEmployee(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-            />
-            <Label htmlFor="group-by-employee">Groepeer per medewerker</Label>
-          </div>
-
-          <Button className="mt-4" onClick={loadReport} disabled={loading}>
-            <Search className="h-4 w-4 mr-2" />
-            {loading ? "Laden..." : "Rapport ophalen"}
-          </Button>
-        </CardContent>
-      </Card>
+      <ReportFilters
+        customers={customers}
+        projects={projects}
+        users={users}
+        tags={tags}
+        value={filters}
+        onChange={setFilters}
+        onSubmit={loadReport}
+        loading={loading}
+      />
 
       {data && (
         <>
@@ -193,7 +107,7 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
             </Card>
           </div>
 
-          {groupByEmployee ? (
+          {filters.groupByEmployee ? (
             <Card>
               <CardHeader><CardTitle>Per medewerker</CardTitle></CardHeader>
               <CardContent className="p-0">
@@ -217,8 +131,8 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
                       </TableRow>
                     )}
                     {employeeGroups.map((emp) => {
-                      const days = from && to
-                        ? Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1
+                      const days = filters.from && filters.to
+                        ? Math.round((new Date(filters.to).getTime() - new Date(filters.from).getTime()) / 86_400_000) + 1
                         : 7;
                       const targetHours = emp.weeklyHours != null ? emp.weeklyHours * (days / 7) : null;
                       const extraHours = targetHours != null ? Math.max(0, emp.hours - targetHours) : null;
@@ -257,158 +171,15 @@ export function ReportsClient({ customers, projects, users, tags }: Props) {
           ) : (
             <>
               {data.timeEntries.length > 0 && (
-                <Card>
-                  <CardHeader><CardTitle>Uren ({data.timeEntries.length})</CardTitle></CardHeader>
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Datum</TableHead>
-                          <TableHead>Medewerker</TableHead>
-                          <TableHead>Klant / Project</TableHead>
-                          <TableHead>Activiteit</TableHead>
-                          <TableHead>Omschrijving</TableHead>
-                          <TableHead className="text-right">Uren</TableHead>
-                          <TableHead className="text-right">Tarief</TableHead>
-                          <TableHead className="text-right">Bedrag</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.timeEntries.map((e) => {
-                          const rate = timeRate(e);
-                          const amount = Number(e.hours) * rate;
-                          return (
-                            <TableRow key={e.id}>
-                              <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
-                              <TableCell>{e.user?.name}</TableCell>
-                              <TableCell>
-                                <div>{e.project?.customer?.name}</div>
-                                <div className="text-xs text-muted-foreground">{e.project?.name}</div>
-                              </TableCell>
-                              <TableCell>{e.activityType?.name ?? "—"}</TableCell>
-                              <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
-                              <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
-                              <TableCell className="text-right">{rate ? formatCurrency(rate) : "—"}</TableCell>
-                              <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
-                              <TableCell>
-                                {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                                {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow>
-                          <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
-                          <TableCell className="text-right font-mono font-medium">{formatHours(totalHours)}</TableCell>
-                          <TableCell />
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(data.timeEntries.reduce((s, e) => s + Number(e.hours) * timeRate(e), 0))}
-                          </TableCell>
-                          <TableCell />
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <TimeRows entries={data.timeEntries} total={totalHours} />
               )}
 
               {data.kmEntries.length > 0 && (
-                <Card>
-                  <CardHeader><CardTitle>Kilometers ({data.kmEntries.length})</CardTitle></CardHeader>
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Datum</TableHead>
-                          <TableHead>Medewerker</TableHead>
-                          <TableHead>Klant / Project</TableHead>
-                          <TableHead>Omschrijving</TableHead>
-                          <TableHead className="text-right">Km</TableHead>
-                          <TableHead className="text-right">Tarief</TableHead>
-                          <TableHead className="text-right">Bedrag</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.kmEntries.map((e) => {
-                          const rate = kmRate(e);
-                          const amount = Number(e.km) * rate;
-                          return (
-                            <TableRow key={e.id}>
-                              <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
-                              <TableCell>{e.user?.name}</TableCell>
-                              <TableCell>
-                                <div>{e.project?.customer?.name}</div>
-                                <div className="text-xs text-muted-foreground">{e.project?.name}</div>
-                              </TableCell>
-                              <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
-                              <TableCell className="text-right font-mono">{Number(e.km).toFixed(1)}</TableCell>
-                              <TableCell className="text-right">{rate ? `€${rate.toFixed(2)}/km` : "—"}</TableCell>
-                              <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
-                              <TableCell>
-                                {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <KmRows entries={data.kmEntries} />
               )}
 
               {data.expenses.length > 0 && (
-                <Card>
-                  <CardHeader><CardTitle>Uitgaven ({data.expenses.length})</CardTitle></CardHeader>
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Datum</TableHead>
-                          <TableHead>Medewerker</TableHead>
-                          <TableHead>Klant / Project</TableHead>
-                          <TableHead>Categorie</TableHead>
-                          <TableHead>Omschrijving</TableHead>
-                          <TableHead className="text-right">Bedrag</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.expenses.map((e) => (
-                          <TableRow key={e.id}>
-                            <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
-                            <TableCell>{e.user?.name}</TableCell>
-                            <TableCell>
-                              {e.project ? (
-                                <>
-                                  <div>{e.project?.customer?.name}</div>
-                                  <div className="text-xs text-muted-foreground">{e.project?.name}</div>
-                                </>
-                              ) : "—"}
-                            </TableCell>
-                            <TableCell>{e.category?.name}</TableCell>
-                            <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(Number(e.amount))}</TableCell>
-                            <TableCell>
-                              {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                              {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow>
-                          <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(totalExpenses)}</TableCell>
-                          <TableCell />
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <ExpenseRows entries={data.expenses} total={totalExpenses} />
               )}
 
               {data.timeEntries.length === 0 && data.kmEntries.length === 0 && data.expenses.length === 0 && (
