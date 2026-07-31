@@ -30,7 +30,11 @@ export function BulkBar({ kind, count, projects, users, onApply, busy }: Props) 
         key={projectKey}
         disabled={busy}
         onValueChange={(v) => {
-          onApply({ type: "project", projectId: v });
+          const project = projects.find((p) => p.id === v);
+          const label = project ? `${project.customer ? `${project.customer.name} — ` : ""}${project.name}` : v;
+          if (confirm(`${count} regels verplaatsen naar ${label}?`)) {
+            onApply({ type: "project", projectId: v });
+          }
           setProjectKey((k) => k + 1);
         }}
       >
@@ -46,7 +50,11 @@ export function BulkBar({ kind, count, projects, users, onApply, busy }: Props) 
         key={userKey}
         disabled={busy}
         onValueChange={(v) => {
-          onApply({ type: "user", userId: v });
+          const user = users.find((u) => u.id === v);
+          const name = user?.name ?? v;
+          if (confirm(`${count} regels toewijzen aan ${name}?`)) {
+            onApply({ type: "user", userId: v });
+          }
           setUserKey((k) => k + 1);
         }}
       >
