@@ -14,6 +14,7 @@ model User {
   password          String?
   role              Role              @default(EMPLOYEE)
   weeklyHours       Decimal?          @db.Decimal(5, 2)
+  workLevel         WorkLevel?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   archivedAt        DateTime?
@@ -33,6 +34,13 @@ enum Role {
   ADMIN
   FINANCE
   EMPLOYEE
+}
+
+enum WorkLevel {
+  PRODUCTION
+  JUNIOR
+  MEDIOR
+  SENIOR
 }
 
 enum ContractType {
@@ -58,6 +66,7 @@ model Customer {
   projects   Project[]
   invoices   Invoice[]
   quotes     Quote[]
+  levelRates CustomerLevelRate[]
 }
 
 model Project {
@@ -76,6 +85,7 @@ model Project {
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
   activityRates     ProjectActivityRate[]
+  levelRates        ProjectLevelRate[]
   activityLinks     ActivityTypeProject[]
   expenses          Expense[]
   tags              Tag[]
@@ -132,6 +142,30 @@ model ProjectActivityRate {
   @@unique([projectId, activityTypeId])
 }
 
+model CustomerLevelRate {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  level      WorkLevel
+  rate       Decimal   @db.Decimal(10, 2)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([customerId, level])
+}
+
+model ProjectLevelRate {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  level     WorkLevel
+  rate      Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([projectId, level])
+}
+
 model TimeEntry {
   id             String        @id @default(cuid())
   userId         String
@@ -145,6 +179,7 @@ model TimeEntry {
   description    String?
   rateOverride   Decimal?      @db.Decimal(10, 2)
   billable       Boolean       @default(true)
+  workLevel      WorkLevel?
   invoiced       Boolean       @default(false)
   invoiceLineId  String?
   invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
