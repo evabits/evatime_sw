@@ -56,7 +56,30 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
     (a) => a.showInAllProjects || a.projects.some((p: any) => p.projectId === form.projectId),
   );
 
+  function validate(): string | null {
+    if (kind === "expense") {
+      if (!form.categoryId) return "Categorie is verplicht";
+      if (!form.date) return "Datum is verplicht";
+      if (!(Number(form.amount) > 0)) return "Bedrag moet groter dan 0 zijn";
+      if (form.vatRate === "") return "BTW% is verplicht";
+      const vat = Number(form.vatRate);
+      if (!(vat >= 0 && vat <= 100)) return "BTW% moet tussen 0 en 100 liggen";
+    } else {
+      if (!form.projectId) return "Project is verplicht";
+      if (!form.date) return "Datum is verplicht";
+      if (kind === "time" && !(Number(form.hours) > 0)) return "Uren moet groter dan 0 zijn";
+      if (kind === "km" && !(Number(form.km) > 0)) return "Kilometers moet groter dan 0 zijn";
+    }
+    if (form.rateOverride !== "" && !(Number(form.rateOverride) > 0)) return "Tarief moet positief zijn";
+    return null;
+  }
+
   async function save() {
+    const message = validate();
+    if (message) {
+      setError(message);
+      return;
+    }
     setSaving(true);
     setError(null);
     const body =
@@ -74,7 +97,7 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
     setSaving(false);
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
-      setError(payload.error ?? "Opslaan mislukt");
+      setError(payload.issues ? "Controleer de ingevulde velden." : (payload.error ?? "Opslaan mislukt"));
       return;
     }
     onSaved();
