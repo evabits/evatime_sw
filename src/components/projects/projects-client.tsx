@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { LevelRateFields } from "@/components/shared/level-rate-fields";
 
 const schema = z.object({
   customerId: z.string().min(1, "Verplicht"),
@@ -52,6 +53,11 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
   const [showArchived, setShowArchived] = useState(false);
   const [noCustomerOnly, setNoCustomerOnly] = useState(initialNoCustomerOnly);
   const customerlessCount = projects.filter((p) => !p.customer).length;
+  const [levelRates, setLevelRates] = useState<Record<string, string>>({});
+  // Whether levelRates was actually loaded for the project being edited (vs. the
+  // include being missing upstream). false must mean "don't touch rates on save",
+  // never "save an empty set" — otherwise a missing `include` silently wipes rates.
+  const [levelRatesKnown, setLevelRatesKnown] = useState(true);
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -83,6 +89,16 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
       defaultHourlyRate: data.defaultHourlyRate === "" ? null : data.defaultHourlyRate || null,
       defaultKmRate: data.defaultKmRate === "" ? null : data.defaultKmRate || null,
       tags: selectedTags.map((t) => t.name),
+      // Omit levelRates entirely when we never loaded the project's current rates
+      // (levelRatesKnown === false): the API treats an absent key as "leave
+      // untouched", so this can't wipe rates it never saw.
+      ...(levelRatesKnown
+        ? {
+            levelRates: Object.entries(levelRates)
+              .filter(([, v]) => v !== "" && Number(v) > 0)
+              .map(([level, v]) => ({ level, rate: Number(v) })),
+          }
+        : {}),
     };
     try {
       if (editing) {
@@ -120,6 +136,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
     setSelectedTags([]);
     setTagInput("");
     form.reset({ status: "ACTIVE" });
+    setLevelRates({});
+    setLevelRatesKnown(true);
   }
 
   function startEdit(project: any) {
@@ -133,6 +151,15 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
       defaultHourlyRate: project.defaultHourlyRate ? Number(project.defaultHourlyRate) : "",
       defaultKmRate: project.defaultKmRate ? Number(project.defaultKmRate) : "",
     });
+    // project.levelRates is only absent when the query that loaded this project
+    // forgot to include it — not a legitimate "zero rates" state, which is `[]`.
+    const known = Array.isArray(project.levelRates);
+    setLevelRatesKnown(known);
+    setLevelRates(
+      known
+        ? Object.fromEntries(project.levelRates.map((r: any) => [r.level, String(r.rate)]))
+        : {},
+    );
     setDialogOpen(true);
   }
 
@@ -175,7 +202,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
               <SelectItem value="COMPLETED">Afgerond</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => { form.reset({ status: "ACTIVE" }); setEditing(null); setSelectedTags([]); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset({ status: "ACTIVE" }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Project toevoegen
           </Button>
         </div>
@@ -343,6 +370,17 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
             <div className="space-y-1">
               <Label>Standaard km-tarief (€/km)</Label>
               <Input type="number" step="0.01" min="0" placeholder="0.23" {...form.register("defaultKmRate")} />
+            </div>
+            <div className="sm:col-span-2">
+              <LevelRateFields
+                value={levelRates}
+                onChange={setLevelRates}
+                hint={
+                  levelRatesKnown
+                    ? "Leeg laten betekent: gebruik het tarief van de klant."
+                    : "Tarieven konden niet worden geladen; wijzigingen hier worden niet opgeslagen."
+                }
+              />
             </div>
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={close}>Annuleren</Button>

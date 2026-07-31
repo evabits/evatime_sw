@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
+import { levelRatesField } from "@/lib/rates";
 
 const schema = z.object({
   customerId: z.string().min(1),
@@ -12,6 +13,7 @@ const schema = z.object({
   defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
+  levelRates: levelRatesField,
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         customer: { select: { id: true, name: true } },
         activityRates: { include: { activityType: true } },
         tags: { select: { id: true, name: true } },
+        levelRates: true,
       },
     });
     if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -39,7 +42,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const { tags, ...rest } = schema.parse(await req.json());
+    const { tags, levelRates, ...rest } = schema.parse(await req.json());
     const project = await prisma.project.update({
       where: { id },
       data: {
@@ -58,7 +61,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
       include: { tags: { select: { id: true, name: true } } },
     });
-    return NextResponse.json(project);
+    if (levelRates) {
+      await prisma.$transaction([
+        prisma.projectLevelRate.deleteMany({ where: { projectId: project.id } }),
+        ...levelRates.map((r) =>
+          prisma.projectLevelRate.create({
+            data: { projectId: project.id, level: r.level as any, rate: r.rate },
+          }),
+        ),
+      ]);
+    }
+    return NextResponse.json({ ...project, ...(levelRates ? { levelRates } : {}) });
   } catch (e) { return handleError(e); }
 }
 
