@@ -24,6 +24,7 @@ const schema = z.object({
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
   billable: z.boolean().optional(),
+  userId: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -44,12 +45,14 @@ interface Props {
   projects: any[];
   activityTypes: any[];
   customers: any[];
+  users: any[];
   initialEntries: any[];
   initialTemplates: any[];
+  userId: string;
   role: string;
 }
 
-export function KmEntriesClient({ projects, activityTypes, customers, initialEntries, initialTemplates, role }: Props) {
+export function KmEntriesClient({ projects, activityTypes, customers, users, initialEntries, initialTemplates, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [entries, setEntries] = useState(initialEntries);
@@ -65,12 +68,13 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
   const [loading, setLoading] = useState(false);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
   const [filterProject, setFilterProject] = useState("all");
+  const [filterUser, setFilterUser] = useState("all");
   const [fetching, setFetching] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true },
+    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true, userId },
   });
 
   const selectedProjectId = form.watch("projectId");
@@ -111,11 +115,12 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
     form.setValue("description", t.description ?? "");
   }
 
-  async function fetchEntries(month: string, projectId: string) {
+  async function fetchEntries(month: string, projectId: string, userFilter = filterUser) {
     setFetching(true);
     const { from, to } = monthBounds(month);
     const params = new URLSearchParams({ from, to });
     if (projectId !== "all") params.set("projectId", projectId);
+    if (userFilter !== "all") params.set("userId", userFilter);
     const res = await fetch(`/api/km?${params}`);
     if (res.ok) setEntries(await res.json());
     setFetching(false);
@@ -129,6 +134,11 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
   function handleProjectChange(projectId: string) {
     setFilterProject(projectId);
     fetchEntries(filterMonth, projectId);
+  }
+
+  async function handleUserChange(uid: string) {
+    setFilterUser(uid);
+    await fetchEntries(filterMonth, filterProject, uid);
   }
 
   async function onSubmit(data: FormData) {
@@ -149,7 +159,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
           const updated = await res.json();
           setEntries((prev) => prev.map((e) => (e.id === editing ? { ...e, ...updated } : e)));
           setEditing(null);
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
         }
       } else {
         const res = await fetch("/api/km", {
@@ -158,11 +168,18 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          const created = await res.json();
-          const { from, to } = monthBounds(filterMonth);
-          const entryDate = data.date;
-          if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
-            setEntries((prev) => [created, ...prev]);
+          const targetUser = data.userId ?? userId;
+          const switchedFilter =
+            isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
+          if (switchedFilter) {
+            await handleUserChange(targetUser);
+          } else {
+            const created = await res.json();
+            const { from, to } = monthBounds(filterMonth);
+            const entryDate = data.date;
+            if (entryDate >= from && entryDate <= to && (filterProject === "all" || data.projectId === filterProject)) {
+              setEntries((prev) => [created, ...prev]);
+            }
           }
           if (saveAsTemplate) {
             setPendingTemplate({
@@ -175,7 +192,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
             setTemplateError("");
             setTemplateDialogOpen(true);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
           setAppliedTemplate("");
         }
       }
@@ -227,6 +244,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
       description: entry.description ?? "",
       rateOverride: entry.rateOverride ? Number(entry.rateOverride) : undefined,
       billable: entry.billable,
+      userId: entry.userId,
     });
   }
 
@@ -245,6 +263,20 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+
+            {isAdmin && users.length > 0 && (
+              <div className="space-y-2">
+                <Label>Medewerker</Label>
+                <Select onValueChange={(v) => form.setValue("userId", v)} value={form.watch("userId") ?? userId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {!editing && templates.length > 0 && (
               <div className="space-y-2 sm:col-span-2">
@@ -349,7 +381,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
                   setSelectedCustomerId("");
                   setAppliedTemplate("");
                   setSaveAsTemplate(false);
-                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true });
+                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
                 }}>Annuleren</Button>
               )}
               {!editing && (
@@ -378,6 +410,17 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
               )}
             </div>
             <div className="flex flex-wrap gap-2">
+              {isAdmin && users.length > 0 && (
+                <Select value={filterUser} onValueChange={handleUserChange}>
+                  <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle medewerkers</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Input
                 type="month"
                 value={filterMonth}
@@ -404,6 +447,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
                 <TableHead>Project</TableHead>
                 <TableHead>Activiteit</TableHead>
                 <TableHead>Omschrijving</TableHead>
+                {isAdmin && filterUser === "all" && <TableHead>Medewerker</TableHead>}
                 <TableHead className="text-right">Km</TableHead>
                 {isAdmin && <TableHead className="text-right">Tarief</TableHead>}
                 <TableHead></TableHead>
@@ -411,10 +455,10 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
             </TableHeader>
             <TableBody>
               {fetching && (
-                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
               )}
               {!fetching && entries.length === 0 && (
-                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
               {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
@@ -425,6 +469,9 @@ export function KmEntriesClient({ projects, activityTypes, customers, initialEnt
                   </TableCell>
                   <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
+                  {isAdmin && filterUser === "all" && (
+                    <TableCell className="text-sm">{entry.user?.name ?? "—"}</TableCell>
+                  )}
                   <TableCell className="text-right font-mono">{Number(entry.km).toFixed(1)}</TableCell>
                   {isAdmin && (
                     <TableCell className="text-right">

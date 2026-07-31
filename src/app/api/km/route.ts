@@ -23,6 +23,7 @@ export async function GET(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
+    const filterUserId = searchParams.get("userId");
     const customerId = searchParams.get("customerId");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
     const entries = await prisma.kmEntry.findMany({
       where: {
         ...(ownerId ? { userId: ownerId } : {}),
+        ...(filterUserId && canViewAllEntries(role) ? { userId: filterUserId } : {}),
         ...(projectId ? { projectId } : {}),
         ...(customerId ? { project: { customerId } } : {}),
         ...(from || to ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
