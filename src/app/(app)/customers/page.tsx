@@ -6,7 +6,7 @@ export default async function CustomersPage() {
   const customers = await prisma.customer.findMany({
     where: { archivedAt: null },
     orderBy: { name: "asc" },
-    include: { _count: { select: { projects: true, invoices: true } } },
+    include: { _count: { select: { projects: true, invoices: true } }, levelRates: true },
   });
 
   return <CustomersClient initialCustomers={serialize(customers)} />;
