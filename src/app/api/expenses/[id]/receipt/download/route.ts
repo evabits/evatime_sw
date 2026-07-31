@@ -2,15 +2,20 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
+import { isAdmin } from "@/lib/roles";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    const sessionUserId = session.user?.id;
+    if (!sessionUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const expense = await prisma.expense.findUnique({ where: { id }, select: { receiptUrl: true } });
+    const expense = await prisma.expense.findUnique({ where: { id }, select: { userId: true, receiptUrl: true } });
     if (!expense?.receiptUrl) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!isAdmin(role) && expense.userId !== sessionUserId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const blobRes = await fetch(expense.receiptUrl, {
       headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
