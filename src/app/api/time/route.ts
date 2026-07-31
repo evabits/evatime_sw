@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canViewAllEntries, isAdmin } from "@/lib/roles";
+import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -13,6 +14,7 @@ const schema = z.object({
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   billable: z.boolean().optional(),
+  userId: z.string().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -69,11 +71,19 @@ export async function POST(req: Request) {
       }
     }
 
+    const { userId: requestedUserId, ...entryData } = data;
+    const ownerId = resolveEntryUserId(role, userId, requestedUserId);
+    if (ownerId !== userId) {
+      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
     const entry = await prisma.timeEntry.create({
-      data: { ...data, rateOverride, billable: billable ?? true, date: new Date(data.date), userId },
+      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },
+        user: { select: { id: true, name: true } },
       },
     });
     return NextResponse.json(entry, { status: 201 });

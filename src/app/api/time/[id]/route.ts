@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError, entryMutationError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
-import { checkEntryMutation } from "@/lib/entry-owner";
+import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -14,6 +14,7 @@ const schema = z.object({
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   billable: z.boolean().optional(),
+  userId: z.string().optional().nullable(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -43,12 +44,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
+    const { userId: requestedUserId, ...entryData } = data;
+    const ownerId = resolveEntryUserId(role, sessionUserId, requestedUserId);
+    if (ownerId !== sessionUserId) {
+      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
     const entry = await prisma.timeEntry.update({
       where: { id },
-      data: { ...data, rateOverride, billable: billable ?? true, date: new Date(data.date) },
+      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },
+        user: { select: { id: true, name: true } },
       },
     });
     return NextResponse.json(entry);

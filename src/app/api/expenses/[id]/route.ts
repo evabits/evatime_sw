@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   categoryId: z.string().min(1),
@@ -14,6 +15,7 @@ const schema = z.object({
   vatRate: z.number().min(0).max(100),
   billable: z.boolean(),
   reimbursable: z.boolean(),
+  userId: z.string().optional().nullable(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,9 +32,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (existing.invoiced) return NextResponse.json({ error: "Gefactureerde onkosten kunnen niet worden bewerkt" }, { status: 400 });
 
     const data = schema.parse(await req.json());
+    const { userId: requestedUserId, ...entryData } = data;
+    const ownerId = resolveEntryUserId(role, userId, requestedUserId);
+    if (ownerId !== userId) {
+      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
     const expense = await prisma.expense.update({
       where: { id },
-      data: { ...data, date: new Date(data.date) },
+      data: { ...entryData, date: new Date(data.date), userId: ownerId },
       include: {
         category: { select: { id: true, name: true } },
         project: { select: { id: true, name: true, customer: { select: { name: true } } } },

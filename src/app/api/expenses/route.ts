@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canViewAllEntries, canViewReimbursements } from "@/lib/roles";
+import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   categoryId: z.string().min(1),
@@ -14,6 +15,7 @@ const schema = z.object({
   vatRate: z.number().min(0).max(100).default(21),
   billable: z.boolean().default(true),
   reimbursable: z.boolean().default(false),
+  userId: z.string().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -67,10 +69,18 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = session.user?.id!;
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
 
     const data = schema.parse(await req.json());
+    const { userId: requestedUserId, ...entryData } = data;
+    const ownerId = resolveEntryUserId(role, userId, requestedUserId);
+    if (ownerId !== userId) {
+      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
     const expense = await prisma.expense.create({
-      data: { ...data, date: new Date(data.date), userId },
+      data: { ...entryData, date: new Date(data.date), userId: ownerId },
       include: {
         category: { select: { id: true, name: true } },
         project: { select: { id: true, name: true, customer: { select: { name: true } } } },
