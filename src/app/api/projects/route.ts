@@ -12,7 +12,6 @@ const schema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]).default("ACTIVE"),
-  defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
   activityTypeIds: z.array(z.string()).optional(),

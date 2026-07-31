@@ -52,7 +52,7 @@ export async function GET(req: Request) {
               customer: { select: { id: true, name: true, levelRates: true } },
             },
           },
-          activityType: { select: { id: true, name: true, defaultRate: true } },
+          activityType: { select: { id: true, name: true } },
           user: { select: { id: true, name: true, workLevel: true } },
         },
         orderBy: { date: "desc" },

@@ -8,7 +8,6 @@ import { archivedWhere } from "@/lib/archive";
 
 const schema = z.object({
   name: z.string().min(1),
-  defaultRate: z.number().positive().optional().nullable(),
   billable: z.boolean().default(true),
   showInAllProjects: z.boolean().default(false),
   projectIds: z.array(z.string()).default([]),

@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
 
 const schema = z.object({
@@ -21,7 +20,6 @@ const schema = z.object({
   name: z.string().min(1, "Verplicht"),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
-  defaultHourlyRate: z.coerce.number().positive().optional().or(z.literal("")),
   defaultKmRate: z.coerce.number().positive().optional().or(z.literal("")),
 });
 
@@ -86,7 +84,6 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
     setLoading(true);
     const payload = {
       ...data,
-      defaultHourlyRate: data.defaultHourlyRate === "" ? null : data.defaultHourlyRate || null,
       defaultKmRate: data.defaultKmRate === "" ? null : data.defaultKmRate || null,
       tags: selectedTags.map((t) => t.name),
       // Omit levelRates entirely when we never loaded the project's current rates
@@ -148,7 +145,6 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
       name: project.name,
       description: project.description ?? "",
       status: project.status,
-      defaultHourlyRate: project.defaultHourlyRate ? Number(project.defaultHourlyRate) : "",
       defaultKmRate: project.defaultKmRate ? Number(project.defaultKmRate) : "",
     });
     // project.levelRates is only absent when the query that loaded this project
@@ -217,7 +213,6 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                 <TableHead>Klant</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Tags</TableHead>
-                <TableHead className="text-right">Uurtarief</TableHead>
                 <TableHead className="text-right">Km-tarief</TableHead>
                 <TableHead className="text-right">Uren</TableHead>
                 <TableHead></TableHead>
@@ -225,7 +220,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
             </TableHeader>
             <TableBody>
               {projects.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
               {projects
               .filter((p) => statusFilter === "all" || p.status === statusFilter)
@@ -247,7 +242,6 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">{p.defaultHourlyRate ? formatCurrency(Number(p.defaultHourlyRate)) : "—"}</TableCell>
                   <TableCell className="text-right">{p.defaultKmRate ? `€${Number(p.defaultKmRate).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-right">{p._count?.timeEntries ?? 0}</TableCell>
                   <TableCell>
@@ -361,11 +355,6 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                   <SelectItem value="COMPLETED">Afgerond</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div />
-            <div className="space-y-1">
-              <Label>Standaard uurtarief (€)</Label>
-              <Input type="number" step="0.01" min="0" placeholder="95.00" {...form.register("defaultHourlyRate")} />
             </div>
             <div className="space-y-1">
               <Label>Standaard km-tarief (€/km)</Label>

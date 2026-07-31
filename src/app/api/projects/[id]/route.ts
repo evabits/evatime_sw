@@ -10,7 +10,6 @@ const schema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
-  defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
   levelRates: levelRatesField,
@@ -26,7 +25,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       include: {
         customer: { select: { id: true, name: true } },
-        activityRates: { include: { activityType: true } },
         tags: { select: { id: true, name: true } },
         levelRates: true,
       },

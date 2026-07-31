@@ -57,7 +57,7 @@ export async function GET(req: Request) {
               },
             }
           : { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { id: true, name: true, defaultRate: true } },
+        activityType: { select: { id: true, name: true } },
         user: canSeeRates
           ? { select: { id: true, name: true, workLevel: true } }
           : { select: { id: true, name: true } },

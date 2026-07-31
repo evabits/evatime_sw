@@ -76,7 +76,6 @@ model Project {
   name              String
   description       String?
   status            ProjectStatus         @default(ACTIVE)
-  defaultHourlyRate Decimal?              @db.Decimal(10, 2)
   defaultKmRate     Decimal?              @db.Decimal(10, 2)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
@@ -84,7 +83,6 @@ model Project {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
-  activityRates     ProjectActivityRate[]
   levelRates        ProjectLevelRate[]
   activityLinks     ActivityTypeProject[]
   expenses          Expense[]
@@ -108,7 +106,6 @@ model Tag {
 model ActivityType {
   id                String                @id @default(cuid())
   name              String                @unique
-  defaultRate       Decimal?              @db.Decimal(10, 2)
   billable          Boolean               @default(true)
   showInAllProjects Boolean               @default(false)
   createdAt         DateTime              @default(now())
@@ -117,7 +114,6 @@ model ActivityType {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
-  projectRates      ProjectActivityRate[]
   projects          ActivityTypeProject[]
 }
 
@@ -128,18 +124,6 @@ model ActivityTypeProject {
   project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([activityTypeId, projectId])
-}
-
-model ProjectActivityRate {
-  id             String       @id @default(cuid())
-  projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  activityTypeId String
-  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
-  rate           Decimal      @db.Decimal(10, 2)
-  createdAt      DateTime     @default(now())
-
-  @@unique([projectId, activityTypeId])
 }
 
 model CustomerLevelRate {

@@ -17,8 +17,10 @@ describe("projects", () => {
   it("employees may not attach a customer to a concept project", () => {
     expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", customerId: "c1" })).toBeTruthy();
   });
-  it("employees may not set defaultHourlyRate on a concept project", () => {
-    expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", defaultHourlyRate: 80 })).toBeTruthy();
+  it("employees may not set levelRates on a concept project", () => {
+    expect(
+      projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", levelRates: [{ level: "JUNIOR", rate: 80 }] }),
+    ).toBeTruthy();
   });
   it("employees may not set defaultKmRate on a concept project", () => {
     expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", defaultKmRate: 0.23 })).toBeTruthy();
