@@ -210,10 +210,10 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
     fetchEntries(filterMonth, projectId);
   }
 
-  function handleUserChange(uid: string) {
+  async function handleUserChange(uid: string) {
     setFilterUser(uid);
-    if (viewMode === "week") fetchWeekEntries(weekOffset, uid);
-    else fetchEntries(filterMonth, filterProject, uid);
+    if (viewMode === "week") await fetchWeekEntries(weekOffset, uid);
+    else await fetchEntries(filterMonth, filterProject, uid);
   }
 
   async function handleWeekNav(newOffset: number) {
@@ -309,11 +309,12 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
         });
         if (res.ok) {
           const targetUser = data.userId ?? userId;
-          if (isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser) {
-            handleUserChange(targetUser);
-          }
+          const switchedFilter =
+            isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
           form.reset({ date: data.date, billable: true, userId: data.userId ?? userId });
-          if (viewMode === "week") {
+          if (switchedFilter) {
+            await handleUserChange(targetUser);
+          } else if (viewMode === "week") {
             await fetchWeekEntries(weekOffset);
           } else {
             const created = await res.json();
