@@ -97,7 +97,8 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
     }
     const { count } = await res.json();
     if (count < ids.length) {
-      alert(`${count} van de ${ids.length} regels bijgewerkt, gefactureerde regels overgeslagen`);
+      const verb = action.type === "delete" ? "verwijderd" : "bijgewerkt";
+      alert(`${count} van de ${ids.length} regels ${verb}, gefactureerde regels overgeslagen`);
     }
     setSelected((prev) => ({ ...prev, [kind]: new Set<string>() }));
     await loadReport();
