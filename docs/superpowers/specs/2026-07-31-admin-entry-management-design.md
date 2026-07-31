@@ -86,11 +86,10 @@ van uit de lijst te vallen.
 `/expenses` krijgt géén medewerkersfilter: een admin ziet daar al de uitgaven van iedereen, dus
 een uitgave die je voor een collega invoert komt vanzelf in beeld.
 
-Bij het aanpassen van `expenses-client.tsx` wordt en passant `isReadOnly` gerepareerd. Die
-bepaalt nu of een regel van jezelf is met `expense.userId !== expenses[0]?.userId`, dus door
-hem te vergelijken met de eigenaar van de eerste rij in de lijst. Staat die eerste rij op naam
-van iemand anders, dan lijken je eigen regels ineens read-only. Het wordt een vergelijking met
-de daadwerkelijk ingelogde gebruiker, die als prop wordt doorgegeven.
+Bij het aanpassen van `expenses-client.tsx` gaat en passant de dode `isReadOnly`-regel eruit.
+Die vergelijkt een regel met de eigenaar van de eerste rij in de lijst, maar wordt nergens
+aangeroepen — de tabel gebruikt `const readOnly = showReimbursements`. Puur schrappen dus, geen
+gedragsverandering.
 
 ## Deel 2: `/reports` bewerkbaar maken
 
@@ -150,15 +149,16 @@ Eén nieuwe route, `POST /api/entries/bulk`, alleen voor ADMIN:
     | { type: "delete" } }
 ```
 
-De vertaling van actie naar prisma-fragment zit in een pure helper:
+De vertaling van actie naar prisma-fragment zit in twee pure helpers:
 
 ```ts
 // src/lib/bulk-entries.ts
-export function buildBulkMutation(
-  kind: "time" | "km" | "expense",
-  action: BulkAction,
-): { data: Record<string, unknown> } | { delete: true }
+export function buildBulkWhere(ids: string[]): { id: { in: string[] }; invoiced: false }
+export function buildBulkData(action: BulkAction): Record<string, string | boolean>
 ```
+
+De `invoiced: false`-guard zit vast in `buildBulkWhere`, zodat geen enkele aanroeper hem kan
+overslaan.
 
 Uitgevoerd als `updateMany` of `deleteMany` met `where: { id: { in: ids }, invoiced: false }`.
 Gefactureerde regels vallen daarmee structureel buiten de mutatie, ook als de client ze toch
