@@ -132,7 +132,10 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
 
           <div className="space-y-2">
             <Label>Project</Label>
-            <Select value={form.projectId} onValueChange={(v) => set("projectId", v)}>
+            <Select
+              value={form.projectId}
+              onValueChange={(v) => setForm((f: any) => ({ ...f, projectId: v, activityTypeId: "" }))}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {projects.map((p) => (
@@ -145,9 +148,13 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
           {kind !== "expense" && (
             <div className="space-y-2">
               <Label>Activiteit</Label>
-              <Select value={form.activityTypeId} onValueChange={(v) => set("activityTypeId", v)}>
+              <Select
+                value={form.activityTypeId || "_none"}
+                onValueChange={(v) => set("activityTypeId", v === "_none" ? "" : v)}
+              >
                 <SelectTrigger><SelectValue placeholder="Geen" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="_none">Geen</SelectItem>
                   {availableActivities.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
