@@ -57,6 +57,10 @@ describe("groupByEmployee", () => {
     expect(rows.map((r) => r.name)).toEqual(["Anne", "Bram"]);
     expect(rows[0]).toMatchObject({ hours: 2, km: 10, expenses: 40, weeklyHours: 40 });
     expect(rows[1]).toMatchObject({ hours: 3, km: 0, expenses: 60, weeklyHours: null });
+    // Anne: 2*100 (time) + 10*0.23 (km) + 40 (billable expense) = 242.3
+    expect(rows[0].revenue).toBeCloseTo(242.3, 2);
+    // Bram: 3*50 (time); his 60 expense is not billable so it must not count = 150
+    expect(rows[1].revenue).toBe(150);
   });
 
   it("sorts by name", () => {
