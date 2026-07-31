@@ -3,11 +3,13 @@ import { timeRate, kmRate, reportTotals, groupByEmployee } from "./report-totals
 
 const data = {
   timeEntries: [
-    { hours: 2, rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u1", name: "Anne" } },
-    { hours: 3, rateOverride: 50, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u2", name: "Bram" } },
+    { hours: 2, billable: true, rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u1", name: "Anne" } },
+    { hours: 3, billable: true, rateOverride: 50, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u2", name: "Bram" } },
+    { hours: 4, billable: false, rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u1", name: "Anne" } },
   ],
   kmEntries: [
-    { km: 10, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u1", name: "Anne" } },
+    { km: 10, billable: true, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u1", name: "Anne" } },
+    { km: 20, billable: false, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u2", name: "Bram" } },
   ],
   expenses: [
     { amount: 40, billable: true, user: { id: "u1", name: "Anne" } },
@@ -36,15 +38,20 @@ describe("kmRate", () => {
 });
 
 describe("reportTotals", () => {
-  it("sums hours, km and expense amounts", () => {
+  it("sums hours, km and expense amounts regardless of billable", () => {
+    // hours: 2 + 3 + 4 (incl. the non-billable one) = 9
+    // km: 10 + 20 (incl. the non-billable one) = 30
     const t = reportTotals(data);
-    expect(t.hours).toBe(5);
-    expect(t.km).toBe(10);
+    expect(t.hours).toBe(9);
+    expect(t.km).toBe(30);
     expect(t.expenses).toBe(100);
   });
 
-  it("counts only billable expenses towards revenue", () => {
-    // 2*100 + 3*50 + 10*0.23 + 40 = 392.3
+  it("counts only billable time, km and expenses towards revenue", () => {
+    // billable only: Anne's time (2*100) + Bram's time (3*50) + Anne's km (10*0.23) + Anne's expense (40)
+    // = 200 + 150 + 2.3 + 40 = 392.3
+    // excluded: Anne's non-billable time (4*100=400), Bram's non-billable km (20*0.23=4.6),
+    // Bram's non-billable expense (60) — none of that may show up in the total.
     expect(reportTotals(data).revenue).toBeCloseTo(392.3, 2);
   });
 });
@@ -55,11 +62,15 @@ describe("groupByEmployee", () => {
   it("groups every kind under its employee", () => {
     const rows = groupByEmployee(data, users);
     expect(rows.map((r) => r.name)).toEqual(["Anne", "Bram"]);
-    expect(rows[0]).toMatchObject({ hours: 2, km: 10, expenses: 40, weeklyHours: 40 });
-    expect(rows[1]).toMatchObject({ hours: 3, km: 0, expenses: 60, weeklyHours: null });
-    // Anne: 2*100 (time) + 10*0.23 (km) + 40 (billable expense) = 242.3
+    // Anne: 2h billable + 4h non-billable = 6h; 10 billable km
+    expect(rows[0]).toMatchObject({ hours: 6, km: 10, expenses: 40, weeklyHours: 40 });
+    // Bram: 3h billable time; 20 non-billable km
+    expect(rows[1]).toMatchObject({ hours: 3, km: 20, expenses: 60, weeklyHours: null });
+    // Anne: 2*100 (billable time) + 10*0.23 (billable km) + 40 (billable expense) = 242.3
+    // her 4h non-billable time (4*100=400) must not count
     expect(rows[0].revenue).toBeCloseTo(242.3, 2);
-    // Bram: 3*50 (time); his 60 expense is not billable so it must not count = 150
+    // Bram: 3*50 (billable time) = 150; his 20 non-billable km (20*0.23=4.6) and his
+    // 60 non-billable expense must not count
     expect(rows[1].revenue).toBe(150);
   });
 

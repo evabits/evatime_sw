@@ -29,8 +29,8 @@ export function reportTotals(data: ReportData) {
   const km = data.kmEntries.reduce((s, e) => s + Number(e.km), 0);
   const expenses = data.expenses.reduce((s, e) => s + Number(e.amount), 0);
   const revenue =
-    data.timeEntries.reduce((s, e) => s + Number(e.hours) * timeRate(e), 0) +
-    data.kmEntries.reduce((s, e) => s + Number(e.km) * kmRate(e), 0) +
+    data.timeEntries.filter((e) => e.billable).reduce((s, e) => s + Number(e.hours) * timeRate(e), 0) +
+    data.kmEntries.filter((e) => e.billable).reduce((s, e) => s + Number(e.km) * kmRate(e), 0) +
     data.expenses.filter((e) => e.billable).reduce((s, e) => s + Number(e.amount), 0);
   return { hours, km, expenses, revenue };
 }
@@ -58,12 +58,12 @@ export function groupByEmployee(
   for (const e of data.timeEntries) {
     const row = bucket(e.user);
     row.hours += Number(e.hours);
-    row.revenue += Number(e.hours) * timeRate(e);
+    if (e.billable) row.revenue += Number(e.hours) * timeRate(e);
   }
   for (const e of data.kmEntries) {
     const row = bucket(e.user);
     row.km += Number(e.km);
-    row.revenue += Number(e.km) * kmRate(e);
+    if (e.billable) row.revenue += Number(e.km) * kmRate(e);
   }
   for (const e of data.expenses) {
     const row = bucket(e.user);
