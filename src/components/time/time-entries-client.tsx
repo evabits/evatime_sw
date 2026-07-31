@@ -27,6 +27,7 @@ const schema = z.object({
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
   billable: z.boolean().optional(),
+  userId: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -140,7 +141,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: today, billable: true },
+    defaultValues: { date: today, billable: true, userId },
   });
 
   const selectedProjectId = form.watch("projectId");
@@ -293,7 +294,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
         });
         if (res.ok) {
           setEditing(null);
-          form.reset({ date: selectedDay ?? today, billable: true });
+          form.reset({ date: selectedDay ?? today, billable: true, userId });
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
             const updated = await res.json();
@@ -307,7 +308,11 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          form.reset({ date: data.date, billable: true });
+          const targetUser = data.userId ?? userId;
+          if (isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser) {
+            handleUserChange(targetUser);
+          }
+          form.reset({ date: data.date, billable: true, userId: data.userId ?? userId });
           if (viewMode === "week") {
             await fetchWeekEntries(weekOffset);
           } else {
@@ -342,6 +347,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
       description: entry.description ?? "",
       rateOverride: entry.rateOverride ? Number(entry.rateOverride) : undefined,
       billable: entry.billable,
+      userId: entry.userId,
     });
   }
 
@@ -373,6 +379,20 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 </SelectContent>
               </Select>
             </div>
+
+            {isAdmin && users.length > 0 && (
+              <div className="space-y-2">
+                <Label>Medewerker</Label>
+                <Select onValueChange={(v) => form.setValue("userId", v)} value={form.watch("userId") ?? userId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Project *</Label>
@@ -472,7 +492,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 <Button type="button" variant="outline" onClick={() => {
                   setEditing(null);
                   setSelectedCustomerId("");
-                  form.reset({ date: selectedDay ?? today, billable: true });
+                  form.reset({ date: selectedDay ?? today, billable: true, userId });
                 }}>Annuleren</Button>
               )}
             </div>
