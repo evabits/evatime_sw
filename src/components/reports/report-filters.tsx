@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search } from "lucide-react";
 import { resolvePeriod, PERIOD_LABELS, PERIOD_ORDER, type PeriodPreset } from "@/lib/periods";
+import { formatDate } from "@/lib/utils";
 
 export type FilterState = {
   period: PeriodPreset;
@@ -59,6 +60,11 @@ export function ReportFilters({ customers, projects, users, tags, value, onChang
                 ))}
               </SelectContent>
             </Select>
+            {value.period !== "custom" && (
+              <p className="text-xs text-muted-foreground">
+                {formatDate(value.from)} t/m {formatDate(value.to)}
+              </p>
+            )}
           </div>
 
           {value.period === "custom" && (
