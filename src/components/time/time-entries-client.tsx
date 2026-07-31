@@ -468,9 +468,9 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
               <div className="space-y-2">
                 <Label>
                   Tarief override (€/u)
-                  {effectiveRate == null
+                  {selectedProject && (effectiveRate == null
                     ? <span className="text-muted-foreground font-normal"> · geen tarief voor dit niveau</span>
-                    : <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
+                    : <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>)}
                 </Label>
                 <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
               </div>

@@ -14,13 +14,24 @@ export default async function TimePage() {
     prisma.project.findMany({
       where: { status: { in: ["ACTIVE", "CONCEPT"] }, archivedAt: null },
       orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        levelRates: true,
-        customer: { select: { id: true, name: true, levelRates: true } },
-      },
+      // The rate preview (and its "Tarief override" field) only ever renders
+      // for admins — see the `{isAdmin && ...}` guard in TimeEntriesClient.
+      // Non-admins don't need the per-level rate card, so don't ship it to
+      // them in the page payload; same class of leak as the /api/time fix.
+      select: admin
+        ? {
+            id: true,
+            name: true,
+            status: true,
+            levelRates: true,
+            customer: { select: { id: true, name: true, levelRates: true } },
+          }
+        : {
+            id: true,
+            name: true,
+            status: true,
+            customer: { select: { id: true, name: true } },
+          },
     }),
     prisma.activityType.findMany({
       where: { archivedAt: null },
