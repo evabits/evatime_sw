@@ -26,6 +26,24 @@ describe("buildBulkData", () => {
     expect(buildBulkData({ type: "user", userId: "u-9" })).toEqual({ userId: "u-9" });
   });
 
+  it("re-snapshots the work level when the caller passes one along (bulk time reassignment)", () => {
+    expect(buildBulkData({ type: "user", userId: "u-9" }, { workLevel: "SENIOR" })).toEqual({
+      userId: "u-9",
+      workLevel: "SENIOR",
+    });
+  });
+
+  it("carries a null work level through unchanged (target user has none set)", () => {
+    expect(buildBulkData({ type: "user", userId: "u-9" }, { workLevel: null })).toEqual({
+      userId: "u-9",
+      workLevel: null,
+    });
+  });
+
+  it("leaves workLevel out entirely for km/expense reassignment (no opts passed)", () => {
+    expect(buildBulkData({ type: "user", userId: "u-9" })).not.toHaveProperty("workLevel");
+  });
+
   it("refuses to build update data for a delete", () => {
     expect(() => buildBulkData({ type: "delete" })).toThrow();
   });
