@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { levelRatesField } from "@/lib/rates";
+import { isAdmin } from "@/lib/roles";
 
 const schema = z.object({
   customerId: z.string().min(1),
@@ -38,6 +39,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    // Unlike POST (where projectCreateDenialReason still lets employees create
+    // bare concept projects), editing an EXISTING project is only exposed via
+    // the admin-only /projects page, and this route lets the caller reassign
+    // the customer, status and levelRates in one call — so the whole route is
+    // admin-only rather than stripping just levelRates.
+    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
     const { tags, levelRates, ...rest } = schema.parse(await req.json());

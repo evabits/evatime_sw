@@ -6,6 +6,7 @@ import { handleError } from "@/lib/api";
 import { projectCreateDenialReason } from "@/lib/projects";
 import { archivedWhere } from "@/lib/archive";
 import { levelRatesField } from "@/lib/rates";
+import { canEditInvoices } from "@/lib/roles";
 
 const schema = z.object({
   customerId: z.string().min(1).optional().nullable(),
@@ -22,10 +23,18 @@ export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
     const includeArchived = searchParams.get("includeArchived") === "1";
+
+    // This endpoint is also used by the time-entry form's project dropdown
+    // for every role, so it must stay reachable for everyone — only the
+    // levelRates rate card is withheld from non-admins. Same gate as
+    // GET /api/time and GET /api/customers.
+    const canSeeRates = canEditInvoices(role);
+
     const projects = await prisma.project.findMany({
       where: {
         ...(customerId ? { customerId } : {}),
@@ -37,7 +46,7 @@ export async function GET(req: Request) {
         customer: { select: { name: true } },
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
-        levelRates: true,
+        ...(canSeeRates ? { levelRates: true } : {}),
       },
     });
     return NextResponse.json(projects);

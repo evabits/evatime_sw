@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { levelRatesField } from "@/lib/rates";
+import { isAdmin } from "@/lib/roles";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -40,6 +41,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    // Same reasoning as POST /api/customers: only the admin-only /customers
+    // page edits customers, so the whole route is admin-only.
+    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
     const { levelRates, ...data } = schema.parse(await req.json());
     const customer = await prisma.customer.update({
