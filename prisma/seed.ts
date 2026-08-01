@@ -13,6 +13,7 @@ async function main() {
       email: "admin@evabits.com",
       password,
       role: "ADMIN",
+      workLevel: "SENIOR",
     },
   });
   console.log("Created user:", user.email);
