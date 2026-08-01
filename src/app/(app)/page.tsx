@@ -42,11 +42,11 @@ export default async function DashboardPage() {
         customer: { select: { name: true, levelRates: true } },
         timeEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { hours: true, rateOverride: true, workLevel: true, user: { select: { workLevel: true } } },
+          select: { hours: true, rateOverride: true, workLevel: true, billable: true, user: { select: { workLevel: true } } },
         },
         kmEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { km: true, rateOverride: true },
+          select: { km: true, rateOverride: true, billable: true },
         },
         levelRates: true,
       },
@@ -104,7 +104,7 @@ export default async function DashboardPage() {
   const totalRevenue = projectStats.reduce((sum, project) => {
     const levelRates = project.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
     const customerLevelRates = project.customer?.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
-    const hourRevenue = project.timeEntries.reduce((s, e) => {
+    const hourRevenue = project.timeEntries.filter((e) => e.billable).reduce((s, e) => {
       const rate = resolveHourRate({
         rateOverride: e.rateOverride == null ? null : Number(e.rateOverride),
         workLevel: e.workLevel,
@@ -113,7 +113,7 @@ export default async function DashboardPage() {
       });
       return rate == null ? s : s + Number(e.hours) * rate;
     }, 0);
-    const kmRevenue = project.kmEntries.reduce((s, e) => {
+    const kmRevenue = project.kmEntries.filter((e) => e.billable).reduce((s, e) => {
       const rate = Number(e.rateOverride ?? project.defaultKmRate ?? 0);
       return s + Number(e.km) * rate;
     }, 0);
