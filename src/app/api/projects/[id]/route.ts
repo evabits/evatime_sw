@@ -3,17 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
-import { levelRatesField } from "@/lib/rates";
-import { isAdmin } from "@/lib/roles";
 
 const schema = z.object({
   customerId: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
+  defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
-  levelRates: levelRatesField,
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,8 +24,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       include: {
         customer: { select: { id: true, name: true } },
+        activityRates: { include: { activityType: true } },
         tags: { select: { id: true, name: true } },
-        levelRates: true,
       },
     });
     if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -39,16 +37,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const role = (session.user as any)?.role ?? "EMPLOYEE";
-    // Unlike POST (where projectCreateDenialReason still lets employees create
-    // bare concept projects), editing an EXISTING project is only exposed via
-    // the admin-only /projects page, and this route lets the caller reassign
-    // the customer, status and levelRates in one call — so the whole route is
-    // admin-only rather than stripping just levelRates.
-    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
-    const { tags, levelRates, ...rest } = schema.parse(await req.json());
+    const { tags, ...rest } = schema.parse(await req.json());
     const project = await prisma.project.update({
       where: { id },
       data: {
@@ -67,17 +58,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
       include: { tags: { select: { id: true, name: true } } },
     });
-    if (levelRates) {
-      await prisma.$transaction([
-        prisma.projectLevelRate.deleteMany({ where: { projectId: project.id } }),
-        ...levelRates.map((r) =>
-          prisma.projectLevelRate.create({
-            data: { projectId: project.id, level: r.level as any, rate: r.rate },
-          }),
-        ),
-      ]);
-    }
-    return NextResponse.json({ ...project, ...(levelRates ? { levelRates } : {}) });
+    return NextResponse.json(project);
   } catch (e) { return handleError(e); }
 }
 

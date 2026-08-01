@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, ExternalLink, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { LevelRateFields } from "@/components/shared/level-rate-fields";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
@@ -44,11 +43,6 @@ export function CustomersClient({ initialCustomers }: Props) {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [levelRates, setLevelRates] = useState<Record<string, string>>({});
-  // Whether levelRates was actually loaded for the customer being edited (vs. the
-  // include being missing upstream). false must mean "don't touch rates on save",
-  // never "save an empty set" — otherwise a missing `include` silently wipes rates.
-  const [levelRatesKnown, setLevelRatesKnown] = useState(true);
 
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: EMPTY });
 
@@ -71,19 +65,7 @@ export function CustomersClient({ initialCustomers }: Props) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          // Omit levelRates entirely when we never loaded the customer's current
-          // rates (levelRatesKnown === false): the API treats an absent key as
-          // "leave untouched", so this can't wipe rates it never saw.
-          ...(levelRatesKnown
-            ? {
-                levelRates: Object.entries(levelRates)
-                  .filter(([, v]) => v !== "" && Number(v) > 0)
-                  .map(([level, v]) => ({ level, rate: Number(v) })),
-              }
-            : {}),
-        }),
+        body: JSON.stringify(data),
       });
 
       if (res.ok) {
@@ -114,8 +96,6 @@ export function CustomersClient({ initialCustomers }: Props) {
     setEditing(null);
     setServerError("");
     form.reset(EMPTY);
-    setLevelRates({});
-    setLevelRatesKnown(true);
   }
 
   function startEdit(customer: any) {
@@ -132,15 +112,6 @@ export function CustomersClient({ initialCustomers }: Props) {
       vatNumber: customer.vatNumber ?? "",
       notes: customer.notes ?? "",
     });
-    // customer.levelRates is only absent when the query that loaded this customer
-    // forgot to include it — not a legitimate "zero rates" state, which is `[]`.
-    const known = Array.isArray(customer.levelRates);
-    setLevelRatesKnown(known);
-    setLevelRates(
-      known
-        ? Object.fromEntries(customer.levelRates.map((r: any) => [r.level, String(r.rate)]))
-        : {},
-    );
     setDialogOpen(true);
   }
 
@@ -164,7 +135,7 @@ export function CustomersClient({ initialCustomers }: Props) {
               onChange={(e) => { setShowArchived(e.target.checked); loadCustomers(e.target.checked); }} />
             Toon gearchiveerd
           </label>
-          <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Klant toevoegen
           </Button>
         </div>
@@ -278,17 +249,6 @@ export function CustomersClient({ initialCustomers }: Props) {
             <div className="space-y-1 sm:col-span-2">
               <Label>Notities</Label>
               <Textarea {...form.register("notes")} rows={2} />
-            </div>
-            <div className="sm:col-span-2">
-              <LevelRateFields
-                value={levelRates}
-                onChange={setLevelRates}
-                hint={
-                  levelRatesKnown
-                    ? undefined
-                    : "Tarieven konden niet worden geladen; wijzigingen hier worden niet opgeslagen."
-                }
-              />
             </div>
             {serverError && (
               <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>

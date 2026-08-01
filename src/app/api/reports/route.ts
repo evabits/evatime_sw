@@ -45,15 +45,9 @@ export async function GET(req: Request) {
           ...(billable !== null ? { billable: billable === "true" } : {}),
         },
         include: {
-          project: {
-            select: {
-              id: true, name: true,
-              levelRates: true,
-              customer: { select: { id: true, name: true, levelRates: true } },
-            },
-          },
-          activityType: { select: { id: true, name: true } },
-          user: { select: { id: true, name: true, workLevel: true } },
+          project: { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
+          activityType: { select: { id: true, name: true, defaultRate: true } },
+          user: { select: { id: true, name: true } },
         },
         orderBy: { date: "desc" },
       }),

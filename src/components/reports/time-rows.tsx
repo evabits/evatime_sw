@@ -52,6 +52,7 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
           <TableBody>
             {entries.map((e) => {
               const rate = timeRate(e);
+              const amount = Number(e.hours) * rate;
               return (
                 <TableRow key={e.id}>
                   {canEdit && (
@@ -75,14 +76,8 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
                   <TableCell>{e.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
-                  <TableCell className="text-right">
-                    {rate == null
-                      ? <Badge variant="secondary" className="text-xs">Geen tarief</Badge>
-                      : formatCurrency(rate)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {rate == null ? "—" : formatCurrency(Number(e.hours) * rate)}
-                  </TableCell>
+                  <TableCell className="text-right">{rate ? formatCurrency(rate) : "—"}</TableCell>
+                  <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
                   <TableCell>
                     {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
                     {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
@@ -110,12 +105,7 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
               <TableCell className="text-right font-mono font-medium">{formatHours(total)}</TableCell>
               <TableCell />
               <TableCell className="text-right font-medium">
-                {formatCurrency(
-                  entries.reduce((s, e) => {
-                    const rate = timeRate(e);
-                    return rate == null ? s : s + Number(e.hours) * rate;
-                  }, 0),
-                )}
+                {formatCurrency(entries.reduce((s, e) => s + Number(e.hours) * timeRate(e), 0))}
               </TableCell>
               <TableCell />
               {canEdit && <TableCell />}

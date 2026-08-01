@@ -13,17 +13,16 @@ async function main() {
       email: "admin@evabits.com",
       password,
       role: "ADMIN",
-      workLevel: "SENIOR",
     },
   });
   console.log("Created user:", user.email);
 
   const activityTypes = await Promise.all([
-    prisma.activityType.upsert({ where: { name: "Ontwikkeling" }, update: {}, create: { name: "Ontwikkeling" } }),
-    prisma.activityType.upsert({ where: { name: "Advies" }, update: {}, create: { name: "Advies" } }),
-    prisma.activityType.upsert({ where: { name: "Projectbeheer" }, update: {}, create: { name: "Projectbeheer" } }),
-    prisma.activityType.upsert({ where: { name: "Ontwerp" }, update: {}, create: { name: "Ontwerp" } }),
-    prisma.activityType.upsert({ where: { name: "Support" }, update: {}, create: { name: "Support" } }),
+    prisma.activityType.upsert({ where: { name: "Ontwikkeling" }, update: {}, create: { name: "Ontwikkeling", defaultRate: 95 } }),
+    prisma.activityType.upsert({ where: { name: "Advies" }, update: {}, create: { name: "Advies", defaultRate: 120 } }),
+    prisma.activityType.upsert({ where: { name: "Projectbeheer" }, update: {}, create: { name: "Projectbeheer", defaultRate: 105 } }),
+    prisma.activityType.upsert({ where: { name: "Ontwerp" }, update: {}, create: { name: "Ontwerp", defaultRate: 90 } }),
+    prisma.activityType.upsert({ where: { name: "Support" }, update: {}, create: { name: "Support", defaultRate: 85 } }),
   ]);
   console.log("Created", activityTypes.length, "activity types");
 

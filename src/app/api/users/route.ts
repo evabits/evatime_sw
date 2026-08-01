@@ -4,9 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
-import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
+import { weeklyHoursField } from "@/lib/user-schema";
 import { archivedWhere } from "@/lib/archive";
-import type { WorkLevel } from "@prisma/client";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -14,11 +13,10 @@ const createSchema = z.object({
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]).default("EMPLOYEE"),
   weeklyHours: weeklyHoursField,
-  workLevel: workLevelField,
 });
 
 const userSelect = {
-  id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
+  id: true, name: true, email: true, role: true, weeklyHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -51,7 +49,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { weeklyHours, workLevel, ...rest } = createSchema.parse(await req.json());
+    const { weeklyHours, ...rest } = createSchema.parse(await req.json());
     const existing = await prisma.user.findUnique({ where: { email: rest.email } });
     if (existing) return NextResponse.json({ error: "E-mailadres al in gebruik" }, { status: 409 });
 
@@ -60,7 +58,6 @@ export async function POST(req: Request) {
         ...rest,
         password: await hash(rest.password, 12),
         weeklyHours: weeklyHours ?? null,
-        workLevel: (workLevel ?? null) as WorkLevel | null,
       },
       select: userSelect,
     });

@@ -15,8 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatHours, formatCurrency, cn } from "@/lib/utils";
 import { partitionProjectsByCustomer } from "@/lib/projects";
-import { resolveHourRate } from "@/lib/rates";
-import type { WorkLevel } from "@/lib/work-levels";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
 const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
@@ -54,10 +52,9 @@ interface Props {
   initialEntries: any[];
   userId: string;
   role: string;
-  currentUserLevel: WorkLevel | null;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, activityTypes: activityTypesProp, customers, users, initialEntries, userId, role, currentUserLevel }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, activityTypes: activityTypesProp, customers, users, initialEntries, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
@@ -149,6 +146,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const activityTypeId = form.watch("activityTypeId");
 
   const { matched: matchedProjects, customerless: customerlessProjects } =
     partitionProjectsByCustomer(projects, selectedCustomerId);
@@ -171,18 +169,13 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
     }
   }, [selectedDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function getEffectiveRate(): number | null {
+  function getEffectiveRate(atId?: string): number | null {
     if (!selectedProject) return null;
-    const targetUserId = form.watch("userId") || userId;
-    const level =
-      users.find((u: any) => u.id === targetUserId)?.workLevel ?? currentUserLevel ?? null;
-    return resolveHourRate({
-      workLevel: level,
-      project: {
-        levelRates: selectedProject.levelRates,
-        customer: selectedProject.customer,
-      },
-    });
+    const override = selectedProject.activityRates?.find((r: any) => r.activityTypeId === atId);
+    if (override) return Number(override.rate);
+    const actType = activityTypes.find((a: any) => a.id === atId);
+    if (actType?.defaultRate) return Number(actType.defaultRate);
+    return selectedProject.defaultHourlyRate ? Number(selectedProject.defaultHourlyRate) : null;
   }
 
   async function fetchEntries(month: string, projectId: string, userFilter = filterUser) {
@@ -266,7 +259,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
       const created = await res.json();
       setProjects((prev) => [
         ...prev,
-        { id: created.id, name: created.name, status: "CONCEPT", levelRates: [], customer: null },
+        { id: created.id, name: created.name, status: "CONCEPT", defaultHourlyRate: null, customer: null, activityRates: [] },
       ]);
       // Make the chosen activities selectable for the new project without a reload.
       setActivityTypes((prev) =>
@@ -359,7 +352,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
     });
   }
 
-  const effectiveRate = getEffectiveRate();
+  const effectiveRate = getEffectiveRate(activityTypeId);
   const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0);
 
   return (
@@ -446,7 +439,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 <SelectContent>
                   {filteredActivityTypes.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name}
+                      {a.name}{isAdmin && a.defaultRate ? ` (€${Number(a.defaultRate).toFixed(2)}/u)` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -468,9 +461,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
               <div className="space-y-2">
                 <Label>
                   Tarief override (€/u)
-                  {selectedProject && (effectiveRate == null
-                    ? <span className="text-muted-foreground font-normal"> · geen tarief voor dit niveau</span>
-                    : <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>)}
+                  {effectiveRate && <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>}
                 </Label>
                 <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
               </div>

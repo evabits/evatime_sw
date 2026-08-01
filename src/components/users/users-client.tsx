@@ -13,8 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
-import { WORK_LEVEL_ORDER, WORK_LEVEL_LABELS } from "@/lib/work-levels";
+import { weeklyHoursField } from "@/lib/user-schema";
 
 const createSchema = z.object({
   name: z.string().min(1, "Verplicht"),
@@ -22,7 +21,6 @@ const createSchema = z.object({
   password: z.string().min(8, "Minimaal 8 tekens"),
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   weeklyHours: weeklyHoursField,
-  workLevel: workLevelField,
 });
 
 const editSchema = z.object({
@@ -31,7 +29,6 @@ const editSchema = z.object({
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
-  workLevel: workLevelField,
 });
 
 type CreateData = z.infer<typeof createSchema>;
@@ -43,7 +40,6 @@ interface User {
   email: string;
   role: "ADMIN" | "FINANCE" | "EMPLOYEE";
   weeklyHours: number | null;
-  workLevel: string | null;
   createdAt: string;
   archivedAt?: string | null;
 }
@@ -81,7 +77,6 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
     editForm.reset({
       name: user.name, email: user.email, role: user.role, password: "",
       weeklyHours: user.weeklyHours ?? undefined,
-      workLevel: user.workLevel ?? undefined,
     });
     setServerError("");
     setDialogOpen(true);
@@ -181,7 +176,6 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead className="text-right">Uren/week</TableHead>
-                <TableHead>Werkniveau</TableHead>
                 <TableHead>Aangemaakt</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -204,11 +198,6 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {user.weeklyHours != null ? `${user.weeklyHours}u` : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    {user.workLevel
-                      ? WORK_LEVEL_LABELS[user.workLevel as keyof typeof WORK_LEVEL_LABELS]
-                      : <span className="text-muted-foreground">Niet ingesteld</span>}
                   </TableCell>
                   <TableCell>{formatDate(user.createdAt)}</TableCell>
                   <TableCell>
@@ -278,21 +267,6 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                     <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...editForm.register("weeklyHours")} />
                     {editForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{editForm.formState.errors.weeklyHours.message}</p>}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Werkniveau</Label>
-                    <Select
-                      onValueChange={(v) => editForm.setValue("workLevel", v === "_none" ? "" : v)}
-                      value={editForm.watch("workLevel") || "_none"}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_none">Niet ingesteld</SelectItem>
-                        {WORK_LEVEL_ORDER.map((l) => (
-                          <SelectItem key={l} value={l}>{WORK_LEVEL_LABELS[l]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   {editingId && <p className="text-xs text-muted-foreground">Contracten beheren via <a className="underline" href={`/personeel/${editingId}`}>Personeel</a>.</p>}
                 </>
               )}
@@ -338,21 +312,6 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                 <Label>Uren per week <span className="text-muted-foreground font-normal">(leeg = geen target)</span></Label>
                 <Input type="number" step="0.5" min="1" max="80" placeholder="bijv. 40" {...createForm.register("weeklyHours")} />
                 {createForm.formState.errors.weeklyHours && <p className="text-xs text-destructive">{createForm.formState.errors.weeklyHours.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Werkniveau</Label>
-                <Select
-                  onValueChange={(v) => createForm.setValue("workLevel", v === "_none" ? "" : v)}
-                  value={createForm.watch("workLevel") || "_none"}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Niet ingesteld</SelectItem>
-                    {WORK_LEVEL_ORDER.map((l) => (
-                      <SelectItem key={l} value={l}>{WORK_LEVEL_LABELS[l]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}
               <DialogFooter>

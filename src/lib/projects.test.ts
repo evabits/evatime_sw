@@ -17,21 +17,11 @@ describe("projects", () => {
   it("employees may not attach a customer to a concept project", () => {
     expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", customerId: "c1" })).toBeTruthy();
   });
-  it("employees may not set levelRates on a concept project", () => {
-    expect(
-      projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", levelRates: [{ level: "JUNIOR", rate: 80 }] }),
-    ).toBeTruthy();
+  it("employees may not set defaultHourlyRate on a concept project", () => {
+    expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", defaultHourlyRate: 80 })).toBeTruthy();
   });
   it("employees may not set defaultKmRate on a concept project", () => {
     expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", defaultKmRate: 0.23 })).toBeTruthy();
-  });
-  it("refuses a concept project with level rates from a non-admin", () => {
-    expect(
-      projectCreateDenialReason("EMPLOYEE", {
-        status: "CONCEPT",
-        levelRates: [{ level: "SENIOR", rate: 140 }],
-      }),
-    ).toBe("Een conceptproject kan geen tarieven hebben");
   });
   it("FINANCE is not admin -> same restriction as employees", () => {
     expect(projectCreateDenialReason("FINANCE", { status: "ACTIVE", customerId: "c1" })).toBeTruthy();

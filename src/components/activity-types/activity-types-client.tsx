@@ -11,10 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { removedProjectIds } from "@/lib/activity-impact";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
+  defaultRate: z.coerce.number().positive().optional().or(z.literal("")),
   billable: z.boolean(),
   showInAllProjects: z.boolean(),
 });
@@ -63,6 +65,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
     setLoading(true);
     const payload = {
       ...data,
+      defaultRate: data.defaultRate === "" ? null : data.defaultRate || null,
       projectIds: data.showInAllProjects ? [] : selectedProjectIds,
     };
     try {
@@ -114,6 +117,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
     setEditOriginalProjectIds(original);
     form.reset({
       name: type.name,
+      defaultRate: type.defaultRate ? Number(type.defaultRate) : "",
       billable: type.billable,
       showInAllProjects: type.showInAllProjects,
     });
@@ -186,12 +190,13 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
                 <TableHead>Naam</TableHead>
                 <TableHead>Factureerbaar</TableHead>
                 <TableHead>Zichtbaarheid</TableHead>
+                <TableHead className="text-right">Standaardtarief</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {types.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Geen activiteittypes gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen activiteittypes gevonden</TableCell></TableRow>
               )}
               {types.map((t) => {
                 const linkedCount = t.projects?.length ?? 0;
@@ -205,6 +210,7 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
                     <TableCell className="text-sm text-muted-foreground">
                       {t.showInAllProjects ? "Alle projecten" : linkedCount === 0 ? "Geen projecten" : `${linkedCount} project${linkedCount !== 1 ? "en" : ""}`}
                     </TableCell>
+                    <TableCell className="text-right">{t.defaultRate ? formatCurrency(Number(t.defaultRate)) + "/u" : "—"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
                         {t.archivedAt ? (
@@ -243,6 +249,11 @@ export function ActivityTypesClient({ initialTypes, projects }: Props) {
                 <Label>Naam *</Label>
                 <Input {...form.register("name")} placeholder="Bijv. Ontwikkeling" autoFocus />
                 {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Standaardtarief (€/u)</Label>
+                <Input type="number" step="0.01" min="0" placeholder="95.00" {...form.register("defaultRate")} />
               </div>
 
               <div className="space-y-2">

@@ -30,10 +30,9 @@ export async function POST(req: Request) {
       const project = await prisma.project.findUnique({ where: { id: action.projectId }, select: { id: true } });
       if (!project) return NextResponse.json({ error: "Onbekend project" }, { status: 400 });
     }
-    let targetUser: { id: string; workLevel: string | null } | null = null;
     if (action.type === "user") {
-      targetUser = await prisma.user.findUnique({ where: { id: action.userId }, select: { id: true, workLevel: true } });
-      if (!targetUser) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+      const user = await prisma.user.findUnique({ where: { id: action.userId }, select: { id: true } });
+      if (!user) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
     }
 
     const model =
@@ -41,20 +40,10 @@ export async function POST(req: Request) {
     const where = buildBulkWhere(ids);
 
     // De drie delegates delen deze where/data-vorm maar niet hun generieke type.
-    // Alleen tijdregels dragen een workLevel-snapshot; bij herindeling naar een
-    // andere medewerker moet dat mee, anders blijft het tarief van de oude
-    // eigenaar staan (zie src/app/api/time/[id]/route.ts voor dezelfde regel op
-    // de losse-regel-endpoint).
     const { count } =
       action.type === "delete"
         ? await (model as any).deleteMany({ where })
-        : await (model as any).updateMany({
-            where,
-            data:
-              action.type === "user" && kind === "time"
-                ? buildBulkData(action, { workLevel: targetUser!.workLevel })
-                : buildBulkData(action),
-          });
+        : await (model as any).updateMany({ where, data: buildBulkData(action) });
 
     return NextResponse.json({ count });
   } catch (e) { return handleError(e); }

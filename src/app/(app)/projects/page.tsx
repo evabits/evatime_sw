@@ -21,7 +21,6 @@ export default async function ProjectsPage({
         customer: { select: { id: true, name: true } },
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
-        levelRates: true,
       },
     }),
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),

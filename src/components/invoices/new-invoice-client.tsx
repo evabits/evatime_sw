@@ -11,8 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
-import { resolveHourRate, effectiveWorkLevel } from "@/lib/rates";
-import { WORK_LEVEL_LABELS } from "@/lib/work-levels";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -74,35 +72,19 @@ export function NewInvoiceClient({ customers }: Props) {
     const newLines: InvoiceLine[] = [];
 
     const selectedTime = unbilledTime.filter((e) => selectedTimeIds.has(e.id));
-    const withRate = selectedTime.filter((e) => resolveHourRate(e) != null);
-    if (withRate.length > 0) {
-      const grouped = new Map<string, typeof withRate>();
-      withRate.forEach((e) => {
-        const key = `${e.activityType?.name ?? "Werkzaamheden"}|${resolveHourRate(e)}`;
+    if (selectedTime.length > 0) {
+      const grouped = new Map<string, typeof selectedTime>();
+      selectedTime.forEach((e) => {
+        const key = e.activityType?.name ?? "Werkzaamheden";
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key)!.push(e);
       });
-
-      // Splitst één activiteit in meerdere regels zodra er meerdere tarieven in
-      // zitten; dan pas komt het niveau in de omschrijving, zodat facturen met
-      // één tarief er ongewijzigd uitzien.
-      const labelCounts = new Map<string, number>();
-      grouped.forEach((_v, key) => {
-        const label = key.split("|")[0];
-        labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
-      });
-
-      grouped.forEach((entries, key) => {
-        const label = key.split("|")[0];
-        const rate = resolveHourRate(entries[0])!;
-        const level = effectiveWorkLevel(entries[0]);
-        const description =
-          (labelCounts.get(label) ?? 0) > 1 && level
-            ? `${label} (${WORK_LEVEL_LABELS[level]})`
-            : label;
+      grouped.forEach((entries, label) => {
+        const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0);
+        const rate = Number(entries[0].rateOverride ?? entries[0].activityType?.defaultRate ?? entries[0].project?.defaultHourlyRate ?? 0);
         newLines.push({
-          description,
-          quantity: entries.reduce((s, e) => s + Number(e.hours), 0),
+          description: label,
+          quantity: totalHours,
           unitPrice: rate,
           lineType: "HOURS",
           timeEntryIds: entries.map((e) => e.id),
@@ -210,11 +192,6 @@ export function NewInvoiceClient({ customers }: Props) {
             {unbilledTime.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Uren</p>
-                {unbilledTime.some((e) => resolveHourRate(e) == null) && (
-                  <p className="text-sm text-muted-foreground px-4 py-2">
-                    Sommige uren hebben geen tarief. Stel een tarief in bij de klant of het project, of zet een handmatig tarief op de regel.
-                  </p>
-                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -224,36 +201,21 @@ export function NewInvoiceClient({ customers }: Props) {
                       <TableHead>Activiteit</TableHead>
                       <TableHead>Omschrijving</TableHead>
                       <TableHead className="text-right">Uren</TableHead>
-                      <TableHead className="text-right">Tarief</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unbilledTime.map((e) => {
-                      const rate = resolveHourRate(e);
-                      return (
+                    {unbilledTime.map((e) => (
                       <TableRow key={e.id} className={selectedTimeIds.has(e.id) ? "bg-primary/5" : ""}>
                         <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedTimeIds.has(e.id)}
-                            onChange={() => toggleTimeEntry(e.id)}
-                            disabled={rate == null}
-                            className="h-4 w-4"
-                          />
+                          <input type="checkbox" checked={selectedTimeIds.has(e.id)} onChange={() => toggleTimeEntry(e.id)} className="h-4 w-4" />
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
                         <TableCell>{e.activityType?.name ?? "—"}</TableCell>
                         <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right">{formatHours(Number(e.hours))}</TableCell>
-                        <TableCell className="text-right">
-                          {rate == null
-                            ? <Badge variant="secondary" className="text-xs">Geen tarief</Badge>
-                            : formatCurrency(rate)}
-                        </TableCell>
                       </TableRow>
-                      );
-                    })}
+                    ))}
                   </TableBody>
                 </Table>
               </div>

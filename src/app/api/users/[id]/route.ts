@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
-import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
+import { weeklyHoursField } from "@/lib/user-schema";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -12,11 +12,10 @@ const updateSchema = z.object({
   role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
   password: z.string().min(8).optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
-  workLevel: workLevelField,
 });
 
 const userSelect = {
-  id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
+  id: true, name: true, email: true, role: true, weeklyHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -48,7 +47,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (isAdmin) {
       updateData.role = data.role;
       updateData.weeklyHours = data.weeklyHours ?? null;
-      updateData.workLevel = data.workLevel ?? null;
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 

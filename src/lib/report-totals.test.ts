@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { timeRate, kmRate, reportTotals, groupByEmployee } from "./report-totals";
 
-const seniorProject = { levelRates: [{ level: "SENIOR", rate: 100 }], customer: { levelRates: [{ level: "SENIOR", rate: 80 }] } };
-
 const data = {
   timeEntries: [
-    { hours: 2, billable: true, rateOverride: null, workLevel: "SENIOR", project: seniorProject, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
-    { hours: 3, billable: true, rateOverride: 50, workLevel: "JUNIOR", project: { levelRates: [], customer: { levelRates: [] } }, user: { id: "u2", name: "Bram", workLevel: "JUNIOR" } },
-    { hours: 4, billable: false, rateOverride: null, workLevel: "SENIOR", project: seniorProject, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
+    { hours: 2, billable: true, rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u1", name: "Anne" } },
+    { hours: 3, billable: true, rateOverride: 50, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u2", name: "Bram" } },
+    { hours: 4, billable: false, rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 }, user: { id: "u1", name: "Anne" } },
   ],
   kmEntries: [
     { km: 10, billable: true, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u1", name: "Anne" } },
@@ -21,16 +19,13 @@ const data = {
 
 describe("timeRate", () => {
   it("prefers the override", () => {
-    expect(timeRate({ rateOverride: 50, workLevel: "SENIOR", project: seniorProject })).toBe(50);
+    expect(timeRate({ rateOverride: 50, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 } })).toBe(50);
   });
 
-  it("falls back to the project rate, then the customer rate", () => {
-    expect(timeRate({ rateOverride: null, workLevel: "SENIOR", project: seniorProject })).toBe(100);
-    expect(timeRate({ rateOverride: null, workLevel: "SENIOR", project: { levelRates: [], customer: { levelRates: [{ level: "SENIOR", rate: 80 }] } } })).toBe(80);
-  });
-
-  it("returns null, not zero, when no rate can be determined", () => {
-    expect(timeRate({ rateOverride: null, workLevel: null, project: null })).toBeNull();
+  it("falls back to the activity rate, then the project rate", () => {
+    expect(timeRate({ rateOverride: null, activityType: { defaultRate: 100 }, project: { defaultHourlyRate: 80 } })).toBe(100);
+    expect(timeRate({ rateOverride: null, activityType: null, project: { defaultHourlyRate: 80 } })).toBe(80);
+    expect(timeRate({ rateOverride: null, activityType: null, project: null })).toBe(0);
   });
 });
 
@@ -85,37 +80,7 @@ describe("groupByEmployee", () => {
   });
 
   it("buckets entries without a user under Onbekend", () => {
-    const orphan = { timeEntries: [{ hours: 1, rateOverride: null, workLevel: null, project: null, user: null }], kmEntries: [], expenses: [] };
+    const orphan = { timeEntries: [{ hours: 1, rateOverride: null, activityType: null, project: null, user: null }], kmEntries: [], expenses: [] };
     expect(groupByEmployee(orphan, users)[0]).toMatchObject({ userId: "unknown", name: "Onbekend" });
-  });
-});
-
-describe("entries without a determinable rate", () => {
-  const data = {
-    timeEntries: [
-      {
-        hours: 5, billable: true, rateOverride: null, workLevel: "SENIOR",
-        user: { id: "u1", name: "Anne", workLevel: "SENIOR" },
-        project: { levelRates: [], customer: { levelRates: [] } },
-      },
-    ],
-    kmEntries: [],
-    expenses: [],
-  };
-
-  it("counts the hours but not any revenue", () => {
-    const t = reportTotals(data);
-    expect(t.hours).toBe(5);
-    expect(t.revenue).toBe(0);
-  });
-
-  it("counts the hours but not any revenue per employee", () => {
-    const rows = groupByEmployee(data, [{ id: "u1", weeklyHours: 40 }]);
-    expect(rows[0].hours).toBe(5);
-    expect(rows[0].revenue).toBe(0);
-  });
-
-  it("reports the rate as null rather than zero", () => {
-    expect(timeRate(data.timeEntries[0])).toBeNull();
   });
 });

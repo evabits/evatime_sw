@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { weeklyHoursField, workLevelField } from "./user-schema";
+import { weeklyHoursField } from "./user-schema";
 
 describe("weeklyHoursField", () => {
   it("empty string => undefined (no target)", () => {
@@ -22,23 +22,5 @@ describe("weeklyHoursField", () => {
   });
   it("negative rejected", () => {
     expect(() => weeklyHoursField.parse("-5")).toThrow();
-  });
-});
-
-describe("workLevelField", () => {
-  it("accepts each of the four levels", () => {
-    for (const level of ["PRODUCTION", "JUNIOR", "MEDIOR", "SENIOR"]) {
-      expect(workLevelField.parse(level)).toBe(level);
-    }
-  });
-
-  it("treats empty input as not set", () => {
-    expect(workLevelField.parse("")).toBeUndefined();
-    expect(workLevelField.parse(null)).toBeUndefined();
-    expect(workLevelField.parse(undefined)).toBeUndefined();
-  });
-
-  it("rejects an unknown level", () => {
-    expect(() => workLevelField.parse("PRINCIPAL")).toThrow();
   });
 });
