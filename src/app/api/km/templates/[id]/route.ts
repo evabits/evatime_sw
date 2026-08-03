@@ -1,9 +1,10 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { handleError } from "@/lib/api";
+import { handleError, projectMembershipError } from "@/lib/api";
 import { serialize } from "@/lib/utils";
 import { kmTemplateSchema as schema, canManageTemplate } from "@/lib/km-template";
+import { membershipCheckNeeded } from "@/lib/project-members";
 
 const include = {
   project: { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
@@ -31,6 +32,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (gate.error) return gate.error;
 
     const data = schema.parse(await req.json());
+
+    if (membershipCheckNeeded(
+      { projectId: gate.template!.projectId, userId: gate.template!.userId },
+      { projectId: data.projectId, userId: gate.template!.userId },
+    )) {
+      const memberError = await projectMembershipError(data.projectId, gate.template!.userId);
+      if (memberError) return memberError;
+    }
+
     await prisma.kmTemplate.update({ where: { id }, data });
     const updated = await prisma.kmTemplate.findUnique({ where: { id }, include });
     return NextResponse.json(serialize(updated));

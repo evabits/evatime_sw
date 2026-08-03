@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { handleError } from "@/lib/api";
+import { handleError, projectMembershipError } from "@/lib/api";
 import { serialize } from "@/lib/utils";
 import { kmTemplateSchema as schema } from "@/lib/km-template";
 
@@ -37,6 +37,9 @@ export async function POST(req: Request) {
     // Admins may create a managed template for a target user; everyone else creates their own.
     const targetUserId = admin && typeof body.userId === "string" ? body.userId : currentUserId;
     const managedByAdmin = admin && body.managedByAdmin === true;
+
+    const memberError = await projectMembershipError(data.projectId, targetUserId);
+    if (memberError) return memberError;
 
     const template = await prisma.kmTemplate.create({
       data: { ...data, userId: targetUserId, managedByAdmin },

@@ -2,9 +2,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError } from "@/lib/api";
+import { handleError, projectMembershipError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
+import { membershipCheckNeeded } from "@/lib/project-members";
 
 const schema = z.object({
   categoryId: z.string().min(1),
@@ -25,7 +26,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const role = (session.user as any)?.role ?? "EMPLOYEE";
     const userId = session.user?.id!;
 
-    const existing = await prisma.expense.findUnique({ where: { id }, select: { userId: true, invoiced: true } });
+    const existing = await prisma.expense.findUnique({ where: { id }, select: { userId: true, invoiced: true, projectId: true } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!isAdmin(role) && existing.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (existing.invoiced) return NextResponse.json({ error: "Gefactureerde onkosten kunnen niet worden bewerkt" }, { status: 400 });
@@ -36,6 +37,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (ownerId !== userId) {
       const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
       if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
+    if (membershipCheckNeeded(
+      { projectId: existing.projectId, userId: existing.userId },
+      { projectId: data.projectId ?? null, userId: ownerId },
+    )) {
+      const memberError = await projectMembershipError(data.projectId ?? null, ownerId);
+      if (memberError) return memberError;
     }
 
     const expense = await prisma.expense.update({
