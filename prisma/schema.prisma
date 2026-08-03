@@ -76,6 +76,7 @@ model Project {
   name              String
   description       String?
   status            ProjectStatus         @default(ACTIVE)
+  billable          Boolean               @default(true)
   defaultKmRate     Decimal?              @db.Decimal(10, 2)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
