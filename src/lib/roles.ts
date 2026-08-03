@@ -96,10 +96,6 @@ export function canManageExpenseCategories(role: string): boolean {
   return role === "ADMIN";
 }
 
-export function canManageActivityTypes(role: string): boolean {
-  return role === "ADMIN";
-}
-
 export function canViewReimbursements(role: string): boolean {
   return role === "ADMIN" || role === "FINANCE";
 }
