@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { isProjectMember } from "@/lib/project-members";
 import { buildBulkWhere, buildBulkData } from "@/lib/bulk-entries";
 
 const schema = z.object({
@@ -25,18 +26,54 @@ export async function POST(req: Request) {
 
     const { kind, ids, action } = schema.parse(await req.json());
 
+    const model =
+      kind === "time" ? prisma.timeEntry : kind === "km" ? prisma.kmEntry : prisma.expense;
+
     if (action.type === "project") {
       const project = await prisma.project.findUnique({ where: { id: action.projectId }, select: { id: true } });
       if (!project) return NextResponse.json({ error: "Onbekend project" }, { status: 400 });
+
+      const members = await prisma.projectMember.findMany({
+        where: { projectId: action.projectId },
+        select: { userId: true },
+      });
+      const memberIds = members.map((m) => m.userId);
+      const rows = await (model as any).findMany({
+        where: { id: { in: ids } },
+        select: { userId: true },
+      });
+      const buiten = rows.filter((r: any) => !isProjectMember(memberIds, r.userId)).length;
+      if (buiten > 0) {
+        return NextResponse.json(
+          { error: `${buiten} van de ${ids.length} regels heeft een eigenaar die geen deelnemer is van dit project` },
+          { status: 400 },
+        );
+      }
     }
     let targetUser: { id: string; workLevel: string | null } | null = null;
     if (action.type === "user") {
       targetUser = await prisma.user.findUnique({ where: { id: action.userId }, select: { id: true, workLevel: true } });
       if (!targetUser) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+
+      const rows = await (model as any).findMany({
+        where: { id: { in: ids } },
+        select: { projectId: true },
+      });
+      const projectIds = [...new Set(rows.map((r: any) => r.projectId).filter(Boolean))] as string[];
+      const memberships = await prisma.projectMember.findMany({
+        where: { userId: action.userId, projectId: { in: projectIds } },
+        select: { projectId: true },
+      });
+      const heeft = new Set(memberships.map((m) => m.projectId));
+      const buiten = projectIds.filter((p) => !heeft.has(p)).length;
+      if (buiten > 0) {
+        return NextResponse.json(
+          { error: `De gekozen medewerker is geen deelnemer van ${buiten} van de betrokken projecten` },
+          { status: 400 },
+        );
+      }
     }
 
-    const model =
-      kind === "time" ? prisma.timeEntry : kind === "km" ? prisma.kmEntry : prisma.expense;
     const where = buildBulkWhere(ids);
 
     // De drie delegates delen deze where/data-vorm maar niet hun generieke type.
