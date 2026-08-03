@@ -14,12 +14,11 @@ async function main() {
       timeEntries: { select: { userId: true } },
       kmEntries: { select: { userId: true } },
       expenses: { select: { userId: true } },
-      members: { select: { userId: true } },
     },
     orderBy: { name: "asc" },
   });
 
-  const plan: { projectId: string; label: string; userIds: string[]; alHad: number }[] = [];
+  const plan: { projectId: string; label: string; userIds: string[] }[] = [];
   const leeg: string[] = [];
 
   for (const p of projects) {
@@ -30,12 +29,12 @@ async function main() {
       ...p.expenses.map((e) => e.userId),
     ]);
     if (boekers.size === 0) { leeg.push(label); continue; }
-    plan.push({ projectId: p.id, label, userIds: [...boekers], alHad: p.members.length });
+    plan.push({ projectId: p.id, label, userIds: [...boekers] });
   }
 
   console.log(`${write ? "SCHRIJVEN" : "DROOG (geen wijzigingen)"} — ${plan.length} projecten\n`);
   for (const r of plan) {
-    console.log(`  ${String(r.userIds.length).padStart(2)} deelnemer(s)  ${r.label}${r.alHad ? `   [had er al ${r.alHad}]` : ""}`);
+    console.log(`  ${String(r.userIds.length).padStart(2)} deelnemer(s)  ${r.label}`);
   }
 
   if (leeg.length > 0) {
