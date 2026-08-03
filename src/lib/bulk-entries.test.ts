@@ -17,11 +17,6 @@ describe("buildBulkData", () => {
     expect(buildBulkData({ type: "project", projectId: "p-1" })).toEqual({ projectId: "p-1" });
   });
 
-  it("flips the billable flag both ways", () => {
-    expect(buildBulkData({ type: "billable", billable: false })).toEqual({ billable: false });
-    expect(buildBulkData({ type: "billable", billable: true })).toEqual({ billable: true });
-  });
-
   it("reassigns rows to another employee", () => {
     expect(buildBulkData({ type: "user", userId: "u-9" })).toEqual({ userId: "u-9" });
   });

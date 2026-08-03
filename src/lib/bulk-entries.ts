@@ -2,7 +2,6 @@ export type BulkKind = "time" | "km" | "expense";
 
 export type BulkAction =
   | { type: "project"; projectId: string }
-  | { type: "billable"; billable: boolean }
   | { type: "user"; userId: string }
   | { type: "delete" };
 
@@ -27,7 +26,6 @@ export function buildBulkData(
 ): Record<string, string | boolean | null> {
   switch (action.type) {
     case "project": return { projectId: action.projectId };
-    case "billable": return { billable: action.billable };
     case "user":
       // Voor tijdregels moet de meegegeven workLevel (het huidige niveau van
       // de nieuwe eigenaar) mee, anders blijft het tarief van de oude

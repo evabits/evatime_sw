@@ -64,12 +64,6 @@ export function BulkBar({ kind, count, projects, users, onApply, busy }: Props) 
         </SelectContent>
       </Select>
 
-      <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => onApply({ type: "billable", billable: true })}>
-        Factureerbaar
-      </Button>
-      <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => onApply({ type: "billable", billable: false })}>
-        Niet factureerbaar
-      </Button>
       <Button variant="destructive" size="sm" className="h-8" disabled={busy} onClick={() => onApply({ type: "delete" })}>
         Verwijderen
       </Button>

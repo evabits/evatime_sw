@@ -11,7 +11,6 @@ const schema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(500),
   action: z.discriminatedUnion("type", [
     z.object({ type: z.literal("project"), projectId: z.string().min(1) }),
-    z.object({ type: z.literal("billable"), billable: z.boolean() }),
     z.object({ type: z.literal("user"), userId: z.string().min(1) }),
     z.object({ type: z.literal("delete") }),
   ]),
