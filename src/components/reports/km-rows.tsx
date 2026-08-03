@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { kmRate } from "@/lib/report-totals";
+import { isBillable } from "@/lib/billable";
 
 interface Props {
   entries: any[];
@@ -77,6 +78,12 @@ export function KmRows({ entries, canEdit, selected, selectableIds, onToggle, on
                   <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>
                   <TableCell>
                     {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
+                    {isBillable(e) === null && (
+                      <Badge variant="outline" className="text-xs">Onbekend</Badge>
+                    )}
+                    {isBillable(e) === false && (
+                      <Badge variant="secondary" className="text-xs">Niet</Badge>
+                    )}
                   </TableCell>
                   {canEdit && (
                     <TableCell>
