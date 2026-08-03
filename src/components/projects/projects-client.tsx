@@ -133,7 +133,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
     setEditing(null);
     setSelectedTags([]);
     setTagInput("");
-    form.reset({ status: "ACTIVE" });
+    form.reset({ status: "ACTIVE", billable: true });
     setLevelRates({});
     setLevelRatesKnown(true);
   }
@@ -200,7 +200,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
               <SelectItem value="COMPLETED">Afgerond</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => { form.reset({ status: "ACTIVE" }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Project toevoegen
           </Button>
         </div>

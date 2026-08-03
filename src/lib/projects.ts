@@ -5,6 +5,7 @@ export type NewProjectInput = {
   customerId?: string | null;
   defaultKmRate?: number | null;
   levelRates?: unknown[] | null;
+  billable?: boolean;
 };
 
 /**
@@ -18,6 +19,11 @@ export function projectCreateDenialReason(role: string, input: NewProjectInput):
   if (input.customerId) return "Een conceptproject kan geen klant hebben";
   if (input.defaultKmRate != null || (input.levelRates?.length ?? 0) > 0)
     return "Een conceptproject kan geen tarieven hebben";
+  // billable: false is a real attempt to change the schema default (true) and
+  // is refused, same as the other fields above. billable: true/undefined is
+  // indistinguishable from doing nothing, so it's allowed through — refusing
+  // it would just add friction with no protective value.
+  if (input.billable === false) return "Medewerkers kunnen factureerbaarheid niet aanpassen";
   return null;
 }
 

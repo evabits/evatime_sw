@@ -36,6 +36,14 @@ describe("projects", () => {
   it("FINANCE is not admin -> same restriction as employees", () => {
     expect(projectCreateDenialReason("FINANCE", { status: "ACTIVE", customerId: "c1" })).toBeTruthy();
   });
+  it("employees may not set billable: false on a concept project", () => {
+    expect(
+      projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", billable: false }),
+    ).toBe("Medewerkers kunnen factureerbaarheid niet aanpassen");
+  });
+  it("employees may create a concept project with billable: true (matches the default)", () => {
+    expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", billable: true })).toBeNull();
+  });
 });
 
 describe("partitionProjectsByCustomer", () => {
