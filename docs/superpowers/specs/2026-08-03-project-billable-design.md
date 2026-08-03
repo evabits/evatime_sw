@@ -133,6 +133,14 @@ straks maar één zijn:
 | EVAjig / DEVjig - EFRO | 14,00 u | 14,50 u |
 | EVAjig / gadget | 13,00 u | 7,00 u |
 | EVAjig / AUTOjig | 3,50 u | 9,00 u |
+| Erik / testproject | 5 uren + 1 rit | 1 uitgave van € 0,69 |
+
+Die laatste is er bij het bouwen bij gekomen: de urenverdeling hierboven is berekend uit uren en
+ritten, terwijl uitgaven volgens dit ontwerp óók hun factureerbaarheid uit het project halen.
+`Erik / testproject` heeft uitsluitend factureerbare uren en ritten, maar twee uitgaven — één van
+€ 100 factureerbaar en één van € 0,69 niet — en is daarmee gemengd. **Het zijn er dus acht, niet
+zeven.** Het backfill-script telt uitgaven wel mee en drukt bij weigering de gezaghebbende lijst
+af; ga daarvan uit en niet van deze tabel.
 
 De gebruiker levert per project de gewenste waarde aan bij stap 2 van de uitrol. Die keuzes horen
 niet in deze spec: het zijn bedrijfsbeslissingen, geen ontwerpbeslissingen.
