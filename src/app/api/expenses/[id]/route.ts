@@ -5,7 +5,7 @@ import { z } from "zod";
 import { handleError, projectMembershipError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
-import { membershipCheckNeeded } from "@/lib/project-members";
+import { membershipCheckNeeded, resolveNextProjectId } from "@/lib/project-members";
 
 const schema = z.object({
   categoryId: z.string().min(1),
@@ -39,17 +39,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
     }
 
+    // Check en write moeten hetzelfde project zien; zie resolveNextProjectId.
+    const nextProjectId = resolveNextProjectId(existing.projectId, data.projectId);
+
     if (membershipCheckNeeded(
       { projectId: existing.projectId, userId: existing.userId },
-      { projectId: data.projectId ?? null, userId: ownerId },
+      { projectId: nextProjectId, userId: ownerId },
     )) {
-      const memberError = await projectMembershipError(data.projectId ?? null, ownerId);
+      const memberError = await projectMembershipError(nextProjectId, ownerId);
       if (memberError) return memberError;
     }
 
     const expense = await prisma.expense.update({
       where: { id },
-      data: { ...entryData, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, projectId: nextProjectId, date: new Date(data.date), userId: ownerId },
       include: {
         category: { select: { id: true, name: true } },
         project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isProjectMember, membershipCheckNeeded } from "./project-members";
+import { isProjectMember, membershipCheckNeeded, resolveNextProjectId } from "./project-members";
 
 describe("isProjectMember", () => {
   it("is false for an empty member list", () => {
@@ -49,5 +49,19 @@ describe("membershipCheckNeeded", () => {
 
   it("checks when an expense gains a project it did not have", () => {
     expect(membershipCheckNeeded({ projectId: null, userId: "u1" }, next)).toBe(true);
+  });
+});
+
+describe("resolveNextProjectId", () => {
+  it("keeps the existing project when the field is absent (Prisma's 'unchanged')", () => {
+    expect(resolveNextProjectId("p1", undefined)).toBe("p1");
+  });
+
+  it("clears the project on an explicit null", () => {
+    expect(resolveNextProjectId("p1", null)).toBe(null);
+  });
+
+  it("moves to the incoming project when one is given", () => {
+    expect(resolveNextProjectId("p1", "p2")).toBe("p2");
   });
 });
