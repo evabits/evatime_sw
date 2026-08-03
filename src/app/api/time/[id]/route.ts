@@ -49,7 +49,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       where: { id },
       data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel },
       include: {
-        project: { select: { name: true, customer: { select: { id: true, name: true } } } },
+        project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });

@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     const entry = await prisma.timeEntry.create({
       data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
       include: {
-        project: { select: { name: true, customer: { select: { id: true, name: true } } } },
+        project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });

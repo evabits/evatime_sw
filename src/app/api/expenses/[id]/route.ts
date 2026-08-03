@@ -43,7 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       data: { ...entryData, date: new Date(data.date), userId: ownerId },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, customer: { select: { name: true } } } },
+        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });
