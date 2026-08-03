@@ -39,13 +39,13 @@ export async function POST(req: Request) {
       });
       const memberIds = members.map((m) => m.userId);
       const rows = await (model as any).findMany({
-        where: { id: { in: ids } },
+        where: buildBulkWhere(ids),
         select: { userId: true },
       });
       const buiten = rows.filter((r: any) => !isProjectMember(memberIds, r.userId)).length;
       if (buiten > 0) {
         return NextResponse.json(
-          { error: `${buiten} van de ${ids.length} regels heeft een eigenaar die geen deelnemer is van dit project` },
+          { error: `${buiten} van de ${rows.length} regels heeft een eigenaar die geen deelnemer is van dit project` },
           { status: 400 },
         );
       }
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       if (!targetUser) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
 
       const rows = await (model as any).findMany({
-        where: { id: { in: ids } },
+        where: buildBulkWhere(ids),
         select: { projectId: true },
       });
       const projectIds = [...new Set(rows.map((r: any) => r.projectId).filter(Boolean))] as string[];
