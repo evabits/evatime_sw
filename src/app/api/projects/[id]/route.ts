@@ -22,6 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
     const { id } = await params;
 
     const project = await prisma.project.findUnique({
@@ -30,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         customer: { select: { id: true, name: true } },
         tags: { select: { id: true, name: true } },
         levelRates: true,
-        members: { select: { userId: true } },
+        ...(isAdmin(role) ? { members: { select: { userId: true } } } : {}),
       },
     });
     if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });

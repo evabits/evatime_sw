@@ -47,8 +47,7 @@ export async function GET(req: Request) {
         customer: { select: { name: true } },
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
-        ...(canSeeRates ? { levelRates: true } : {}),
-        members: { select: { userId: true } },
+        ...(canSeeRates ? { levelRates: true, members: { select: { userId: true } } } : {}),
       },
     });
     return NextResponse.json(projects);
