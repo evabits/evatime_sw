@@ -13,7 +13,7 @@ const schema = z.object({
   description: z.string().optional(),
   amount: z.number().positive(),
   vatRate: z.number().min(0).max(100),
-  billable: z.boolean(),
+  billable: z.boolean().optional(),
   reimbursable: z.boolean(),
   userId: z.string().optional().nullable(),
 });

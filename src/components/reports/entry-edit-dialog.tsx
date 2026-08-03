@@ -15,14 +15,13 @@ interface Props {
   kind: BulkKind | null;
   entry: any | null;
   projects: any[];
-  activityTypes: any[];
   categories: any[];
   users: any[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function EntryEditDialog({ kind, entry, projects, activityTypes, categories, users, onClose, onSaved }: Props) {
+export function EntryEditDialog({ kind, entry, projects, categories, users, onClose, onSaved }: Props) {
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +31,6 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
     setError(null);
     setForm({
       projectId: entry.projectId ?? "",
-      activityTypeId: entry.activityTypeId ?? "",
       categoryId: entry.categoryId ?? "",
       userId: entry.userId ?? "",
       date: format(new Date(entry.date), "yyyy-MM-dd"),
@@ -42,7 +40,6 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
       vatRate: entry.vatRate != null ? String(entry.vatRate) : "21",
       description: entry.description ?? "",
       rateOverride: entry.rateOverride != null ? String(entry.rateOverride) : "",
-      billable: entry.billable ?? true,
       reimbursable: entry.reimbursable ?? false,
     });
   }, [entry, kind]);
@@ -51,10 +48,6 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
 
   const set = (key: string, value: any) => setForm((f: any) => ({ ...f, [key]: value }));
   const num = (v: string) => (v === "" ? null : Number(v));
-
-  const availableActivities = activityTypes.filter(
-    (a) => a.showInAllProjects || a.projects.some((p: any) => p.projectId === form.projectId),
-  );
 
   function validate(): string | null {
     if (kind === "expense") {
@@ -84,10 +77,10 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
     setError(null);
     const body =
       kind === "time"
-        ? { projectId: form.projectId, activityTypeId: form.activityTypeId || null, date: form.date, hours: Number(form.hours), description: form.description, rateOverride: num(form.rateOverride), billable: form.billable, userId: form.userId }
+        ? { projectId: form.projectId, date: form.date, hours: Number(form.hours), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
         : kind === "km"
-        ? { projectId: form.projectId, activityTypeId: form.activityTypeId || null, date: form.date, km: Number(form.km), description: form.description, rateOverride: num(form.rateOverride), billable: form.billable, userId: form.userId }
-        : { categoryId: form.categoryId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), billable: form.billable, reimbursable: form.reimbursable, userId: form.userId };
+        ? { projectId: form.projectId, date: form.date, km: Number(form.km), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
+        : { categoryId: form.categoryId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), reimbursable: form.reimbursable, userId: form.userId };
 
     const res = await fetch(`${ENTRY_ENDPOINT[kind as BulkKind]}/${entry.id}`, {
       method: "PUT",
@@ -134,7 +127,7 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
             <Label>Project</Label>
             <Select
               value={form.projectId}
-              onValueChange={(v) => setForm((f: any) => ({ ...f, projectId: v, activityTypeId: "" }))}
+              onValueChange={(v) => setForm((f: any) => ({ ...f, projectId: v }))}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -144,22 +137,6 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
               </SelectContent>
             </Select>
           </div>
-
-          {kind !== "expense" && (
-            <div className="space-y-2">
-              <Label>Activiteit</Label>
-              <Select
-                value={form.activityTypeId || "_none"}
-                onValueChange={(v) => set("activityTypeId", v === "_none" ? "" : v)}
-              >
-                <SelectTrigger><SelectValue placeholder="Geen" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">Geen</SelectItem>
-                  {availableActivities.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label>Datum</Label>
@@ -197,17 +174,6 @@ export function EntryEditDialog({ kind, entry, projects, activityTypes, categori
               <Input type="number" step="0.01" min="0" placeholder="Optioneel" value={form.rateOverride} onChange={(e) => set("rateOverride", e.target.value)} />
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label>Factureerbaar</Label>
-            <Select value={form.billable ? "true" : "false"} onValueChange={(v) => set("billable", v === "true")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Ja</SelectItem>
-                <SelectItem value="false">Nee</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {kind === "expense" && (
             <div className="space-y-2">

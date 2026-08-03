@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { formatDate, formatHours, formatCurrency, cn } from "@/lib/utils";
 import { partitionProjectsByCustomer } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
+import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
@@ -669,7 +670,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                     {isAdmin && (
                       <TableCell className="text-right">
                         {entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) : "—"}
-                        {!entry.billable && <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>}
+                        {isBillable(entry) === null && (
+                          <Badge variant="outline" className="ml-2 text-xs">Onbekend</Badge>
+                        )}
+                        {isBillable(entry) === false && (
+                          <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>
+                        )}
                       </TableCell>
                     )}
                     <TableCell>

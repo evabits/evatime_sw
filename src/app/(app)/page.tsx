@@ -57,7 +57,7 @@ export default async function DashboardPage() {
       where: { userId },
       orderBy: { date: "desc" },
       take: 5,
-      include: { project: { select: { name: true } }, activityType: { select: { name: true } } },
+      include: { project: { select: { name: true } } },
     }),
     prisma.kmEntry.findMany({
       where: { userId },

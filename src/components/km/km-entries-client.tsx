@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { isBillable } from "@/lib/billable";
 import { Pencil, Trash2 } from "lucide-react";
 
 const schema = z.object({
@@ -423,7 +424,12 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
                   {isAdmin && (
                     <TableCell className="text-right">
                       {entry.rateOverride ? formatCurrency(Number(entry.rateOverride)) + "/km" : "—"}
-                      {!entry.billable && <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>}
+                      {isBillable(entry) === null && (
+                        <Badge variant="outline" className="ml-2 text-xs">Onbekend</Badge>
+                      )}
+                      {isBillable(entry) === false && (
+                        <Badge variant="secondary" className="ml-2 text-xs">Niet</Badge>
+                      )}
                     </TableCell>
                   )}
                   <TableCell>

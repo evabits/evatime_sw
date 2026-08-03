@@ -18,12 +18,11 @@ interface Props {
   projects: any[];
   users: { id: string; name: string; weeklyHours: number | null }[];
   tags: { id: string; name: string }[];
-  activityTypes: any[];
   categories: any[];
   role: string;
 }
 
-export function ReportsClient({ customers, projects, users, tags, activityTypes, categories, role }: Props) {
+export function ReportsClient({ customers, projects, users, tags, categories, role }: Props) {
   const [filters, setFilters] = useState<FilterState>(() => {
     const range = resolvePeriod("this-month", new Date())!;
     return {
@@ -313,7 +312,6 @@ export function ReportsClient({ customers, projects, users, tags, activityTypes,
         kind={editing?.kind ?? null}
         entry={editing?.entry ?? null}
         projects={projects}
-        activityTypes={activityTypes}
         categories={categories}
         users={users}
         onClose={() => setEditing(null)}

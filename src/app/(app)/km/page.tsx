@@ -36,7 +36,7 @@ export default async function KmPage() {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { name: true, customer: { select: { id: true, name: true } } } },
+        project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },
       },
     }),

@@ -23,25 +23,17 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         orderBy: { name: "asc" },
         include: {
           project: { select: { id: true, name: true, customer: { select: { name: true } } } },
-          activityType: { select: { id: true, name: true } },
         },
       },
     },
   });
   if (!user) notFound();
 
-  const [projects, activityTypes] = await Promise.all([
-    prisma.project.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, customer: { select: { name: true } } },
-    }),
-    prisma.activityType.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-  ]);
+  const projects = await prisma.project.findMany({
+    where: { archivedAt: null },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, customer: { select: { name: true } } },
+  });
 
   return (
     <div className="space-y-8">
@@ -54,7 +46,6 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         employeeId={user.id}
         initialTemplates={user.kmTemplates.map((t) => ({ ...t, km: Number(t.km) }))}
         projects={projects}
-        activityTypes={activityTypes}
       />
     </div>
   );

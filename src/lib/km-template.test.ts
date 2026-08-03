@@ -7,8 +7,11 @@ describe("km-template schema", () => {
   });
   it("valid full payload parses", () => {
     expect(
-      kmTemplateSchema.safeParse({ name: "Thuis", projectId: "p1", activityTypeId: null, km: 1, description: "x" }).success,
+      kmTemplateSchema.safeParse({ name: "Thuis", projectId: "p1", km: 1, description: "x" }).success,
     ).toBeTruthy();
+  });
+  it("missing projectId rejected", () => {
+    expect(kmTemplateSchema.safeParse({ name: "Thuis", km: 1 }).success).toBe(false);
   });
   it("empty name rejected", () => {
     expect(kmTemplateSchema.safeParse({ name: "", projectId: "p1", km: 1 }).success).toBe(false);

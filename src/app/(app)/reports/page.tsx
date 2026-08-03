@@ -8,7 +8,7 @@ import { ReportsClient } from "@/components/reports/reports-client";
 export default async function ReportsPage() {
   const session = await auth();
   if (!canViewReports((session?.user as any)?.role ?? "EMPLOYEE")) redirect("/");
-  const [customers, projects, users, tags, activityTypes, categories] = await Promise.all([
+  const [customers, projects, users, tags, categories] = await Promise.all([
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.project.findMany({
       where: { archivedAt: null },
@@ -17,11 +17,6 @@ export default async function ReportsPage() {
     }),
     prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, weeklyHours: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.activityType.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: "asc" },
-      include: { projects: { select: { projectId: true } } },
-    }),
     prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
   ]);
 
@@ -33,7 +28,6 @@ export default async function ReportsPage() {
       projects={serialize(projects)}
       users={serializedUsers}
       tags={serialize(tags)}
-      activityTypes={serialize(activityTypes)}
       categories={serialize(categories)}
       role={(session?.user as any)?.role ?? "EMPLOYEE"}
     />

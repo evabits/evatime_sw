@@ -41,7 +41,6 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
               <TableHead>Datum</TableHead>
               <TableHead>Medewerker</TableHead>
               <TableHead>Klant / Project</TableHead>
-              <TableHead>Activiteit</TableHead>
               <TableHead>Omschrijving</TableHead>
               <TableHead className="text-right">Uren</TableHead>
               <TableHead className="text-right">Tarief</TableHead>
@@ -73,7 +72,6 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
                     <div>{e.project?.customer?.name}</div>
                     <div className="text-xs text-muted-foreground">{e.project?.name}</div>
                   </TableCell>
-                  <TableCell>{e.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
                   <TableCell className="text-right">
@@ -112,7 +110,7 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
           <TableFooter>
             <TableRow>
               {canEdit && <TableCell />}
-              <TableCell colSpan={5} className="font-medium">Totaal</TableCell>
+              <TableCell colSpan={4} className="font-medium">Totaal</TableCell>
               <TableCell className="text-right font-mono font-medium">{formatHours(total)}</TableCell>
               <TableCell />
               <TableCell className="text-right font-medium">

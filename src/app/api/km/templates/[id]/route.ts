@@ -7,7 +7,6 @@ import { kmTemplateSchema as schema, canManageTemplate } from "@/lib/km-template
 
 const include = {
   project: { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
-  activityType: { select: { id: true, name: true } },
 } as const;
 
 async function loadAuthorized(id: string) {

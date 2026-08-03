@@ -37,7 +37,6 @@ export function KmTemplatesClient({ initialTemplates }: Props) {
         body: JSON.stringify({
           name: name.trim(),
           projectId: renaming.projectId ?? renaming.project?.id,
-          activityTypeId: renaming.activityTypeId ?? renaming.activityType?.id ?? null,
           km: Number(renaming.km),
           description: renaming.description ?? null,
         }),
@@ -81,14 +80,13 @@ export function KmTemplatesClient({ initialTemplates }: Props) {
               <TableRow>
                 <TableHead>Naam</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Activiteit</TableHead>
                 <TableHead className="text-right">Km</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {templates.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell></TableRow>
               )}
               {templates.map((t) => (
                 <TableRow key={t.id}>
@@ -97,7 +95,6 @@ export function KmTemplatesClient({ initialTemplates }: Props) {
                     <div>{t.project?.name}</div>
                     <div className="text-xs text-muted-foreground">{t.project?.customer?.name}</div>
                   </TableCell>
-                  <TableCell>{t.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{Number(t.km).toFixed(1)}</TableCell>
                   <TableCell>
                     {t.managedByAdmin ? (

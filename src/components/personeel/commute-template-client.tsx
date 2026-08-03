@@ -15,7 +15,6 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
   projectId: z.string().min(1, "Verplicht"),
-  activityTypeId: z.string().optional(),
   km: z.coerce.number().positive("Moet groter dan 0 zijn"),
   description: z.string().optional(),
 });
@@ -26,10 +25,9 @@ interface Props {
   employeeId: string;
   initialTemplates: any[];
   projects: any[];
-  activityTypes: any[];
 }
 
-export function CommuteTemplateClient({ employeeId, initialTemplates, projects, activityTypes }: Props) {
+export function CommuteTemplateClient({ employeeId, initialTemplates, projects }: Props) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -38,14 +36,14 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", projectId: "", activityTypeId: "", km: undefined, description: "" },
+    defaultValues: { name: "", projectId: "", km: undefined, description: "" },
   });
 
   function closeDialog() {
     setDialogOpen(false);
     setEditing(null);
     setApiError("");
-    form.reset({ name: "", projectId: "", activityTypeId: "", km: undefined, description: "" });
+    form.reset({ name: "", projectId: "", km: undefined, description: "" });
   }
 
   function openCreate() {
@@ -59,7 +57,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
     form.reset({
       name: t.name,
       projectId: t.project?.id ?? "",
-      activityTypeId: t.activityType?.id ?? "",
       km: t.km,
       description: t.description ?? "",
     });
@@ -77,7 +74,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
           body: JSON.stringify({
             name: data.name,
             projectId: data.projectId,
-            activityTypeId: data.activityTypeId || null,
             km: data.km,
             description: data.description || null,
           }),
@@ -98,7 +94,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
           body: JSON.stringify({
             name: data.name,
             projectId: data.projectId,
-            activityTypeId: data.activityTypeId || null,
             km: data.km,
             description: data.description || null,
             userId: employeeId,
@@ -145,7 +140,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
               <TableRow>
                 <TableHead>Naam</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Activiteit</TableHead>
                 <TableHead className="text-right">Km</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -153,7 +147,7 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
             <TableBody>
               {templates.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     Geen woon-werk sjabloon
                   </TableCell>
                 </TableRow>
@@ -165,7 +159,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
                     <div>{t.project?.name}</div>
                     <div className="text-xs text-muted-foreground">{t.project?.customer?.name}</div>
                   </TableCell>
-                  <TableCell>{t.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">{Number(t.km).toFixed(1)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
@@ -215,24 +208,6 @@ export function CommuteTemplateClient({ employeeId, initialTemplates, projects, 
                 </SelectContent>
               </Select>
               {form.formState.errors.projectId && <p className="text-xs text-destructive">{form.formState.errors.projectId.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Activiteit</Label>
-              <Select
-                value={form.watch("activityTypeId") || "__none__"}
-                onValueChange={(v) => form.setValue("activityTypeId", v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Geen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Geen</SelectItem>
-                  {activityTypes.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
