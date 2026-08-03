@@ -21,6 +21,7 @@ const schema = z.object({
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
   defaultKmRate: z.coerce.number().positive().optional().or(z.literal("")),
+  billable: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -69,7 +70,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { status: "ACTIVE" },
+    defaultValues: { status: "ACTIVE", billable: true },
   });
 
   function addTag(name: string) {
@@ -146,6 +147,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
       description: project.description ?? "",
       status: project.status,
       defaultKmRate: project.defaultKmRate ? Number(project.defaultKmRate) : "",
+      billable: project.billable,
     });
     // project.levelRates is only absent when the query that loaded this project
     // forgot to include it — not a legitimate "zero rates" state, which is `[]`.
@@ -213,6 +215,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                 <TableHead>Klant</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Tags</TableHead>
+                <TableHead>Factureerbaar</TableHead>
                 <TableHead className="text-right">Km-tarief</TableHead>
                 <TableHead className="text-right">Uren</TableHead>
                 <TableHead></TableHead>
@@ -220,7 +223,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
             </TableHeader>
             <TableBody>
               {projects.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
               {projects
               .filter((p) => statusFilter === "all" || p.status === statusFilter)
@@ -241,6 +244,11 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                         <Badge key={tag.id} variant="outline" className="text-xs">{tag.name}</Badge>
                       ))}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {p.billable
+                      ? <Badge variant="secondary" className="text-xs">Ja</Badge>
+                      : <Badge variant="outline" className="text-xs">Nee</Badge>}
                   </TableCell>
                   <TableCell className="text-right">{p.defaultKmRate ? `€${Number(p.defaultKmRate).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-right">{p._count?.timeEntries ?? 0}</TableCell>
@@ -359,6 +367,22 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
             <div className="space-y-1">
               <Label>Standaard km-tarief (€/km)</Label>
               <Input type="number" step="0.01" min="0" placeholder="0.23" {...form.register("defaultKmRate")} />
+            </div>
+            <div className="space-y-2">
+              <Label>Factureerbaar</Label>
+              <Select
+                onValueChange={(v) => form.setValue("billable", v === "true")}
+                value={form.watch("billable") === false ? "false" : "true"}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ja</SelectItem>
+                  <SelectItem value="false">Nee</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Bepaalt of uren, ritten en uitgaven op dit project gefactureerd kunnen worden.
+              </p>
             </div>
             <div className="sm:col-span-2">
               <LevelRateFields

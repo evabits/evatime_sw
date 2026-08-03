@@ -14,6 +14,7 @@ const schema = z.object({
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
   levelRates: levelRatesField,
+  billable: z.boolean().optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

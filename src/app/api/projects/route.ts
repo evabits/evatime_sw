@@ -17,6 +17,7 @@ const schema = z.object({
   tags: z.array(z.string()).optional(),
   activityTypeIds: z.array(z.string()).optional(),
   levelRates: levelRatesField,
+  billable: z.boolean().optional(),
 });
 
 export async function GET(req: Request) {
