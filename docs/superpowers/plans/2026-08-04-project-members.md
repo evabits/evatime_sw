@@ -752,7 +752,15 @@ De uitrol is drie stappen; dit traject verwijdert niets, dus er is geen afbraaks
 
 1. **Toevoegen.** `npm run db:push` met het schema van Task 1. Draai vooraf `prisma migrate diff` en lees de volledige lijst — er hoort alleen een tabel bij te komen. Bij de vorige batch verdween er onverwacht een kolom die niemand had gecontroleerd.
 2. **Vullen.** `npm run backfill:members` droog draaien, de uitvoer controleren — let vooral op de lijst "ZONDER BOEKINGEN" — en dan met `--write`.
-3. **Deployen.** De volledige branch.
+3. **Deployen.** De volledige branch, kort na stap 2.
+
+**Draai `--write` precies één keer, en daarna nooit meer.** Het script doet per project een
+`deleteMany` gevolgd door verse regels: opnieuw draaien is technisch veilig, maar zet elk project
+met boekingen terug naar de historie en wist daarmee elke deelnemer die je daarna in de UI hebt
+toegevoegd of weggehaald.
+
+Stap 2 en 3 horen dicht op elkaar. Deploy je vóór het vullen, dan kan niemand meer boeken: de
+nieuwe code weigert elke schrijfactie omdat nog geen enkel project deelnemers heeft.
 
 Daarna in de app: op `/projects` de projecten uit die "zonder boekingen"-lijst aanvullen met
 deelnemers, anders kan er niemand op boeken.
