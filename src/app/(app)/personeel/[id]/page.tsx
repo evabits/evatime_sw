@@ -30,7 +30,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   if (!user) notFound();
 
   const projects = await prisma.project.findMany({
-    where: { archivedAt: null },
+    where: { archivedAt: null, members: { some: { userId: id } } },
     orderBy: { name: "asc" },
     select: { id: true, name: true, customer: { select: { name: true } } },
   });

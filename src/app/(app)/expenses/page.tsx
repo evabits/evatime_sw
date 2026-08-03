@@ -8,6 +8,7 @@ export default async function ExpensesPage() {
   const session = await auth();
   const userId = session?.user?.id ?? "";
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
+  const admin = isAdmin(role);
 
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -16,7 +17,11 @@ export default async function ExpensesPage() {
   const [categories, projects, initialExpenses, users] = await Promise.all([
     prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
     prisma.project.findMany({
-      where: { status: "ACTIVE", archivedAt: null },
+      where: {
+        status: "ACTIVE",
+        archivedAt: null,
+        ...(admin ? {} : { members: { some: { userId } } }),
+      },
       orderBy: { name: "asc" },
       select: { id: true, name: true, customer: { select: { name: true } } },
     }),

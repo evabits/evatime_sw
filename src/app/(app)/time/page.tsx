@@ -12,7 +12,11 @@ export default async function TimePage() {
 
   const [projects, customers, recentEntries, users] = await Promise.all([
     prisma.project.findMany({
-      where: { status: { in: ["ACTIVE", "CONCEPT"] }, archivedAt: null },
+      where: {
+        status: { in: ["ACTIVE", "CONCEPT"] },
+        archivedAt: null,
+        ...(admin ? {} : { members: { some: { userId } } }),
+      },
       orderBy: { name: "asc" },
       // The rate preview (and its "Tarief override" field) only ever renders
       // for admins — see the `{isAdmin && ...}` guard in TimeEntriesClient.
@@ -24,6 +28,7 @@ export default async function TimePage() {
             name: true,
             status: true,
             levelRates: true,
+            members: { select: { userId: true } },
             customer: { select: { id: true, name: true, levelRates: true } },
           }
         : {

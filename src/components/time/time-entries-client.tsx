@@ -146,8 +146,17 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
+  // `projects` also feeds the registration-list filter further down, which must
+  // keep showing every project (an admin may want to filter on a project they
+  // don't book on themselves). Only the entry form's picker narrows to what the
+  // selected employee may actually book on.
+  const targetUserId = form.watch("userId") || userId;
+  const bookableProjects = isAdmin
+    ? projects.filter((p: any) => (p.members ?? []).some((m: any) => m.userId === targetUserId))
+    : projects;
+
   const { matched: matchedProjects, customerless: customerlessProjects } =
-    partitionProjectsByCustomer(projects, selectedCustomerId);
+    partitionProjectsByCustomer(bookableProjects, selectedCustomerId);
 
   useEffect(() => {
     form.setValue("projectId", "");
@@ -254,7 +263,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
       const created = await res.json();
       setProjects((prev) => [
         ...prev,
-        { id: created.id, name: created.name, status: "CONCEPT", levelRates: [], customer: null },
+        { id: created.id, name: created.name, status: "CONCEPT", levelRates: [], customer: null, members: created.members },
       ]);
       form.setValue("projectId", created.id);
       setNewProjectOpen(false);

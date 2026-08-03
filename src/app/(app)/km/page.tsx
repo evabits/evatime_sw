@@ -12,7 +12,11 @@ export default async function KmPage() {
 
   const [projects, customers, recentEntries, templates, users] = await Promise.all([
     prisma.project.findMany({
-      where: { status: "ACTIVE", archivedAt: null },
+      where: {
+        status: "ACTIVE",
+        archivedAt: null,
+        ...(admin ? {} : { members: { some: { userId } } }),
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,
