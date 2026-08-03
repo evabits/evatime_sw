@@ -17,6 +17,7 @@ const schema = z.object({
   tags: z.array(z.string()).optional(),
   levelRates: levelRatesField,
   billable: z.boolean().optional(),
+  memberIds: z.array(z.string().min(1)).optional(),
 });
 
 export async function GET(req: Request) {
@@ -47,6 +48,7 @@ export async function GET(req: Request) {
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
         ...(canSeeRates ? { levelRates: true } : {}),
+        members: { select: { userId: true } },
       },
     });
     return NextResponse.json(projects);
@@ -58,9 +60,9 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = (session.user as { role?: string })?.role ?? "EMPLOYEE";
-    const { tags, levelRates, ...rest } = schema.parse(await req.json());
+    const { tags, levelRates, memberIds, ...rest } = schema.parse(await req.json());
 
-    const denial = projectCreateDenialReason(role, { ...rest, levelRates });
+    const denial = projectCreateDenialReason(role, { ...rest, levelRates, memberIds });
     if (denial) return NextResponse.json({ error: denial }, { status: 403 });
 
     const project = await prisma.project.create({
@@ -86,6 +88,28 @@ export async function POST(req: Request) {
         ),
       ]);
     }
-    return NextResponse.json({ ...project, ...(levelRates ? { levelRates } : {}) }, { status: 201 });
+    // De aanmaker moet erop kunnen boeken; anders levert het knopje in het
+    // urenformulier een project op dat voor hem onbruikbaar is. Dit geldt
+    // ongeacht een meegestuurde memberIds — de unie hieronder zorgt dat de
+    // aanmaker nooit buiten de boot valt, ook niet als de aanroeper hem
+    // vergeet of expliciet weglaat.
+    await prisma.projectMember.create({
+      data: { projectId: project.id, userId: session.user!.id! },
+    });
+    const finalMemberIds = memberIds
+      ? Array.from(new Set([...memberIds, session.user!.id!]))
+      : [session.user!.id!];
+    if (memberIds) {
+      await prisma.$transaction([
+        prisma.projectMember.deleteMany({ where: { projectId: project.id } }),
+        ...finalMemberIds.map((userId) =>
+          prisma.projectMember.create({ data: { projectId: project.id, userId } }),
+        ),
+      ]);
+    }
+    return NextResponse.json(
+      { ...project, ...(levelRates ? { levelRates } : {}), members: finalMemberIds.map((userId) => ({ userId })) },
+      { status: 201 },
+    );
   } catch (e) { return handleError(e); }
 }

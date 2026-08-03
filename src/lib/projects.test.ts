@@ -44,6 +44,14 @@ describe("projects", () => {
   it("employees may create a concept project with billable: true (matches the default)", () => {
     expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", billable: true })).toBeNull();
   });
+  it("employees may not set memberIds on a concept project", () => {
+    expect(
+      projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", memberIds: ["u1"] }),
+    ).toBe("Medewerkers kunnen geen deelnemers toewijzen bij het aanmaken van een project");
+  });
+  it("employees may create a concept project with an empty memberIds", () => {
+    expect(projectCreateDenialReason("EMPLOYEE", { status: "CONCEPT", memberIds: [] })).toBeNull();
+  });
 });
 
 describe("partitionProjectsByCustomer", () => {

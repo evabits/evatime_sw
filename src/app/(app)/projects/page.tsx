@@ -13,7 +13,7 @@ export default async function ProjectsPage({
   if ((session?.user as any)?.role !== "ADMIN") redirect("/");
 
   const { filter } = await searchParams;
-  const [projects, customers, allTags] = await Promise.all([
+  const [projects, customers, allTags, users] = await Promise.all([
     prisma.project.findMany({
       where: { archivedAt: null },
       orderBy: { name: "asc" },
@@ -22,10 +22,12 @@ export default async function ProjectsPage({
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
         levelRates: true,
+        members: { select: { userId: true } },
       },
     }),
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   return (
@@ -33,6 +35,7 @@ export default async function ProjectsPage({
       initialProjects={serialize(projects)}
       customers={serialize(customers)}
       allTags={serialize(allTags)}
+      users={serialize(users)}
       initialNoCustomerOnly={filter === "no-customer"}
     />
   );

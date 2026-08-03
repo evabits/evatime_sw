@@ -38,10 +38,11 @@ interface Props {
   initialProjects: any[];
   customers: any[];
   allTags: { id: string; name: string }[];
+  users: any[];
   initialNoCustomerOnly?: boolean;
 }
 
-export function ProjectsClient({ initialProjects, customers, allTags, initialNoCustomerOnly = false }: Props) {
+export function ProjectsClient({ initialProjects, customers, allTags, users, initialNoCustomerOnly = false }: Props) {
   const [projects, setProjects] = useState(initialProjects);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -57,6 +58,11 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
   // include being missing upstream). false must mean "don't touch rates on save",
   // never "save an empty set" — otherwise a missing `include` silently wipes rates.
   const [levelRatesKnown, setLevelRatesKnown] = useState(true);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  // Same guard as levelRatesKnown: false means "don't touch members on save",
+  // never "save an empty member list" — a missing `include` upstream must not
+  // silently lock everyone out of the project.
+  const [memberIdsKnown, setMemberIdsKnown] = useState(true);
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -97,6 +103,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
               .map(([level, v]) => ({ level, rate: Number(v) })),
           }
         : {}),
+      // Same omit-when-unknown rule as levelRates above.
+      ...(memberIdsKnown ? { memberIds } : {}),
     };
     try {
       if (editing) {
@@ -136,6 +144,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
     form.reset({ status: "ACTIVE", billable: true });
     setLevelRates({});
     setLevelRatesKnown(true);
+    setMemberIds([]);
+    setMemberIdsKnown(true);
   }
 
   function startEdit(project: any) {
@@ -158,6 +168,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
         ? Object.fromEntries(project.levelRates.map((r: any) => [r.level, String(r.rate)]))
         : {},
     );
+    setMemberIdsKnown(Array.isArray(project.members));
+    setMemberIds((project.members ?? []).map((m: any) => m.userId));
     setDialogOpen(true);
   }
 
@@ -200,7 +212,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
               <SelectItem value="COMPLETED">Afgerond</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setMemberIds([]); setMemberIdsKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Project toevoegen
           </Button>
         </div>
@@ -218,12 +230,13 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                 <TableHead>Factureerbaar</TableHead>
                 <TableHead className="text-right">Km-tarief</TableHead>
                 <TableHead className="text-right">Uren</TableHead>
+                <TableHead className="text-right">Deelnemers</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {projects.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
               {projects
               .filter((p) => statusFilter === "all" || p.status === statusFilter)
@@ -252,6 +265,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                   </TableCell>
                   <TableCell className="text-right">{p.defaultKmRate ? `€${Number(p.defaultKmRate).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-right">{p._count?.timeEntries ?? 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.members?.length ?? 0}
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1 justify-end">
                       {p.archivedAt ? (
@@ -394,6 +410,29 @@ export function ProjectsClient({ initialProjects, customers, allTags, initialNoC
                     : "Tarieven konden niet worden geladen; wijzigingen hier worden niet opgeslagen."
                 }
               />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Deelnemers</Label>
+              <p className="text-xs text-muted-foreground">
+                Alleen deze medewerkers kunnen uren, ritten en uitgaven op dit project boeken.
+              </p>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {users.map((u: any) => (
+                  <label key={u.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-input accent-primary"
+                      checked={memberIds.includes(u.id)}
+                      onChange={(e) =>
+                        setMemberIds((prev) =>
+                          e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id),
+                        )
+                      }
+                    />
+                    {u.name}
+                  </label>
+                ))}
+              </div>
             </div>
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={close}>Annuleren</Button>

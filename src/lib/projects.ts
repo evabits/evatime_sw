@@ -6,6 +6,7 @@ export type NewProjectInput = {
   defaultKmRate?: number | null;
   levelRates?: unknown[] | null;
   billable?: boolean;
+  memberIds?: string[] | null;
 };
 
 /**
@@ -24,6 +25,12 @@ export function projectCreateDenialReason(role: string, input: NewProjectInput):
   // indistinguishable from doing nothing, so it's allowed through — refusing
   // it would just add friction with no protective value.
   if (input.billable === false) return "Medewerkers kunnen factureerbaarheid niet aanpassen";
+  // The route always makes the caller a member of the concept project it
+  // creates, regardless of what's sent here — so a non-admin never needs to
+  // pass memberIds. Letting it through anyway would let them hand booking
+  // rights on their bare project to arbitrary other users via a raw API call.
+  if ((input.memberIds?.length ?? 0) > 0)
+    return "Medewerkers kunnen geen deelnemers toewijzen bij het aanmaken van een project";
   return null;
 }
 
