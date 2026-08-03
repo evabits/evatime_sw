@@ -222,7 +222,6 @@ export function NewInvoiceClient({ customers }: Props) {
                       <TableHead className="w-8"></TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Project</TableHead>
-                      <TableHead>Activiteit</TableHead>
                       <TableHead>Omschrijving</TableHead>
                       <TableHead className="text-right">Uren</TableHead>
                       <TableHead className="text-right">Tarief</TableHead>
@@ -244,7 +243,6 @@ export function NewInvoiceClient({ customers }: Props) {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
-                        <TableCell>{e.activityType?.name ?? "—"}</TableCell>
                         <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right">{formatHours(Number(e.hours))}</TableCell>
                         <TableCell className="text-right">

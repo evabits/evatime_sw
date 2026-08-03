@@ -15,7 +15,6 @@ const schema = z.object({
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]).default("ACTIVE"),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
-  activityTypeIds: z.array(z.string()).optional(),
   levelRates: levelRatesField,
   billable: z.boolean().optional(),
 });
@@ -59,7 +58,7 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = (session.user as { role?: string })?.role ?? "EMPLOYEE";
-    const { tags, activityTypeIds, levelRates, ...rest } = schema.parse(await req.json());
+    const { tags, levelRates, ...rest } = schema.parse(await req.json());
 
     const denial = projectCreateDenialReason(role, { ...rest, levelRates });
     if (denial) return NextResponse.json({ error: denial }, { status: 403 });
@@ -71,13 +70,6 @@ export async function POST(req: Request) {
           ? {
               tags: {
                 connectOrCreate: tags.map((name) => ({ where: { name }, create: { name } })),
-              },
-            }
-          : {}),
-        ...(activityTypeIds && activityTypeIds.length > 0
-          ? {
-              activityLinks: {
-                create: activityTypeIds.map((activityTypeId) => ({ activityTypeId })),
               },
             }
           : {}),

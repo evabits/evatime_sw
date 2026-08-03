@@ -45,7 +45,6 @@ export default async function KmPage() {
       orderBy: { name: "asc" },
       include: {
         project: { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { id: true, name: true } },
       },
     }),
     admin

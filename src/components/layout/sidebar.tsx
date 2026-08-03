@@ -15,7 +15,6 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Activity,
   UserCog,
   Tag,
   ClipboardList,
@@ -82,7 +81,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/customers", label: "Klanten", icon: Users },
       { href: "/projects", label: "Projecten", icon: FolderOpen },
-      { href: "/activity-types", label: "Activiteiten", icon: Activity },
       { href: "/users", label: "Gebruikers", icon: UserCog },
       { href: "/payroll", label: "Loonverwerking", icon: Wallet },
     ],
