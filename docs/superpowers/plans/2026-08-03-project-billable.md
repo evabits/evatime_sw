@@ -830,9 +830,30 @@ git commit -m "refactor: drop activity types and the per-entry billable flag"
 De uitrol gaat in vier stappen, en de code uit dit plan hoort bij stap 3:
 
 1. **Toevoegen.** `db:push` met alléén Task 1's schemawijziging. Doe dat vanaf een checkout van de commit van Task 1, of voeg de kolom handmatig toe. Draai vooraf `prisma migrate diff` en lees de volledige lijst.
-2. **Vullen.** `KEUZES` in `prisma/backfill-billable.ts` invullen voor de zeven gemengde projecten, droog draaien, de uitvoer controleren, dan met `--write`.
+2. **Vullen.** Task 10 heeft `prisma/backfill-billable.ts` en het `backfill:billable`-npm-script verwijderd — ze lazen de per-regel `billable`-kolommen die diezelfde taak liet vallen, en compileren daardoor niet meer tegen het schema aan de tip van deze branch. Het bestand staat er dus niet meer; dit is geen omissie om op te lossen, haal een werkende kopie terug uit de historie:
+
+   ```
+   git checkout 02c51b6~1 -- prisma/backfill-billable.ts package.json
+   ```
+
+   Elke commit van `cc845f8` tot en met `69102e9` bevat een werkende versie; dit commando pakt de laatste. Vul `KEUZES` in voor de **acht** gemengde projecten:
+
+   | `KEUZES`-sleutel (projectnaam) | Klant |
+   |---|---|
+   | `Assemblage koffer` | Horus View and Explore B.V. |
+   | `H3X testen` | Zonneplan |
+   | `Intern` | EVAbits B.V. |
+   | `Dutch IOT` | EVAjig |
+   | `DEVjig - EFRO` | EVAjig |
+   | `gadget` | EVAjig |
+   | `AUTOjig` | EVAjig |
+   | `testproject` | Erik |
+
+   Draai droog, controleer de uitvoer, dan met `--write`. Gooi daarna **beide teruggehaalde bestanden weer weg** — `git checkout HEAD -- prisma/backfill-billable.ts package.json` — voordat je verder gaat: de tip van de branch mag het script niet bevatten, dat is wat er wordt uitgerold.
 3. **Deployen.** De volledige branch. De oude kolommen bestaan dan nog maar worden niet gelezen.
 4. **Opruimen.** `db:push` met het schema van Task 10. **Dit laat `TimeEntry.billable`, `KmEntry.billable`, `Expense.billable`, de drie `activityTypeId`-kolommen en de tabellen `ActivityType` en `ActivityTypeProject` vallen.** Back-up eerst, en draai `prisma migrate diff` om te zien of er niets ánders in die lijst staat — vorige keer verdween er onverwacht een kolom die niemand had gecontroleerd.
+
+**Volgorde: stap 4 mag pas ná een geslaagde stap 2, nooit ervoor.** `db:push` met het schema van de tip verwijdert de drie per-regel `billable`-kolommen; gebeurt dat voordat de backfill `Project.billable` heeft gezet, dan valt elk project terug op het schema-`@default(true)` en wordt zo in één klap factureerbaar — de acht gemengde projecten én de volledig niet-factureerbare, alleen nog te herstellen uit een back-up.
 
 Daarna handmatig:
 
