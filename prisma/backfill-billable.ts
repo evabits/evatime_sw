@@ -35,6 +35,27 @@ async function main() {
     orderBy: { name: "asc" },
   });
 
+  // KEUZES is gesleuteld op projectnaam, maar Project.name is niet uniek in
+  // het schema. Twee projecten met dezelfde naam zouden dan onopgemerkt door
+  // dezelfde KEUZES-regel worden bestuurd — ook als een mens er maar één van
+  // heeft bekeken. Weiger voordat er iets anders gebeurt als dat zich voordoet.
+  const namen = new Map<string, string[]>();
+  for (const p of projects) {
+    const label = `${p.customer?.name ?? "— geen klant —"} / ${p.name}`;
+    namen.set(p.name, [...(namen.get(p.name) ?? []), label]);
+  }
+  const dubbeleNamen = [...namen.entries()].filter(([, labels]) => labels.length > 1);
+  if (dubbeleNamen.length > 0) {
+    console.error(`GEWEIGERD: ${dubbeleNamen.length} projectnamen komen meer dan eens voor, KEUZES kan ze niet uit elkaar houden:`);
+    for (const [naam, labels] of dubbeleNamen) {
+      console.error(`  "${naam}":`);
+      labels.forEach((l) => console.error("    " + l));
+    }
+    console.error("\nEr is niets gewijzigd.");
+    process.exitCode = 1;
+    return;
+  }
+
   const plan: { id: string; label: string; value: boolean; reason: string }[] = [];
   const ontbreekt: string[] = [];
 
@@ -71,10 +92,8 @@ async function main() {
     return;
   }
 
-  for (const r of plan) {
-    await db.project.update({ where: { id: r.id }, data: { billable: r.value } });
-  }
+  await db.$transaction(plan.map((r) => db.project.update({ where: { id: r.id }, data: { billable: r.value } })));
   console.log(`\n${plan.length} projecten bijgewerkt.`);
 }
 
-main().finally(() => db.$disconnect());
+main().catch(console.error).finally(() => db.$disconnect());
