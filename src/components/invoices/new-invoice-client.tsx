@@ -11,9 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
-import { resolveHourRate, effectiveWorkLevel } from "@/lib/rates";
+import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
-import { WORK_LEVEL_LABELS } from "@/lib/work-levels";
+import { groupHourEntriesForInvoice } from "@/lib/invoice-lines";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -75,40 +75,11 @@ export function NewInvoiceClient({ customers }: Props) {
     const newLines: InvoiceLine[] = [];
 
     const selectedTime = unbilledTime.filter((e) => selectedTimeIds.has(e.id));
-    const withRate = selectedTime.filter((e) => resolveHourRate(e) != null);
-    if (withRate.length > 0) {
-      const grouped = new Map<string, typeof withRate>();
-      withRate.forEach((e) => {
-        const key = `${e.project?.name ?? "Werkzaamheden"}|${resolveHourRate(e)}`;
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(e);
-      });
-
-      // Splitst één activiteit in meerdere regels zodra er meerdere tarieven in
-      // zitten; dan pas komt het niveau in de omschrijving, zodat facturen met
-      // één tarief er ongewijzigd uitzien.
-      const labelCounts = new Map<string, number>();
-      grouped.forEach((_v, key) => {
-        const label = key.split("|")[0];
-        labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
-      });
-
-      grouped.forEach((entries, key) => {
-        const label = key.split("|")[0];
-        const rate = resolveHourRate(entries[0])!;
-        const level = effectiveWorkLevel(entries[0]);
-        const description =
-          (labelCounts.get(label) ?? 0) > 1 && level
-            ? `${label} (${WORK_LEVEL_LABELS[level]})`
-            : label;
-        newLines.push({
-          description,
-          quantity: entries.reduce((s, e) => s + Number(e.hours), 0),
-          unitPrice: rate,
-          lineType: "HOURS",
-          timeEntryIds: entries.map((e) => e.id),
-        });
-      });
+    // Groepeert de geselecteerde urenregels tot factuurregels: één regel per
+    // project + tarief + werkniveau. Zie invoice-lines.ts voor waarom de
+    // sleutel op project-id (niet -naam) en niveau steunt.
+    for (const line of groupHourEntriesForInvoice(selectedTime)) {
+      newLines.push({ ...line, lineType: "HOURS" });
     }
 
     const selectedKm = unbilledKm.filter((e) => selectedKmIds.has(e.id));
