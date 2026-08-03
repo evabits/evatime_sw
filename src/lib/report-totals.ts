@@ -1,4 +1,5 @@
 import { resolveHourRate } from "./rates";
+import { isBillable } from "./billable";
 
 export type ReportData = {
   timeEntries: any[];
@@ -31,12 +32,12 @@ export function reportTotals(data: ReportData) {
   const km = data.kmEntries.reduce((s, e) => s + Number(e.km), 0);
   const expenses = data.expenses.reduce((s, e) => s + Number(e.amount), 0);
   const revenue =
-    data.timeEntries.filter((e) => e.billable).reduce((s, e) => {
+    data.timeEntries.filter((e) => isBillable(e) === true).reduce((s, e) => {
       const rate = timeRate(e);
       return rate == null ? s : s + Number(e.hours) * rate;
     }, 0) +
-    data.kmEntries.filter((e) => e.billable).reduce((s, e) => s + Number(e.km) * kmRate(e), 0) +
-    data.expenses.filter((e) => e.billable).reduce((s, e) => s + Number(e.amount), 0);
+    data.kmEntries.filter((e) => isBillable(e) === true).reduce((s, e) => s + Number(e.km) * kmRate(e), 0) +
+    data.expenses.filter((e) => isBillable(e) === true).reduce((s, e) => s + Number(e.amount), 0);
   return { hours, km, expenses, revenue };
 }
 
@@ -64,17 +65,17 @@ export function groupByEmployee(
     const row = bucket(e.user);
     row.hours += Number(e.hours);
     const rate = timeRate(e);
-    if (e.billable && rate != null) row.revenue += Number(e.hours) * rate;
+    if (isBillable(e) === true && rate != null) row.revenue += Number(e.hours) * rate;
   }
   for (const e of data.kmEntries) {
     const row = bucket(e.user);
     row.km += Number(e.km);
-    if (e.billable) row.revenue += Number(e.km) * kmRate(e);
+    if (isBillable(e) === true) row.revenue += Number(e.km) * kmRate(e);
   }
   for (const e of data.expenses) {
     const row = bucket(e.user);
     row.expenses += Number(e.amount);
-    if (e.billable) row.revenue += Number(e.amount);
+    if (isBillable(e) === true) row.revenue += Number(e.amount);
   }
 
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));

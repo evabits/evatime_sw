@@ -5,17 +5,17 @@ const seniorProject = { levelRates: [{ level: "SENIOR", rate: 100 }], customer: 
 
 const data = {
   timeEntries: [
-    { hours: 2, billable: true, rateOverride: null, workLevel: "SENIOR", project: seniorProject, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
-    { hours: 3, billable: true, rateOverride: 50, workLevel: "JUNIOR", project: { levelRates: [], customer: { levelRates: [] } }, user: { id: "u2", name: "Bram", workLevel: "JUNIOR" } },
-    { hours: 4, billable: false, rateOverride: null, workLevel: "SENIOR", project: seniorProject, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
+    { hours: 2, rateOverride: null, workLevel: "SENIOR", project: { ...seniorProject, billable: true }, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
+    { hours: 3, rateOverride: 50, workLevel: "JUNIOR", project: { levelRates: [], customer: { levelRates: [] }, billable: true }, user: { id: "u2", name: "Bram", workLevel: "JUNIOR" } },
+    { hours: 4, rateOverride: null, workLevel: "SENIOR", project: { ...seniorProject, billable: false }, user: { id: "u1", name: "Anne", workLevel: "SENIOR" } },
   ],
   kmEntries: [
-    { km: 10, billable: true, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u1", name: "Anne" } },
-    { km: 20, billable: false, rateOverride: null, project: { defaultKmRate: 0.23 }, user: { id: "u2", name: "Bram" } },
+    { km: 10, rateOverride: null, project: { defaultKmRate: 0.23, billable: true }, user: { id: "u1", name: "Anne" } },
+    { km: 20, rateOverride: null, project: { defaultKmRate: 0.23, billable: false }, user: { id: "u2", name: "Bram" } },
   ],
   expenses: [
-    { amount: 40, billable: true, user: { id: "u1", name: "Anne" } },
-    { amount: 60, billable: false, user: { id: "u2", name: "Bram" } },
+    { amount: 40, project: { billable: true }, user: { id: "u1", name: "Anne" } },
+    { amount: 60, project: { billable: false }, user: { id: "u2", name: "Bram" } },
   ],
 };
 
@@ -94,9 +94,9 @@ describe("entries without a determinable rate", () => {
   const data = {
     timeEntries: [
       {
-        hours: 5, billable: true, rateOverride: null, workLevel: "SENIOR",
+        hours: 5, rateOverride: null, workLevel: "SENIOR",
         user: { id: "u1", name: "Anne", workLevel: "SENIOR" },
-        project: { levelRates: [], customer: { levelRates: [] } },
+        project: { levelRates: [], customer: { levelRates: [] }, billable: true },
       },
     ],
     kmEntries: [],
@@ -117,5 +117,38 @@ describe("entries without a determinable rate", () => {
 
   it("reports the rate as null rather than zero", () => {
     expect(timeRate(data.timeEntries[0])).toBeNull();
+  });
+});
+
+describe("billability now comes from the project", () => {
+  const base = {
+    hours: 4, rateOverride: 100, workLevel: "SENIOR",
+    user: { id: "u1", name: "Anne", workLevel: "SENIOR" },
+  };
+
+  it("counts revenue only when the project is billable", () => {
+    const t = reportTotals({
+      timeEntries: [{ ...base, project: { billable: true, levelRates: [], customer: null } }],
+      kmEntries: [], expenses: [],
+    });
+    expect(t.hours).toBe(4);
+    expect(t.revenue).toBe(400);
+  });
+
+  it("counts the hours but no revenue for a non-billable project", () => {
+    const t = reportTotals({
+      timeEntries: [{ ...base, project: { billable: false, levelRates: [], customer: null } }],
+      kmEntries: [], expenses: [],
+    });
+    expect(t.hours).toBe(4);
+    expect(t.revenue).toBe(0);
+  });
+
+  it("counts no revenue when the project was not loaded at all", () => {
+    // Vergeten include: hours tellen wel, geld niet. Zou dit als billable
+    // gelden, dan verscheen er omzet die er niet is.
+    const t = reportTotals({ timeEntries: [{ ...base }], kmEntries: [], expenses: [] });
+    expect(t.hours).toBe(4);
+    expect(t.revenue).toBe(0);
   });
 });

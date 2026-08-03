@@ -8,6 +8,7 @@ import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { serialize } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
+import { isBillable } from "@/lib/billable";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -102,9 +103,10 @@ export default async function DashboardPage() {
   const vacRemainingHours = vacBudgetHours - vacUsedHours;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
+    const projectBillable = isBillable({ project }) === true;
     const levelRates = project.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
     const customerLevelRates = project.customer?.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
-    const hourRevenue = project.timeEntries.filter((e) => e.billable).reduce((s, e) => {
+    const hourRevenue = project.timeEntries.filter(() => projectBillable).reduce((s, e) => {
       const rate = resolveHourRate({
         rateOverride: e.rateOverride == null ? null : Number(e.rateOverride),
         workLevel: e.workLevel,
@@ -113,7 +115,7 @@ export default async function DashboardPage() {
       });
       return rate == null ? s : s + Number(e.hours) * rate;
     }, 0);
-    const kmRevenue = project.kmEntries.filter((e) => e.billable).reduce((s, e) => {
+    const kmRevenue = project.kmEntries.filter(() => projectBillable).reduce((s, e) => {
       const rate = Number(e.rateOverride ?? project.defaultKmRate ?? 0);
       return s + Number(e.km) * rate;
     }, 0);
