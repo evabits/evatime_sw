@@ -10,7 +10,7 @@ export default async function TimePage() {
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
   const admin = isAdmin(role);
 
-  const [projects, activityTypes, customers, recentEntries, users] = await Promise.all([
+  const [projects, customers, recentEntries, users] = await Promise.all([
     prisma.project.findMany({
       where: { status: { in: ["ACTIVE", "CONCEPT"] }, archivedAt: null },
       orderBy: { name: "asc" },
@@ -33,11 +33,6 @@ export default async function TimePage() {
             customer: { select: { id: true, name: true } },
           },
     }),
-    prisma.activityType.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: "asc" },
-      include: { projects: { select: { projectId: true } } },
-    }),
     prisma.customer.findMany({
       where: { archivedAt: null },
       orderBy: { name: "asc" },
@@ -54,7 +49,6 @@ export default async function TimePage() {
       orderBy: { date: "desc" },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { name: true } },
         user: { select: { id: true, name: true } },
       },
     }),
@@ -70,7 +64,6 @@ export default async function TimePage() {
   return (
     <TimeEntriesClient
       projects={serialize(projects)}
-      activityTypes={serialize(activityTypes)}
       customers={serialize(customers)}
       users={serialize(users)}
       initialEntries={serialize(recentEntries)}

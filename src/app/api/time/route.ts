@@ -8,12 +8,10 @@ import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   projectId: z.string().min(1),
-  activityTypeId: z.string().optional().nullable(),
   date: z.string(),
   hours: z.number().positive(),
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
-  billable: z.boolean().optional(),
   userId: z.string().optional().nullable(),
 });
 
@@ -58,7 +56,6 @@ export async function GET(req: Request) {
               },
             }
           : { select: { id: true, name: true, billable: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { id: true, name: true } },
         user: canSeeRates
           ? { select: { id: true, name: true, workLevel: true } }
           : { select: { id: true, name: true } },
@@ -78,16 +75,8 @@ export async function POST(req: Request) {
     const role = (session.user as any)?.role ?? "EMPLOYEE";
     const data = schema.parse(await req.json());
 
-    let { rateOverride, billable, activityTypeId } = data;
-    if (!isAdmin(role)) {
-      rateOverride = null;
-      if (activityTypeId) {
-        const act = await prisma.activityType.findUnique({ where: { id: activityTypeId }, select: { billable: true } });
-        billable = act?.billable ?? true;
-      } else {
-        billable = true;
-      }
-    }
+    let { rateOverride } = data;
+    if (!isAdmin(role)) rateOverride = null;
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, userId, requestedUserId);
@@ -98,10 +87,9 @@ export async function POST(req: Request) {
     if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
 
     const entry = await prisma.timeEntry.create({
-      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
+      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { name: true } },
         user: { select: { id: true, name: true } },
       },
     });

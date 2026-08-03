@@ -23,12 +23,10 @@ const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
-  activityTypeId: z.string().optional(),
   date: z.string().min(1, "Verplicht"),
   hours: z.coerce.number().positive("Moet positief zijn"),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
-  billable: z.boolean().optional(),
   userId: z.string().optional(),
 });
 
@@ -48,7 +46,6 @@ function monthBounds(ym: string): { from: string; to: string } {
 
 interface Props {
   projects: any[];
-  activityTypes: any[];
   customers: any[];
   users: any[];
   initialEntries: any[];
@@ -57,11 +54,10 @@ interface Props {
   currentUserLevel: WorkLevel | null;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, activityTypes: activityTypesProp, customers, users, initialEntries, userId, role, currentUserLevel }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
-  const [activityTypes, setActivityTypes] = useState(activityTypesProp);
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +68,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectActivityIds, setNewProjectActivityIds] = useState<string[]>([]);
   const [newProjectSaving, setNewProjectSaving] = useState(false);
 
   const [filterUser, setFilterUser] = useState("all");
@@ -144,7 +139,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: today, billable: true, userId },
+    defaultValues: { date: today, userId },
   });
 
   const selectedProjectId = form.watch("projectId");
@@ -153,15 +148,8 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
   const { matched: matchedProjects, customerless: customerlessProjects } =
     partitionProjectsByCustomer(projects, selectedCustomerId);
 
-  const filteredActivityTypes = activityTypes.filter((a) => {
-    if (a.showInAllProjects) return true;
-    if (!selectedProjectId) return false;
-    return a.projects.some((p: any) => p.projectId === selectedProjectId);
-  });
-
   useEffect(() => {
     form.setValue("projectId", "");
-    form.setValue("activityTypeId", undefined);
   }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When a day is selected in week view, pre-fill the form date
@@ -255,7 +243,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
         body: JSON.stringify({
           name: newProjectName.trim(),
           status: "CONCEPT",
-          activityTypeIds: newProjectActivityIds,
         }),
       });
       if (!res.ok) {
@@ -268,18 +255,9 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
         ...prev,
         { id: created.id, name: created.name, status: "CONCEPT", levelRates: [], customer: null },
       ]);
-      // Make the chosen activities selectable for the new project without a reload.
-      setActivityTypes((prev) =>
-        prev.map((a) =>
-          newProjectActivityIds.includes(a.id)
-            ? { ...a, projects: [...a.projects, { projectId: created.id }] }
-            : a,
-        ),
-      );
       form.setValue("projectId", created.id);
       setNewProjectOpen(false);
       setNewProjectName("");
-      setNewProjectActivityIds([]);
     } finally {
       setNewProjectSaving(false);
     }
@@ -290,7 +268,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
-      activityTypeId: data.activityTypeId || null,
     };
     try {
       if (editing) {
@@ -301,7 +278,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
         });
         if (res.ok) {
           setEditing(null);
-          form.reset({ date: selectedDay ?? today, billable: true, userId });
+          form.reset({ date: selectedDay ?? today, userId });
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
             const updated = await res.json();
@@ -318,7 +295,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
           const targetUser = data.userId ?? userId;
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
-          form.reset({ date: data.date, billable: true, userId: data.userId ?? userId });
+          form.reset({ date: data.date, userId: data.userId ?? userId });
           if (switchedFilter) {
             await handleUserChange(targetUser);
           } else if (viewMode === "week") {
@@ -349,12 +326,10 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
     setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
-      activityTypeId: entry.activityTypeId ?? undefined,
       date: format(new Date(entry.date), "yyyy-MM-dd"),
       hours: Number(entry.hours),
       description: entry.description ?? "",
       rateOverride: entry.rateOverride ? Number(entry.rateOverride) : undefined,
-      billable: entry.billable,
       userId: entry.userId,
     });
   }
@@ -433,27 +408,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
             </div>
 
             <div className="space-y-2">
-              <Label>Activiteit</Label>
-              <Select
-                onValueChange={(v) => {
-                  form.setValue("activityTypeId", v);
-                  const act = activityTypes.find((a) => a.id === v);
-                  form.setValue("billable", act?.billable ?? true);
-                }}
-                value={form.watch("activityTypeId") ?? ""}
-              >
-                <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
-                <SelectContent>
-                  {filteredActivityTypes.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label>Datum *</Label>
               <Input type="date" {...form.register("date")} />
             </div>
@@ -476,19 +430,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
               </div>
             )}
 
-            {isAdmin && (
-              <div className="space-y-2">
-                <Label>Factureerbaar</Label>
-                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ja</SelectItem>
-                    <SelectItem value="false">Nee</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
               <Textarea placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
@@ -502,7 +443,7 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 <Button type="button" variant="outline" onClick={() => {
                   setEditing(null);
                   setSelectedCustomerId("");
-                  form.reset({ date: selectedDay ?? today, billable: true, userId });
+                  form.reset({ date: selectedDay ?? today, userId });
                 }}>Annuleren</Button>
               )}
             </div>
@@ -660,9 +601,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium leading-snug">
                         {entry.project?.name}
-                        {entry.activityType?.name && (
-                          <span className="font-normal"> — {entry.activityType.name}</span>
-                        )}
                         <span className="text-muted-foreground font-normal"> ({entry.project?.customer?.name})</span>
                         {entry.description && (
                           <MessageSquare className="inline h-3 w-3 ml-1.5 text-muted-foreground align-middle" />
@@ -702,7 +640,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                 <TableRow>
                   <TableHead>Datum</TableHead>
                   <TableHead>Project</TableHead>
-                  <TableHead>Activiteit</TableHead>
                   <TableHead>Omschrijving</TableHead>
                   {isAdmin && filterUser === "all" && <TableHead>Medewerker</TableHead>}
                   <TableHead className="text-right">Uren</TableHead>
@@ -712,10 +649,10 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
               </TableHeader>
               <TableBody>
                 {fetching && (
-                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
                 )}
                 {!fetching && entries.length === 0 && (
-                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
                 )}
                 {!fetching && entries.map((entry) => (
                   <TableRow key={entry.id}>
@@ -724,7 +661,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
                       <div className="font-medium">{entry.project?.name}</div>
                       <div className="text-xs text-muted-foreground">{entry.project?.customer?.name}</div>
                     </TableCell>
-                    <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                     <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
                     {isAdmin && filterUser === "all" && (
                       <TableCell className="text-sm">{entry.user?.name ?? "—"}</TableCell>
@@ -763,25 +699,6 @@ export function TimeEntriesClient({ projects: projectsProp, activityTypes: activ
             <div>
               <Label>Naam</Label>
               <Input value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
-            </div>
-            <div>
-              <Label>Activiteiten</Label>
-              <div className="space-y-1">
-                {activityTypes.map((a) => (
-                  <label key={a.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={newProjectActivityIds.includes(a.id)}
-                      onChange={(e) =>
-                        setNewProjectActivityIds((prev) =>
-                          e.target.checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
-                        )
-                      }
-                    />
-                    {a.name}
-                  </label>
-                ))}
-              </div>
             </div>
           </div>
           <DialogFooter>

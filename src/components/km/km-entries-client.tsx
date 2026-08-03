@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,12 +18,10 @@ import { Pencil, Trash2 } from "lucide-react";
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
-  activityTypeId: z.string().optional(),
   date: z.string().min(1, "Verplicht"),
   km: z.coerce.number().positive("Moet positief zijn"),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
-  billable: z.boolean().optional(),
   userId: z.string().optional(),
 });
 
@@ -43,7 +41,6 @@ function monthBounds(ym: string): { from: string; to: string } {
 
 interface Props {
   projects: any[];
-  activityTypes: any[];
   customers: any[];
   users: any[];
   initialEntries: any[];
@@ -52,7 +49,7 @@ interface Props {
   role: string;
 }
 
-export function KmEntriesClient({ projects, activityTypes, customers, users, initialEntries, initialTemplates, userId, role }: Props) {
+export function KmEntriesClient({ projects, customers, users, initialEntries, initialTemplates, userId, role }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [entries, setEntries] = useState(initialEntries);
@@ -74,34 +71,19 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true, userId },
+    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), userId },
   });
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
-  const activityTypeId = form.watch("activityTypeId");
 
   const filteredProjects = selectedCustomerId === ""
     ? projects
     : projects.filter((p) => p.customer?.id === selectedCustomerId);
 
-  const filteredActivityTypes = activityTypes.filter((a) => {
-    if (a.showInAllProjects) return true;
-    if (!selectedProjectId) return false;
-    return a.projects.some((p: any) => p.projectId === selectedProjectId);
-  });
-
-  useEffect(() => {
-    if (!isAdmin) {
-      const act = activityTypes.find((a) => a.id === activityTypeId);
-      form.setValue("billable", act?.billable ?? true);
-    }
-  }, [activityTypeId, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
-
   function changeCustomer(v: string) {
     setSelectedCustomerId(v);
     form.setValue("projectId", "");
-    form.setValue("activityTypeId", undefined);
   }
 
   function applyTemplate(id: string) {
@@ -110,7 +92,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
     if (!t) return;
     setSelectedCustomerId(t.project?.customer?.id ?? "");
     form.setValue("projectId", t.projectId);
-    form.setValue("activityTypeId", t.activityTypeId ?? undefined);
     form.setValue("km", Number(t.km));
     form.setValue("description", t.description ?? "");
   }
@@ -146,7 +127,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
-      activityTypeId: data.activityTypeId || null,
     };
     try {
       if (editing) {
@@ -159,7 +139,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
           const updated = await res.json();
           setEntries((prev) => prev.map((e) => (e.id === editing ? { ...e, ...updated } : e)));
           setEditing(null);
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), userId });
         }
       } else {
         const res = await fetch("/api/km", {
@@ -184,7 +164,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
           if (saveAsTemplate) {
             setPendingTemplate({
               projectId: data.projectId,
-              activityTypeId: data.activityTypeId || null,
               km: data.km,
               description: data.description || null,
             });
@@ -192,7 +171,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
             setTemplateError("");
             setTemplateDialogOpen(true);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId: data.userId ?? userId });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), userId: data.userId ?? userId });
           setAppliedTemplate("");
         }
       }
@@ -238,12 +217,10 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
     setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
-      activityTypeId: entry.activityTypeId ?? undefined,
       date: format(new Date(entry.date), "yyyy-MM-dd"),
       km: Number(entry.km),
       description: entry.description ?? "",
       rateOverride: entry.rateOverride ? Number(entry.rateOverride) : undefined,
-      billable: entry.billable,
       userId: entry.userId,
     });
   }
@@ -318,21 +295,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
             </div>
 
             <div className="space-y-2">
-              <Label>Activiteit</Label>
-              <Select
-                onValueChange={(v) => form.setValue("activityTypeId", v)}
-                value={form.watch("activityTypeId") ?? ""}
-              >
-                <SelectTrigger><SelectValue placeholder="Selecteer activiteit" /></SelectTrigger>
-                <SelectContent>
-                  {filteredActivityTypes.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label>Datum *</Label>
               <Input type="date" {...form.register("date")} />
             </div>
@@ -355,19 +317,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
               </div>
             )}
 
-            {isAdmin && (
-              <div className="space-y-2">
-                <Label>Factureerbaar</Label>
-                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ja</SelectItem>
-                    <SelectItem value="false">Nee</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
               <Textarea placeholder="Bijv. bezoek klant Amsterdam" {...form.register("description")} rows={2} />
@@ -381,7 +330,7 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
                   setSelectedCustomerId("");
                   setAppliedTemplate("");
                   setSaveAsTemplate(false);
-                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, userId });
+                  form.reset({ date: format(new Date(), "yyyy-MM-dd"), userId });
                 }}>Annuleren</Button>
               )}
               {!editing && (
@@ -445,7 +394,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
               <TableRow>
                 <TableHead>Datum</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Activiteit</TableHead>
                 <TableHead>Omschrijving</TableHead>
                 {isAdmin && filterUser === "all" && <TableHead>Medewerker</TableHead>}
                 <TableHead className="text-right">Km</TableHead>
@@ -455,10 +403,10 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
             </TableHeader>
             <TableBody>
               {fetching && (
-                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
               )}
               {!fetching && entries.length === 0 && (
-                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 8 : 7) : 6} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
               {!fetching && entries.map((entry) => (
                 <TableRow key={entry.id}>
@@ -467,7 +415,6 @@ export function KmEntriesClient({ projects, activityTypes, customers, users, ini
                     <div className="font-medium">{entry.project?.name}</div>
                     <div className="text-xs text-muted-foreground">{entry.project?.customer?.name}</div>
                   </TableCell>
-                  <TableCell>{entry.activityType?.name ?? "—"}</TableCell>
                   <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
                   {isAdmin && filterUser === "all" && (
                     <TableCell className="text-sm">{entry.user?.name ?? "—"}</TableCell>

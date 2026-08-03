@@ -8,12 +8,10 @@ import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
   projectId: z.string().min(1),
-  activityTypeId: z.string().optional().nullable(),
   date: z.string(),
   km: z.number().positive(),
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
-  billable: z.boolean().optional(),
   userId: z.string().optional().nullable(),
 });
 
@@ -31,17 +29,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (error) return error;
 
     const data = schema.parse(await req.json());
-    let { rateOverride, billable, activityTypeId } = data;
-
-    if (!isAdmin(role)) {
-      rateOverride = null;
-      if (activityTypeId) {
-        const act = await prisma.activityType.findUnique({ where: { id: activityTypeId }, select: { billable: true } });
-        billable = act?.billable ?? true;
-      } else {
-        billable = true;
-      }
-    }
+    let { rateOverride } = data;
+    if (!isAdmin(role)) rateOverride = null;
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, sessionUserId, requestedUserId);
@@ -52,10 +41,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const entry = await prisma.kmEntry.update({
       where: { id },
-      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { name: true } },
         user: { select: { id: true, name: true } },
       },
     });
