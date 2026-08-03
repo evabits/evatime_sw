@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { isBillable } from "@/lib/billable";
 
 interface Props {
   entries: any[];
@@ -76,7 +77,12 @@ export function ExpenseRows({ entries, total, canEdit, selected, selectableIds, 
                 <TableCell className="text-right font-mono">{formatCurrency(Number(e.amount))}</TableCell>
                 <TableCell>
                   {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
-                  {!e.billable && <Badge variant="secondary" className="text-xs">Niet</Badge>}
+                  {isBillable(e) === null && (
+                    <Badge variant="outline" className="text-xs">Onbekend</Badge>
+                  )}
+                  {isBillable(e) === false && (
+                    <Badge variant="secondary" className="text-xs">Niet</Badge>
+                  )}
                 </TableCell>
                 {canEdit && (
                   <TableCell>

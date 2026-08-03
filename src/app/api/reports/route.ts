@@ -3,6 +3,7 @@ import { canViewReports } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
+import { projectWhereForRequiredProject, projectWhereForOptionalProject } from "@/lib/report-filters";
 
 export async function GET(req: Request) {
   try {
@@ -25,25 +26,14 @@ export async function GET(req: Request) {
       ...(to ? { lte: new Date(to) } : {}),
     };
 
-    const projectFilter = projectId
-      ? { projectId }
-      : customerId || tagIds.length > 0
-      ? {
-          project: {
-            ...(customerId ? { customerId } : {}),
-            ...(tagIds.length > 0 ? { tags: { some: { id: { in: tagIds } } } } : {}),
-          },
-        }
-      : {};
+    const filterParams = { projectId, customerId, tagIds, billable };
 
     const [timeEntries, kmEntries, expenses] = await Promise.all([
       prisma.timeEntry.findMany({
         where: {
           ...(from || to ? { date: dateFilter } : {}),
-          ...projectFilter,
           ...(userId ? { userId } : {}),
-          ...(billable === "true" ? { project: { billable: true } } : {}),
-          ...(billable === "false" ? { project: { billable: false } } : {}),
+          ...projectWhereForRequiredProject(filterParams),
         },
         include: {
           project: {
@@ -62,10 +52,8 @@ export async function GET(req: Request) {
       prisma.kmEntry.findMany({
         where: {
           ...(from || to ? { date: dateFilter } : {}),
-          ...projectFilter,
           ...(userId ? { userId } : {}),
-          ...(billable === "true" ? { project: { billable: true } } : {}),
-          ...(billable === "false" ? { project: { billable: false } } : {}),
+          ...projectWhereForRequiredProject(filterParams),
         },
         include: {
           project: { select: { id: true, name: true, billable: true, defaultKmRate: true, customer: { select: { id: true, name: true } } } },
@@ -76,10 +64,8 @@ export async function GET(req: Request) {
       prisma.expense.findMany({
         where: {
           ...(from || to ? { date: dateFilter } : {}),
-          ...projectFilter,
           ...(userId ? { userId } : {}),
-          ...(billable === "true" ? { project: { billable: true } } : {}),
-          ...(billable === "false" ? { OR: [{ project: { billable: false } }, { projectId: null }] } : {}),
+          ...projectWhereForOptionalProject(filterParams),
         },
         include: {
           category: { select: { id: true, name: true } },
