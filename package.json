@@ -11,7 +11,6 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "backfill:billable": "tsx prisma/backfill-billable.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

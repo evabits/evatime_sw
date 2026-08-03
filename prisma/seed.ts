@@ -18,15 +18,6 @@ async function main() {
   });
   console.log("Created user:", user.email);
 
-  const activityTypes = await Promise.all([
-    prisma.activityType.upsert({ where: { name: "Ontwikkeling" }, update: {}, create: { name: "Ontwikkeling" } }),
-    prisma.activityType.upsert({ where: { name: "Advies" }, update: {}, create: { name: "Advies" } }),
-    prisma.activityType.upsert({ where: { name: "Projectbeheer" }, update: {}, create: { name: "Projectbeheer" } }),
-    prisma.activityType.upsert({ where: { name: "Ontwerp" }, update: {}, create: { name: "Ontwerp" } }),
-    prisma.activityType.upsert({ where: { name: "Support" }, update: {}, create: { name: "Support" } }),
-  ]);
-  console.log("Created", activityTypes.length, "activity types");
-
   await prisma.companySettings.upsert({
     where: { id: "default" },
     update: {},

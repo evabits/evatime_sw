@@ -43,11 +43,11 @@ export default async function DashboardPage() {
         customer: { select: { name: true, levelRates: true } },
         timeEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { hours: true, rateOverride: true, workLevel: true, billable: true, user: { select: { workLevel: true } } },
+          select: { hours: true, rateOverride: true, workLevel: true, user: { select: { workLevel: true } } },
         },
         kmEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { km: true, rateOverride: true, billable: true },
+          select: { km: true, rateOverride: true },
         },
         levelRates: true,
       },

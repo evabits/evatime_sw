@@ -85,7 +85,6 @@ model Project {
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
   levelRates        ProjectLevelRate[]
-  activityLinks     ActivityTypeProject[]
   expenses          Expense[]
   tags              Tag[]
 }
@@ -102,29 +101,6 @@ model Tag {
   name      String    @unique
   createdAt DateTime  @default(now())
   projects  Project[]
-}
-
-model ActivityType {
-  id                String                @id @default(cuid())
-  name              String                @unique
-  billable          Boolean               @default(true)
-  showInAllProjects Boolean               @default(false)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  archivedAt        DateTime?
-  timeEntries       TimeEntry[]
-  kmEntries         KmEntry[]
-  kmTemplates       KmTemplate[]
-  projects          ActivityTypeProject[]
-}
-
-model ActivityTypeProject {
-  activityTypeId String
-  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
-  projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@id([activityTypeId, projectId])
 }
 
 model CustomerLevelRate {
@@ -157,13 +133,10 @@ model TimeEntry {
   user           User          @relation(fields: [userId], references: [id])
   projectId      String
   project        Project       @relation(fields: [projectId], references: [id])
-  activityTypeId String?
-  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   date           DateTime      @db.Date
   hours          Decimal       @db.Decimal(5, 2)
   description    String?
   rateOverride   Decimal?      @db.Decimal(10, 2)
-  billable       Boolean       @default(true)
   workLevel      WorkLevel?
   invoiced       Boolean       @default(false)
   invoiceLineId  String?
@@ -178,13 +151,10 @@ model KmEntry {
   user           User          @relation(fields: [userId], references: [id])
   projectId      String
   project        Project       @relation(fields: [projectId], references: [id])
-  activityTypeId String?
-  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   date           DateTime      @db.Date
   km             Decimal       @db.Decimal(8, 2)
   description    String?
   rateOverride   Decimal?      @db.Decimal(10, 2)
-  billable       Boolean       @default(true)
   invoiced       Boolean       @default(false)
   invoiceLineId  String?
   invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
@@ -199,8 +169,6 @@ model KmTemplate {
   name           String
   projectId      String
   project        Project       @relation(fields: [projectId], references: [id])
-  activityTypeId String?
-  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   km             Decimal       @db.Decimal(8, 2)
   description    String?
   managedByAdmin Boolean       @default(false)
@@ -294,7 +262,6 @@ model Expense {
   amount        Decimal          @db.Decimal(10, 2)
   vatRate       Decimal          @db.Decimal(5, 2) @default(21)
   receiptUrl    String?
-  billable      Boolean          @default(true)
   reimbursable  Boolean          @default(false)
   invoiced      Boolean          @default(false)
   invoiceLineId String?
