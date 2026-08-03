@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError } from "@/lib/api";
+import { handleError, projectMembershipError } from "@/lib/api";
 import { canViewAllEntries, canEditInvoices, isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
 
@@ -85,6 +85,9 @@ export async function POST(req: Request) {
       select: { id: true, workLevel: true },
     });
     if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+
+    const memberError = await projectMembershipError(data.projectId, ownerId);
+    if (memberError) return memberError;
 
     const entry = await prisma.timeEntry.create({
       data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },

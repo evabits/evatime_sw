@@ -2,9 +2,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError, entryMutationError } from "@/lib/api";
+import { handleError, entryMutationError, projectMembershipError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
+import { membershipCheckNeeded } from "@/lib/project-members";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -24,7 +25,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!sessionUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, workLevel: true } });
+    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, workLevel: true, projectId: true } });
     const error = entryMutationError(checkEntryMutation(role, sessionUserId, existing));
     if (error || !existing) return error ?? NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -35,6 +36,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, sessionUserId, requestedUserId);
+
+    if (membershipCheckNeeded(
+      { projectId: existing.projectId, userId: existing.userId },
+      { projectId: data.projectId, userId: ownerId },
+    )) {
+      const memberError = await projectMembershipError(data.projectId, ownerId);
+      if (memberError) return memberError;
+    }
+
     let workLevel = existing.workLevel;
     if (ownerId !== existing.userId) {
       const owner = await prisma.user.findUnique({

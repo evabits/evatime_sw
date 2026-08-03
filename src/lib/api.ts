@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import type { EntryMutationVerdict } from "./entry-owner";
+import { prisma } from "./prisma";
+import { isProjectMember } from "./project-members";
 
 export function handleError(error: unknown) {
   if (error instanceof ZodError) {
@@ -21,4 +23,25 @@ export function entryMutationError(verdict: EntryMutationVerdict): NextResponse 
     );
   }
   return null;
+}
+
+/**
+ * Geeft een 400-response als de eigenaar geen deelnemer is van het project,
+ * en null als de opslag door mag. Een projectloze registratie (een uitgave
+ * zonder project) valt buiten de regel.
+ */
+export async function projectMembershipError(
+  projectId: string | null,
+  ownerId: string,
+): Promise<NextResponse | null> {
+  if (!projectId) return null;
+  const members = await prisma.projectMember.findMany({
+    where: { projectId },
+    select: { userId: true },
+  });
+  if (isProjectMember(members.map((m) => m.userId), ownerId)) return null;
+  return NextResponse.json(
+    { error: "Deze medewerker is geen deelnemer van dit project" },
+    { status: 400 },
+  );
 }
