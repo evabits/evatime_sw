@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
-import { canViewAllEntries, isAdmin } from "@/lib/roles";
+import { canViewAllEntries, canEditInvoices, isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
@@ -31,6 +31,13 @@ export async function GET(req: Request) {
     const role = (session.user as any)?.role ?? "EMPLOYEE";
     const ownerId = canViewAllEntries(role) ? null : session.user?.id;
 
+    // The per-level rate card (and workLevel, which reveals colleagues' levels
+    // once combined with it) is only consumed by the invoice builder, which is
+    // admin-only. Every other caller of this shared endpoint — the /time list,
+    // for any role — never resolves a rate from its response, so withhold both
+    // rather than leak the company's rate table to employees via devtools.
+    const canSeeRates = canEditInvoices(role);
+
     const entries = await prisma.timeEntry.findMany({
       where: {
         ...(ownerId ? { userId: ownerId } : {}),
@@ -41,9 +48,19 @@ export async function GET(req: Request) {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { id: true, name: true, defaultHourlyRate: true, customer: { select: { id: true, name: true } } } },
-        activityType: { select: { id: true, name: true, defaultRate: true } },
-        user: { select: { id: true, name: true } },
+        project: canSeeRates
+          ? {
+              select: {
+                id: true, name: true,
+                levelRates: true,
+                customer: { select: { id: true, name: true, levelRates: true } },
+              },
+            }
+          : { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
+        activityType: { select: { id: true, name: true } },
+        user: canSeeRates
+          ? { select: { id: true, name: true, workLevel: true } }
+          : { select: { id: true, name: true } },
       },
     });
     return NextResponse.json(entries);
@@ -73,13 +90,14 @@ export async function POST(req: Request) {
 
     const { userId: requestedUserId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, userId, requestedUserId);
-    if (ownerId !== userId) {
-      const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
-      if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
-    }
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true, workLevel: true },
+    });
+    if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
 
     const entry = await prisma.timeEntry.create({
-      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, billable: billable ?? true, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
       include: {
         project: { select: { name: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { name: true } },

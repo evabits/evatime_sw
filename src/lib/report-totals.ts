@@ -1,3 +1,5 @@
+import { resolveHourRate } from "./rates";
+
 export type ReportData = {
   timeEntries: any[];
   kmEntries: any[];
@@ -14,9 +16,9 @@ export type EmployeeSummary = {
   weeklyHours: number | null;
 };
 
-/** Uurtarief: override, anders het activiteitstarief, anders het projecttarief. */
-export function timeRate(entry: any): number {
-  return Number(entry.rateOverride ?? entry.activityType?.defaultRate ?? entry.project?.defaultHourlyRate ?? 0);
+/** Uurtarief van een urenregel, of null als er geen te bepalen valt. */
+export function timeRate(entry: any): number | null {
+  return resolveHourRate(entry);
 }
 
 /** Kilometertarief: override, anders het projecttarief. */
@@ -29,7 +31,10 @@ export function reportTotals(data: ReportData) {
   const km = data.kmEntries.reduce((s, e) => s + Number(e.km), 0);
   const expenses = data.expenses.reduce((s, e) => s + Number(e.amount), 0);
   const revenue =
-    data.timeEntries.filter((e) => e.billable).reduce((s, e) => s + Number(e.hours) * timeRate(e), 0) +
+    data.timeEntries.filter((e) => e.billable).reduce((s, e) => {
+      const rate = timeRate(e);
+      return rate == null ? s : s + Number(e.hours) * rate;
+    }, 0) +
     data.kmEntries.filter((e) => e.billable).reduce((s, e) => s + Number(e.km) * kmRate(e), 0) +
     data.expenses.filter((e) => e.billable).reduce((s, e) => s + Number(e.amount), 0);
   return { hours, km, expenses, revenue };
@@ -58,7 +63,8 @@ export function groupByEmployee(
   for (const e of data.timeEntries) {
     const row = bucket(e.user);
     row.hours += Number(e.hours);
-    if (e.billable) row.revenue += Number(e.hours) * timeRate(e);
+    const rate = timeRate(e);
+    if (e.billable && rate != null) row.revenue += Number(e.hours) * rate;
   }
   for (const e of data.kmEntries) {
     const row = bucket(e.user);

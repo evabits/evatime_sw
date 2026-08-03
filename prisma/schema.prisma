@@ -14,6 +14,7 @@ model User {
   password          String?
   role              Role              @default(EMPLOYEE)
   weeklyHours       Decimal?          @db.Decimal(5, 2)
+  workLevel         WorkLevel?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   archivedAt        DateTime?
@@ -33,6 +34,13 @@ enum Role {
   ADMIN
   FINANCE
   EMPLOYEE
+}
+
+enum WorkLevel {
+  PRODUCTION
+  JUNIOR
+  MEDIOR
+  SENIOR
 }
 
 enum ContractType {
@@ -58,6 +66,7 @@ model Customer {
   projects   Project[]
   invoices   Invoice[]
   quotes     Quote[]
+  levelRates CustomerLevelRate[]
 }
 
 model Project {
@@ -67,7 +76,6 @@ model Project {
   name              String
   description       String?
   status            ProjectStatus         @default(ACTIVE)
-  defaultHourlyRate Decimal?              @db.Decimal(10, 2)
   defaultKmRate     Decimal?              @db.Decimal(10, 2)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
@@ -75,7 +83,7 @@ model Project {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
-  activityRates     ProjectActivityRate[]
+  levelRates        ProjectLevelRate[]
   activityLinks     ActivityTypeProject[]
   expenses          Expense[]
   tags              Tag[]
@@ -98,7 +106,6 @@ model Tag {
 model ActivityType {
   id                String                @id @default(cuid())
   name              String                @unique
-  defaultRate       Decimal?              @db.Decimal(10, 2)
   billable          Boolean               @default(true)
   showInAllProjects Boolean               @default(false)
   createdAt         DateTime              @default(now())
@@ -107,7 +114,6 @@ model ActivityType {
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
-  projectRates      ProjectActivityRate[]
   projects          ActivityTypeProject[]
 }
 
@@ -120,16 +126,28 @@ model ActivityTypeProject {
   @@id([activityTypeId, projectId])
 }
 
-model ProjectActivityRate {
-  id             String       @id @default(cuid())
-  projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  activityTypeId String
-  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
-  rate           Decimal      @db.Decimal(10, 2)
-  createdAt      DateTime     @default(now())
+model CustomerLevelRate {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  level      WorkLevel
+  rate       Decimal   @db.Decimal(10, 2)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  @@unique([projectId, activityTypeId])
+  @@unique([customerId, level])
+}
+
+model ProjectLevelRate {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  level     WorkLevel
+  rate      Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([projectId, level])
 }
 
 model TimeEntry {
@@ -145,6 +163,7 @@ model TimeEntry {
   description    String?
   rateOverride   Decimal?      @db.Decimal(10, 2)
   billable       Boolean       @default(true)
+  workLevel      WorkLevel?
   invoiced       Boolean       @default(false)
   invoiceLineId  String?
   invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])

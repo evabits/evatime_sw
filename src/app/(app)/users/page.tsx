@@ -11,7 +11,7 @@ export default async function UsersPage() {
     where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: {
-      id: true, name: true, email: true, role: true, weeklyHours: true,
+      id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
       createdAt: true, archivedAt: true,
     },
   });

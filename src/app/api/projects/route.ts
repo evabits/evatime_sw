@@ -5,26 +5,36 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { projectCreateDenialReason } from "@/lib/projects";
 import { archivedWhere } from "@/lib/archive";
+import { levelRatesField } from "@/lib/rates";
+import { canEditInvoices } from "@/lib/roles";
 
 const schema = z.object({
   customerId: z.string().min(1).optional().nullable(),
   name: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]).default("ACTIVE"),
-  defaultHourlyRate: z.number().positive().optional().nullable(),
   defaultKmRate: z.number().positive().optional().nullable(),
   tags: z.array(z.string()).optional(),
   activityTypeIds: z.array(z.string()).optional(),
+  levelRates: levelRatesField,
 });
 
 export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
     const includeArchived = searchParams.get("includeArchived") === "1";
+
+    // This endpoint is also used by the time-entry form's project dropdown
+    // for every role, so it must stay reachable for everyone — only the
+    // levelRates rate card is withheld from non-admins. Same gate as
+    // GET /api/time and GET /api/customers.
+    const canSeeRates = canEditInvoices(role);
+
     const projects = await prisma.project.findMany({
       where: {
         ...(customerId ? { customerId } : {}),
@@ -36,6 +46,7 @@ export async function GET(req: Request) {
         customer: { select: { name: true } },
         _count: { select: { timeEntries: true, kmEntries: true } },
         tags: { select: { id: true, name: true } },
+        ...(canSeeRates ? { levelRates: true } : {}),
       },
     });
     return NextResponse.json(projects);
@@ -47,9 +58,9 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = (session.user as { role?: string })?.role ?? "EMPLOYEE";
-    const { tags, activityTypeIds, ...rest } = schema.parse(await req.json());
+    const { tags, activityTypeIds, levelRates, ...rest } = schema.parse(await req.json());
 
-    const denial = projectCreateDenialReason(role, rest);
+    const denial = projectCreateDenialReason(role, { ...rest, levelRates });
     if (denial) return NextResponse.json({ error: denial }, { status: 403 });
 
     const project = await prisma.project.create({
@@ -72,6 +83,16 @@ export async function POST(req: Request) {
       },
       include: { tags: { select: { id: true, name: true } } },
     });
-    return NextResponse.json(project, { status: 201 });
+    if (levelRates) {
+      await prisma.$transaction([
+        prisma.projectLevelRate.deleteMany({ where: { projectId: project.id } }),
+        ...levelRates.map((r) =>
+          prisma.projectLevelRate.create({
+            data: { projectId: project.id, level: r.level as any, rate: r.rate },
+          }),
+        ),
+      ]);
+    }
+    return NextResponse.json({ ...project, ...(levelRates ? { levelRates } : {}) }, { status: 201 });
   } catch (e) { return handleError(e); }
 }

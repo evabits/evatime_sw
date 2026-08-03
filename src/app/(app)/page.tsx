@@ -7,6 +7,7 @@ import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { serialize } from "@/lib/utils";
+import { resolveHourRate } from "@/lib/rates";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -38,15 +39,16 @@ export default async function DashboardPage() {
     prisma.project.findMany({
       where: { status: "ACTIVE", archivedAt: null },
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { name: true, levelRates: true } },
         timeEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { hours: true, rateOverride: true, activityType: { select: { defaultRate: true } } },
+          select: { hours: true, rateOverride: true, workLevel: true, billable: true, user: { select: { workLevel: true } } },
         },
         kmEntries: {
           where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
-          select: { km: true, rateOverride: true },
+          select: { km: true, rateOverride: true, billable: true },
         },
+        levelRates: true,
       },
       take: 10,
     }),
@@ -100,11 +102,18 @@ export default async function DashboardPage() {
   const vacRemainingHours = vacBudgetHours - vacUsedHours;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
-    const hourRevenue = project.timeEntries.reduce((s, e) => {
-      const rate = Number(e.rateOverride ?? e.activityType?.defaultRate ?? project.defaultHourlyRate ?? 0);
-      return s + Number(e.hours) * rate;
+    const levelRates = project.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
+    const customerLevelRates = project.customer?.levelRates.map((r) => ({ level: r.level, rate: Number(r.rate) }));
+    const hourRevenue = project.timeEntries.filter((e) => e.billable).reduce((s, e) => {
+      const rate = resolveHourRate({
+        rateOverride: e.rateOverride == null ? null : Number(e.rateOverride),
+        workLevel: e.workLevel,
+        user: e.user,
+        project: { levelRates, customer: project.customer ? { levelRates: customerLevelRates } : null },
+      });
+      return rate == null ? s : s + Number(e.hours) * rate;
     }, 0);
-    const kmRevenue = project.kmEntries.reduce((s, e) => {
+    const kmRevenue = project.kmEntries.filter((e) => e.billable).reduce((s, e) => {
       const rate = Number(e.rateOverride ?? project.defaultKmRate ?? 0);
       return s + Number(e.km) * rate;
     }, 0);

@@ -21,11 +21,21 @@ export function buildBulkWhere(ids: string[]): { id: { in: string[] }; invoiced:
   return { id: { in: ids }, invoiced: false };
 }
 
-export function buildBulkData(action: BulkAction): Record<string, string | boolean> {
+export function buildBulkData(
+  action: BulkAction,
+  opts?: { workLevel?: string | null },
+): Record<string, string | boolean | null> {
   switch (action.type) {
     case "project": return { projectId: action.projectId };
     case "billable": return { billable: action.billable };
-    case "user": return { userId: action.userId };
+    case "user":
+      // Voor tijdregels moet de meegegeven workLevel (het huidige niveau van
+      // de nieuwe eigenaar) mee, anders blijft het tarief van de oude
+      // eigenaar op de regel staan. km/expense kennen geen workLevel, dus
+      // de aanroeper laat opts daar gewoon weg.
+      return opts?.workLevel !== undefined
+        ? { userId: action.userId, workLevel: opts.workLevel }
+        : { userId: action.userId };
     case "delete": throw new Error("buildBulkData is niet bedoeld voor verwijderen");
   }
 }

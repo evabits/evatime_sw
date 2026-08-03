@@ -3,8 +3,8 @@ import { isAdmin } from "./roles";
 export type NewProjectInput = {
   status: string;
   customerId?: string | null;
-  defaultHourlyRate?: number | null;
   defaultKmRate?: number | null;
+  levelRates?: unknown[] | null;
 };
 
 /**
@@ -16,7 +16,7 @@ export function projectCreateDenialReason(role: string, input: NewProjectInput):
   if (isAdmin(role)) return null;
   if (input.status !== "CONCEPT") return "Medewerkers kunnen alleen conceptprojecten aanmaken";
   if (input.customerId) return "Een conceptproject kan geen klant hebben";
-  if (input.defaultHourlyRate != null || input.defaultKmRate != null)
+  if (input.defaultKmRate != null || (input.levelRates?.length ?? 0) > 0)
     return "Een conceptproject kan geen tarieven hebben";
   return null;
 }
