@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { isBillable } from "@/lib/billable";
 import { Pencil, Trash2, Paperclip, Download } from "lucide-react";
 
 const schema = z.object({
@@ -22,7 +23,6 @@ const schema = z.object({
   description: z.string().optional(),
   amount: z.coerce.number().positive("Moet positief zijn"),
   vatRate: z.coerce.number().min(0).max(100),
-  billable: z.boolean(),
   reimbursable: z.boolean(),
   userId: z.string().optional(),
 });
@@ -61,7 +61,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId },
+    defaultValues: { date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId },
   });
 
   async function fetchExpenses(month: string, projectId: string, reimbursable: boolean) {
@@ -104,7 +104,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
           const updated = await res.json();
           setExpenses((prev) => prev.map((e) => (e.id === editing ? updated : e)));
           setEditing(null);
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId });
         }
       } else {
         const res = await fetch("/api/expenses", {
@@ -118,7 +118,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
           if (data.date >= from && data.date <= to && (filterProject === "all" || data.projectId === filterProject)) {
             setExpenses((prev) => [created, ...prev]);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId: data.userId ?? userId });
+          form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId: data.userId ?? userId });
         }
       }
     } finally { setLoading(false); }
@@ -139,7 +139,6 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
       description: expense.description ?? "",
       amount: Number(expense.amount),
       vatRate: Number(expense.vatRate),
-      billable: expense.billable,
       reimbursable: expense.reimbursable,
       userId: expense.userId,
     });
@@ -228,17 +227,6 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
               </div>
 
               <div className="space-y-2">
-                <Label>Factureerbaar</Label>
-                <Select onValueChange={(v) => form.setValue("billable", v === "true")} value={form.watch("billable") ? "true" : "false"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ja</SelectItem>
-                    <SelectItem value="false">Nee</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Declaratie (terugbetaling)</Label>
                 <Select onValueChange={(v) => form.setValue("reimbursable", v === "true")} value={form.watch("reimbursable") ? "true" : "false"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -257,7 +245,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
               <div className="sm:col-span-2 flex gap-2">
                 <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
                 {editing && (
-                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), billable: true, reimbursable: false, vatRate: 21, userId }); }}>Annuleren</Button>
+                  <Button type="button" variant="outline" onClick={() => { setEditing(null); form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId }); }}>Annuleren</Button>
                 )}
               </div>
             </form>
@@ -339,7 +327,8 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
                     <TableCell className="text-right font-mono">{formatCurrency(Number(expense.amount))}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
-                        {expense.billable && <Badge variant="secondary" className="text-xs">Factureerbaar</Badge>}
+                        {isBillable(expense) === null && <Badge variant="outline" className="text-xs">Onbekend</Badge>}
+                        {isBillable(expense) === false && <Badge variant="secondary" className="text-xs">Niet</Badge>}
                         {expense.reimbursable && <Badge variant="outline" className="text-xs">Declaratie</Badge>}
                         {expense.invoiced && <Badge variant="default" className="text-xs">Gefactureerd</Badge>}
                       </div>

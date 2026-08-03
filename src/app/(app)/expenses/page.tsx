@@ -28,7 +28,7 @@ export default async function ExpensesPage() {
       orderBy: { date: "desc" },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, customer: { select: { name: true } } } },
+        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     }),

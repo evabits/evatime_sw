@@ -13,7 +13,6 @@ const schema = z.object({
   description: z.string().optional(),
   amount: z.number().positive(),
   vatRate: z.number().min(0).max(100).default(21),
-  billable: z.boolean().default(true),
   reimbursable: z.boolean().default(false),
   userId: z.string().optional().nullable(),
 });
@@ -56,7 +55,7 @@ export async function GET(req: Request) {
       orderBy: { date: "desc" },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, customer: { select: { name: true } } } },
+        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });
