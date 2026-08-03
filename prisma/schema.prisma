@@ -8,26 +8,27 @@ datasource db {
 }
 
 model User {
-  id                String            @id @default(cuid())
-  name              String
-  email             String            @unique
-  password          String?
-  role              Role              @default(EMPLOYEE)
-  weeklyHours       Decimal?          @db.Decimal(5, 2)
-  workLevel         WorkLevel?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  archivedAt        DateTime?
-  timeEntries       TimeEntry[]
-  kmEntries         KmEntry[]
-  kmTemplates       KmTemplate[]
-  expenses          Expense[]
-  vacationBudgets   VacationBudget[]
-  absenceRequests   AbsenceRequest[] @relation("AbsenceRequests")
-  absenceReviews    AbsenceRequest[] @relation("AbsenceReviewer")
-  contracts         Contract[]
-  reviews           PerformanceReview[] @relation("ReviewSubject")
-  reviewsGiven      PerformanceReview[] @relation("ReviewReviewer")
+  id                  String            @id @default(cuid())
+  name                String
+  email               String            @unique
+  password            String?
+  role                Role              @default(EMPLOYEE)
+  weeklyHours         Decimal?          @db.Decimal(5, 2)
+  workLevel           WorkLevel?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  archivedAt          DateTime?
+  timeEntries         TimeEntry[]
+  kmEntries           KmEntry[]
+  kmTemplates         KmTemplate[]
+  expenses            Expense[]
+  vacationBudgets     VacationBudget[]
+  absenceRequests     AbsenceRequest[] @relation("AbsenceRequests")
+  absenceReviews      AbsenceRequest[] @relation("AbsenceReviewer")
+  contracts           Contract[]
+  reviews             PerformanceReview[] @relation("ReviewSubject")
+  reviewsGiven        PerformanceReview[] @relation("ReviewReviewer")
+  projectMemberships  ProjectMember[]
 }
 
 enum Role {
@@ -85,6 +86,7 @@ model Project {
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
   levelRates        ProjectLevelRate[]
+  members           ProjectMember[]
   expenses          Expense[]
   tags              Tag[]
 }
@@ -125,6 +127,16 @@ model ProjectLevelRate {
   updatedAt DateTime  @updatedAt
 
   @@unique([projectId, level])
+}
+
+model ProjectMember {
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([projectId, userId])
 }
 
 model TimeEntry {
