@@ -655,6 +655,55 @@ git commit -m "refactor: drop activities from templates, reports and dashboard"
 
 ---
 
+## Task 7b: De Uitgaven-pagina
+
+Toegevoegd tijdens de uitvoering. Een review van Task 7 vond dat `/expenses` in geen enkele
+takenlijst stond, terwijl het scherm een eigen Factureerbaar-keuzelijst heeft die sinds Task 4
+niets meer doet, en `POST /api/expenses` nog naar de kolom schrijft die Task 10 laat vallen.
+Zonder deze taak compileert Task 10 niet.
+
+**Files:**
+- Modify: `src/app/(app)/expenses/page.tsx`, `src/components/expenses/expenses-client.tsx`, `src/app/api/expenses/route.ts`, `src/app/api/expenses/[id]/route.ts`
+
+- [ ] **Step 1: Haal het veld uit het formulier**
+
+In `src/components/expenses/expenses-client.tsx`: verwijder `billable` uit het zod-schema, uit
+`defaultValues`, uit alle drie de `form.reset(...)`-aanroepen, uit het vullen van het
+bewerkformulier in `startEdit`, uit de opslag-payload, en verwijder het hele Factureerbaar-
+`<div className="space-y-2">`-blok met zijn `<Select>`.
+
+- [ ] **Step 2: Zet de badge op de nieuwe bron**
+
+De regel `{expense.billable && <Badge variant="secondary" className="text-xs">Factureerbaar</Badge>}`
+leest een veld dat niet meer klopt. Vervang hem door dezelfde drie-standen-behandeling als in
+`src/components/reports/expense-rows.tsx`: `Onbekend` bij `null`, `Niet` bij `false`, niets bij
+`true`. Voeg daarvoor `billable: true` toe aan de `project`-select van de query in
+`src/app/(app)/expenses/page.tsx`, en controleer of `GET /api/expenses` — die de lijst herlaadt
+na een filterwissel — hem ook meelevert; zo niet, voeg hem daar ook toe.
+
+- [ ] **Step 3: Haal het uit de twee routes**
+
+Verwijder `billable` uit het zod-schema en uit de `create`-data van `POST /api/expenses`, en uit
+het schema en de `update`-data van `PUT /api/expenses/[id]`. Task 7 maakte dat laatste veld
+`.optional()` als tijdelijke brug voor twee aanroepers; die brug is nu overbodig.
+
+- [ ] **Step 4: Controleer**
+
+Run: `source ~/.nvm/nvm.sh && nvm use 20 && npm test && npm run lint && npx tsc --noEmit`
+Expected: tests groen; lint lager dan de baseline; tsc 0.
+
+Run: `grep -rn "billable" src/components/expenses src/app/api/expenses "src/app/(app)/expenses"`
+Expected: alleen nog `isBillable`-aanroepen en de `billable: true` in de project-select.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/components/expenses src/app/api/expenses "src/app/(app)/expenses"
+git commit -m "refactor: drop the per-entry billable field from the expenses page"
+```
+
+---
+
 ## Task 8: De bulkactie Factureerbaar
 
 **Files:**
