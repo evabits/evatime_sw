@@ -52,11 +52,12 @@ export async function GET(req: Request) {
           ? {
               select: {
                 id: true, name: true,
+                billable: true,
                 levelRates: true,
                 customer: { select: { id: true, name: true, levelRates: true } },
               },
             }
-          : { select: { id: true, name: true, customer: { select: { id: true, name: true } } } },
+          : { select: { id: true, name: true, billable: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { id: true, name: true } },
         user: canSeeRates
           ? { select: { id: true, name: true, workLevel: true } }

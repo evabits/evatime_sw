@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { resolveHourRate, effectiveWorkLevel } from "@/lib/rates";
+import { isBillable } from "@/lib/billable";
 import { WORK_LEVEL_LABELS } from "@/lib/work-levels";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -49,8 +50,8 @@ export function NewInvoiceClient({ customers }: Props) {
       fetch(`/api/time?customerId=${customerId}`).then((r) => r.json()),
       fetch(`/api/km?customerId=${customerId}`).then((r) => r.json()),
     ]).then(([time, km]) => {
-      setUnbilledTime(time.filter((e: any) => !e.invoiced && e.billable));
-      setUnbilledKm(km.filter((e: any) => !e.invoiced && e.billable));
+      setUnbilledTime(time.filter((e: any) => !e.invoiced && isBillable(e) === true));
+      setUnbilledKm(km.filter((e: any) => !e.invoiced && isBillable(e) === true));
     });
   }, [customerId]);
 
@@ -78,7 +79,7 @@ export function NewInvoiceClient({ customers }: Props) {
     if (withRate.length > 0) {
       const grouped = new Map<string, typeof withRate>();
       withRate.forEach((e) => {
-        const key = `${e.activityType?.name ?? "Werkzaamheden"}|${resolveHourRate(e)}`;
+        const key = `${e.project?.name ?? "Werkzaamheden"}|${resolveHourRate(e)}`;
         if (!grouped.has(key)) grouped.set(key, []);
         grouped.get(key)!.push(e);
       });

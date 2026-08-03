@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       },
       orderBy: { date: "desc" },
       include: {
-        project: { select: { id: true, name: true, defaultKmRate: true, customer: { select: { id: true, name: true } } } },
+        project: { select: { id: true, name: true, billable: true, defaultKmRate: true, customer: { select: { id: true, name: true } } } },
         activityType: { select: { id: true, name: true } },
         user: { select: { id: true, name: true } },
       },
