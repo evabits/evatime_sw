@@ -88,25 +88,21 @@ export async function POST(req: Request) {
         ),
       ]);
     }
-    // De aanmaker moet erop kunnen boeken; anders levert het knopje in het
-    // urenformulier een project op dat voor hem onbruikbaar is. Dit geldt
-    // ongeacht een meegestuurde memberIds — de unie hieronder zorgt dat de
-    // aanmaker nooit buiten de boot valt, ook niet als de aanroeper hem
-    // vergeet of expliciet weglaat.
-    await prisma.projectMember.create({
-      data: { projectId: project.id, userId: session.user!.id! },
-    });
-    const finalMemberIds = memberIds
-      ? Array.from(new Set([...memberIds, session.user!.id!]))
-      : [session.user!.id!];
-    if (memberIds) {
-      await prisma.$transaction([
-        prisma.projectMember.deleteMany({ where: { projectId: project.id } }),
-        ...finalMemberIds.map((userId) =>
-          prisma.projectMember.create({ data: { projectId: project.id, userId } }),
-        ),
-      ]);
-    }
+    // De aanmaker moet een bare conceptproject wel kunnen boeken; anders
+    // levert het knopje in het urenformulier iets onbruikbaars op. Die
+    // default geldt alleen wanneer er geen echte memberIds is meegestuurd
+    // (ontbrekend of leeg) — projectCreateDenialReason weigert een niet-admin
+    // sowieso bij een niet-lege memberIds, dus alleen een admin kan hier een
+    // bewuste lijst meesturen, en die wordt dan exact overgenomen (ook als de
+    // admin zichzelf daar niet in heeft opgenomen). Eén transactie: de
+    // aanmaker wordt nooit apart, buiten de opgeslagen set om, toegevoegd.
+    const finalMemberIds =
+      memberIds && memberIds.length > 0 ? memberIds : [session.user!.id!];
+    await prisma.$transaction(
+      finalMemberIds.map((userId) =>
+        prisma.projectMember.create({ data: { projectId: project.id, userId } }),
+      ),
+    );
     return NextResponse.json(
       { ...project, ...(levelRates ? { levelRates } : {}), members: finalMemberIds.map((userId) => ({ userId })) },
       { status: 201 },
