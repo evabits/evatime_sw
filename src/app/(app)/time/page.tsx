@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { serialize } from "@/lib/utils";
 import { isAdmin } from "@/lib/roles";
+import { toWeekSchedule } from "@/lib/work-schedule";
 import { TimeEntriesClient } from "@/components/time/time-entries-client";
 
 export default async function TimePage() {
@@ -66,6 +67,13 @@ export default async function TimePage() {
     ? (users.find((u) => u.id === userId)?.workLevel ?? null)
     : ((await prisma.user.findUnique({ where: { id: userId }, select: { workLevel: true } }))?.workLevel ?? null);
 
+  // Het rooster van de INGELOGDE gebruiker. De weekweergave is één raster, niet
+  // één per persoon, dus een admin die andermans uren bekijkt ziet zijn eigen
+  // vrije dagen gemarkeerd. Zonder rooster verandert er niets.
+  const eigenRooster = userId
+    ? await prisma.workSchedule.findUnique({ where: { userId } })
+    : null;
+
   return (
     <TimeEntriesClient
       projects={serialize(projects)}
@@ -75,6 +83,7 @@ export default async function TimePage() {
       userId={userId}
       role={role}
       currentUserLevel={currentUserLevel}
+      workSchedule={toWeekSchedule(eigenRooster)}
     />
   );
 }

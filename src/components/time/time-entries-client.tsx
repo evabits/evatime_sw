@@ -18,6 +18,7 @@ import { partitionProjectsByCustomer } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
+import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
@@ -55,9 +56,10 @@ interface Props {
   userId: string;
   role: string;
   currentUserLevel: WorkLevel | null;
+  workSchedule: WeekSchedule | null;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
@@ -565,6 +567,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   const isToday = dayStr === today;
                   const isSelected = selectedDay === dayStr;
                   const h = hoursPerDay[i];
+                  // Alleen markeren als er ook niets geboekt is: boekte je toch
+                  // uren op je vrije dag, dan is dát de informatie die telt.
+                  const vrijeDag = workSchedule !== null && scheduledHoursOn(workSchedule, dayStr) === 0 && h === 0;
                   return (
                     <button
                       key={dayStr}
@@ -581,7 +586,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                         {DAY_ABBR[i]} {format(day, "d")}
                       </span>
                       <span className={cn("text-sm tabular-nums mt-1", h === 0 ? "text-muted-foreground" : "font-medium")}>
-                        {formatHours(h)}
+                        {vrijeDag ? "vrij" : formatHours(h)}
                       </span>
                     </button>
                   );
