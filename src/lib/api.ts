@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import type { EntryMutationVerdict } from "./entry-owner";
 import { prisma } from "./prisma";
 import { isProjectMember } from "./project-members";
+import { canonicalizeTagNames } from "./tags";
 
 export function handleError(error: unknown) {
   if (error instanceof ZodError) {
@@ -92,4 +93,15 @@ export async function findTagByName(name: string): Promise<{ id: string; name: s
     where: { name: { equals: name.trim(), mode: "insensitive" } },
     select: { id: true, name: true },
   });
+}
+
+/**
+ * Haalt de bestaande tagnamen op en laat `canonicalizeTagNames` bepalen welke
+ * namen er opgeslagen moeten worden. Eén query voor de hele set — er zijn
+ * hooguit enkele tientallen tags, dus per naam opzoeken zou verspilling zijn.
+ */
+export async function resolveTagNames(names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const bestaande = await prisma.tag.findMany({ select: { name: true } });
+  return canonicalizeTagNames(names, bestaande.map((t) => t.name));
 }

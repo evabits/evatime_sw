@@ -18,3 +18,27 @@ export function normalizeTagName(name: string): string {
 export function isReservedTagName(name: string): boolean {
   return normalizeTagName(name) === RESERVED_TAG_NAME;
 }
+
+/**
+ * Zet ingetypte tagnamen om naar de namen die daadwerkelijk opgeslagen moeten
+ * worden: bestaat er al een tag met dezelfde genormaliseerde naam, dan wint de
+ * BESTAANDE schrijfwijze. Zo levert "Marketing" naast een bestaande "marketing"
+ * een koppeling op in plaats van een tweede tag.
+ *
+ * Ontdubbelt op de genormaliseerde sleutel, niet op de letterlijke tekst — anders
+ * maakt één opslagactie waarin iemand "EFRO" en "efro" typt alsnog twee tags.
+ */
+export function canonicalizeTagNames(input: string[], existing: string[]): string[] {
+  const perSleutel = new Map<string, string>();
+  for (const naam of existing) {
+    perSleutel.set(normalizeTagName(naam), naam);
+  }
+  const uit = new Map<string, string>();
+  for (const ruw of input) {
+    const naam = ruw.trim();
+    if (!naam) continue;
+    const sleutel = normalizeTagName(naam);
+    if (!uit.has(sleutel)) uit.set(sleutel, perSleutel.get(sleutel) ?? naam);
+  }
+  return [...uit.values()];
+}

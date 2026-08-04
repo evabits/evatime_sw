@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError, projectNameTakenError } from "@/lib/api";
+import { handleError, projectNameTakenError, resolveTagNames } from "@/lib/api";
 import { projectCreateDenialReason } from "@/lib/projects";
 import { archivedWhere } from "@/lib/archive";
 import { levelRatesField } from "@/lib/rates";
@@ -67,13 +67,17 @@ export async function POST(req: Request) {
     const nameError = await projectNameTakenError(rest.name);
     if (nameError) return nameError;
 
+    // Het tagveld is vrije tekst en connectOrCreate matcht exact; zonder deze
+    // stap levert "Marketing" naast een bestaande "marketing" een tweede tag op.
+    const tagNamen = tags ? await resolveTagNames(tags) : undefined;
+
     const project = await prisma.project.create({
       data: {
         ...rest,
-        ...(tags && tags.length > 0
+        ...(tagNamen && tagNamen.length > 0
           ? {
               tags: {
-                connectOrCreate: tags.map((name) => ({ where: { name }, create: { name } })),
+                connectOrCreate: tagNamen.map((name) => ({ where: { name }, create: { name } })),
               },
             }
           : {}),

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError, projectNameTakenError } from "@/lib/api";
+import { handleError, projectNameTakenError, resolveTagNames } from "@/lib/api";
 import { levelRatesField } from "@/lib/rates";
 import { isAdmin } from "@/lib/roles";
 
@@ -55,15 +55,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { tags, levelRates, memberIds, ...rest } = schema.parse(await req.json());
     const nameError = await projectNameTakenError(rest.name, id);
     if (nameError) return nameError;
+    const tagNamen = tags ? await resolveTagNames(tags) : undefined;
     const project = await prisma.project.update({
       where: { id },
       data: {
         ...rest,
         tags: {
           set: [],
-          ...(tags && tags.length > 0
+          ...(tagNamen && tagNamen.length > 0
             ? {
-                connectOrCreate: tags.map((name) => ({
+                connectOrCreate: tagNamen.map((name) => ({
                   where: { name },
                   create: { name },
                 })),
