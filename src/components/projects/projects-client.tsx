@@ -65,6 +65,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   // silently lock everyone out of the project.
   const [memberIdsKnown, setMemberIdsKnown] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
+  const [tagActie, setTagActie] = useState<"add" | "remove" | null>(null);
+  const [tagKeuze, setTagKeuze] = useState("");
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -253,6 +255,32 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     loadProjects(showArchived);
   }
 
+  async function applyTag() {
+    if (!tagActie || !tagKeuze) return;
+    // selectedVisible, niet selected: wie eerst aanvinkt en daarna het filter
+    // wijzigt, mag geen project taggen dat hij niet meer ziet staan.
+    const ids = selectedVisible.map((p) => p.id);
+    const res = await fetch("/api/projects/bulk-tag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, tagId: tagKeuze, action: tagActie }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(body.error ?? `Fout ${res.status}`);
+      return;
+    }
+    if (body.count < ids.length) {
+      // Een project dat de tag al had (of juist niet had) verandert niet. Zonder
+      // deze melding leest "8 geselecteerd, 3 gewijzigd" als een fout.
+      const woord = tagActie === "add" ? "had de tag al" : "had de tag niet";
+      alert(`${body.count} van de ${ids.length} projecten bijgewerkt; de rest ${woord}.`);
+    }
+    setTagActie(null);
+    setTagKeuze("");
+    loadProjects(showArchived);
+  }
+
   // Eén lijst waar de tabel, de kopcheckbox én de bulkknop uit lezen, zodat
   // "selecteer alles" nooit meer archiveert dan er op het scherm staat.
   const visible = projects
@@ -295,6 +323,16 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               <SelectItem value="COMPLETED">Afgerond</SelectItem>
             </SelectContent>
           </Select>
+          {selectedVisible.length > 0 && (
+            <>
+              <Button variant="outline" onClick={() => { setTagActie("add"); setTagKeuze(""); }}>
+                Tag toevoegen ({selectedVisible.length})
+              </Button>
+              <Button variant="outline" onClick={() => { setTagActie("remove"); setTagKeuze(""); }}>
+                Tag verwijderen ({selectedVisible.length})
+              </Button>
+            </>
+          )}
           {selectedVisible.length > 0 && (
             <Button variant="destructive" onClick={archiveSelected}>
               Archiveer geselecteerde ({selectedVisible.length})
@@ -556,6 +594,36 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tagActie !== null} onOpenChange={(o) => { if (!o) setTagActie(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {tagActie === "add" ? "Tag toevoegen" : "Tag verwijderen"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {selectedVisible.length} geselecteerde project(en).
+              {tagActie === "add"
+                ? " Bestaande tags van die projecten blijven staan."
+                : " Alleen deze tag wordt verwijderd."}
+            </p>
+            <Select onValueChange={setTagKeuze} value={tagKeuze}>
+              <SelectTrigger><SelectValue placeholder="Kies een tag" /></SelectTrigger>
+              <SelectContent>
+                {allTags.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTagActie(null)}>Annuleren</Button>
+            <Button onClick={applyTag} disabled={!tagKeuze}>
+              {tagActie === "add" ? "Toevoegen" : "Verwijderen"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
