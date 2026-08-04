@@ -16,8 +16,19 @@ import { Plus, Pencil, Copy, Trash2, RotateCcw } from "lucide-react";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
 import { isReservedTagName } from "@/lib/tags";
 
+/**
+ * Radix laat een lege string niet toe als waarde van een SelectItem — die is
+ * gereserveerd voor "niets gekozen". Vandaar een sentinel die bij het opslaan
+ * weer een lege string wordt, en verderop een null.
+ */
+const GEEN_KLANT = "__geen_klant__";
+
 const schema = z.object({
-  customerId: z.string().min(1, "Verplicht"),
+  // Optioneel, net als in POST /api/projects: klantloze projecten bestaan echt
+  // — het conceptproject-knopje in het urenformulier maakt ze, en de
+  // verlofprojecten hebben er per definitie geen. Zolang dit veld verplicht was,
+  // kon zo'n project wel aangemaakt maar nooit meer bewerkt worden.
+  customerId: z.string().optional(),
   name: z.string().min(1, "Verplicht"),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
@@ -97,6 +108,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     setServerError("");
     const payload = {
       ...data,
+      customerId: data.customerId || null,
       defaultKmRate: data.defaultKmRate === "" ? null : data.defaultKmRate || null,
       tags: selectedTags.map((t) => t.name),
       // Omit levelRates entirely when we never loaded the project's current rates
@@ -468,12 +480,17 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
-              <Label>Klant *</Label>
-              <Select onValueChange={(v) => form.setValue("customerId", v)} value={form.watch("customerId")}>
-                <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
-                <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              <Label>Klant</Label>
+              <Select
+                onValueChange={(v) => form.setValue("customerId", v === GEEN_KLANT ? "" : v)}
+                value={form.watch("customerId") || GEEN_KLANT}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={GEEN_KLANT}>Geen klant</SelectItem>
+                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
               </Select>
-              {form.formState.errors.customerId && <p className="text-xs text-destructive">{form.formState.errors.customerId.message}</p>}
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Projectnaam *</Label>

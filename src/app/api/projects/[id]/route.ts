@@ -7,7 +7,11 @@ import { levelRatesField } from "@/lib/rates";
 import { isAdmin } from "@/lib/roles";
 
 const schema = z.object({
-  customerId: z.string().min(1),
+  // Optioneel en nullable, gelijk aan POST /api/projects. Klantloze projecten
+  // ontstaan echt — via het conceptproject-knopje in het urenformulier, en de
+  // verlofprojecten hebben er per definitie geen — maar zolang PUT hier een
+  // klant eiste, kon zo'n project wel aangemaakt maar nooit meer bewerkt worden.
+  customerId: z.string().min(1).optional().nullable(),
   name: z.string().trim().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]),
