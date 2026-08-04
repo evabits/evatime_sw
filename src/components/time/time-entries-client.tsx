@@ -569,7 +569,16 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   const h = hoursPerDay[i];
                   // Alleen markeren als er ook niets geboekt is: boekte je toch
                   // uren op je vrije dag, dan is dát de informatie die telt.
-                  const vrijeDag = workSchedule !== null && scheduledHoursOn(workSchedule, dayStr) === 0 && h === 0;
+                  // En alleen wanneer het raster ook echt eigen uren toont (niet
+                  // andermans, gefilterd of niet) en op een werkdag (het weekend
+                  // heeft geen vaste vrije dag, dat is gewoon niemands werkdag).
+                  const eigenRooster = !isAdmin || filterUser === userId;
+                  const vrijeDag =
+                    eigenRooster &&
+                    i < 5 &&
+                    workSchedule !== null &&
+                    scheduledHoursOn(workSchedule, dayStr) === 0 &&
+                    h === 0;
                   return (
                     <button
                       key={dayStr}

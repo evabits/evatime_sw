@@ -29,7 +29,7 @@ export function WorkScheduleClient({ employeeId, initialSchedule, weeklyHours }:
   const [fout, setFout] = useState("");
 
   const totaal = weekTotal(rooster);
-  const wijktAf = weeklyHours !== null && Math.round(totaal * 100) !== Math.round(weeklyHours * 100);
+  const wijktAf = bestaat && weeklyHours !== null && Math.round(totaal * 100) !== Math.round(weeklyHours * 100);
 
   async function opslaan() {
     setLoading(true);
@@ -102,6 +102,12 @@ export function WorkScheduleClient({ employeeId, initialSchedule, weeklyHours }:
         <p className="text-sm">
           <span className="font-medium tabular-nums">{totaal.toFixed(2)}</span> uur per week
         </p>
+
+        {!bestaat && (
+          <p className="text-sm text-muted-foreground">
+            Nog geen rooster ingesteld — deze medewerker valt terug op de standaardberekening.
+          </p>
+        )}
 
         {wijktAf && (
           <p className="text-sm text-muted-foreground">
