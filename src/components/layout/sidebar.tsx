@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   CalendarCheck,
   Umbrella,
+  MessageSquare,
   Menu,
   X,
   Wallet,
@@ -57,6 +58,13 @@ const navGroups: NavGroup[] = [
       { href: "/expenses", label: "Uitgaven", icon: Receipt },
       { href: "/absence", label: "Afwezigheid", icon: Umbrella },
       { href: "/uren-overzicht", label: "Uren Overzicht", icon: CalendarCheck },
+    ],
+  },
+  {
+    label: "Team",
+    roles: ["ADMIN", "TEAMLEAD"],
+    items: [
+      { href: "/standup", label: "StandUp", icon: MessageSquare },
     ],
   },
   {
