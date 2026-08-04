@@ -23,6 +23,7 @@ export const ROLES = {
       createEditInvoices: true,
       viewInvoices: "all" as const,      // DRAFT / SENT / PAID / CANCELLED
       viewReports: true,
+      leadStandup: true,
     },
   },
   FINANCE: {
@@ -42,6 +43,31 @@ export const ROLES = {
       createEditInvoices: false,
       viewInvoices: "sent_paid" as const,
       viewReports: true,
+      leadStandup: false,
+    },
+  },
+  TEAMLEAD: {
+    label: "Teamleider",
+    description:
+      "Leads the daily standup: sees the previous working day's hours for every active " +
+      "employee and records a note per team member. Manages own time, km and expenses. " +
+      "No invoice, report or admin access.",
+    can: {
+      manageUsers: false,
+      manageSettings: false,
+      manageExpenseCategories: false,
+      // Let op: false slaat op de /time- en /km-schermen, waar een teamleider
+      // alleen zijn eigen regels ziet. Via /standup ziet hij wél de geboekte
+      // uren van iedereen, maar uitsluitend van één dag en zonder tarieven.
+      viewAllTimeKm: false,
+      manageAllTimeKm: false,
+      viewAllExpenses: false,
+      viewAllReimbursableExpenses: false,
+      manageAllExpenses: false,
+      createEditInvoices: false,
+      viewInvoices: "none" as const,
+      viewReports: false,
+      leadStandup: true,
     },
   },
   EMPLOYEE: {
@@ -60,6 +86,7 @@ export const ROLES = {
       createEditInvoices: false,
       viewInvoices: "none" as const,
       viewReports: false,
+      leadStandup: false,
     },
   },
 } as const;
@@ -102,4 +129,8 @@ export function canViewReimbursements(role: string): boolean {
 
 export function getRoleLabel(role: string): string {
   return ROLES[role as RoleKey]?.label ?? role;
+}
+
+export function canLeadStandup(role: string): boolean {
+  return role === "ADMIN" || role === "TEAMLEAD";
 }

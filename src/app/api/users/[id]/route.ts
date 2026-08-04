@@ -9,7 +9,7 @@ import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
 const updateSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
+  role: z.enum(["ADMIN", "FINANCE", "TEAMLEAD", "EMPLOYEE"]),
   password: z.string().min(8).optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,

@@ -29,11 +29,14 @@ model User {
   reviews             PerformanceReview[] @relation("ReviewSubject")
   reviewsGiven        PerformanceReview[] @relation("ReviewReviewer")
   projectMemberships  ProjectMember[]
+  standupsLed         Standup[]           @relation("StandupLeader")
+  standupNotes        StandupNote[]       @relation("StandupSubject")
 }
 
 enum Role {
   ADMIN
   FINANCE
+  TEAMLEAD
   EMPLOYEE
 }
 
@@ -103,6 +106,32 @@ model Tag {
   name      String    @unique
   createdAt DateTime  @default(now())
   projects  Project[]
+}
+
+model Standup {
+  id        String        @id @default(cuid())
+  // Uniek: één standup per dag, ongeacht wie hem leidt. Openen twee teamleiders
+  // dezelfde ochtend het scherm, dan werken ze aan dezelfde bijeenkomst in plaats
+  // van aan twee losse — anders raken de notities over twee records verspreid.
+  date      DateTime      @unique @db.Date
+  ledById   String
+  ledBy     User          @relation("StandupLeader", fields: [ledById], references: [id])
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  notes     StandupNote[]
+}
+
+model StandupNote {
+  id        String   @id @default(cuid())
+  standupId String
+  standup   Standup  @relation(fields: [standupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation("StandupSubject", fields: [userId], references: [id], onDelete: Cascade)
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([standupId, userId])
 }
 
 model CustomerLevelRate {

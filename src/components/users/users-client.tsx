@@ -15,12 +15,13 @@ import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
 import { WORK_LEVEL_ORDER, WORK_LEVEL_LABELS } from "@/lib/work-levels";
+import { getRoleLabel } from "@/lib/roles";
 
 const createSchema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres"),
   password: z.string().min(8, "Minimaal 8 tekens"),
-  role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
+  role: z.enum(["ADMIN", "FINANCE", "TEAMLEAD", "EMPLOYEE"]),
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,
 });
@@ -28,7 +29,7 @@ const createSchema = z.object({
 const editSchema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres"),
-  role: z.enum(["ADMIN", "FINANCE", "EMPLOYEE"]),
+  role: z.enum(["ADMIN", "FINANCE", "TEAMLEAD", "EMPLOYEE"]),
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,
@@ -41,7 +42,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "FINANCE" | "EMPLOYEE";
+  role: "ADMIN" | "FINANCE" | "TEAMLEAD" | "EMPLOYEE";
   weeklyHours: number | null;
   workLevel: string | null;
   createdAt: string;
@@ -199,7 +200,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
-                      {user.role === "ADMIN" ? "Beheerder" : user.role === "FINANCE" ? "Financieel" : "Medewerker"}
+                      {getRoleLabel(user.role)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right font-mono">
@@ -268,6 +269,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="EMPLOYEE">Medewerker</SelectItem>
+                        <SelectItem value="TEAMLEAD">Teamleider</SelectItem>
                         <SelectItem value="FINANCE">Financieel</SelectItem>
                         <SelectItem value="ADMIN">Beheerder</SelectItem>
                       </SelectContent>
@@ -330,6 +332,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="EMPLOYEE">Medewerker</SelectItem>
+                    <SelectItem value="TEAMLEAD">Teamleider</SelectItem>
                     <SelectItem value="ADMIN">Beheerder</SelectItem>
                   </SelectContent>
                 </Select>
