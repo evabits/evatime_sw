@@ -707,6 +707,22 @@ Er is geen backfill en er wordt niets verwijderd.
 ramp: hernoem de botsende projecten in de app en draai opnieuw. Gemeten op 2026-08-04 waren er 25
 projecten met 0 dubbele namen, hoofdletterongevoelig en getrimd vergeleken.
 
+## Bekend en bewust blijven staan
+
+Drie punten die de reviews vonden, die zijn afgewogen en niet in dit traject zijn opgelost:
+
+- **`fillForm` wist `serverError` niet** (`src/components/projects/projects-client.tsx`). Sluit je de
+  projectdialoog met Escape, de overlay of het kruisje, dan loopt dat niet via `close()`, en zie je
+  bij het volgende openen van bewerken of kopiëren nog de vorige foutmelding staan. Cosmetisch,
+  geen dataverlies. De fix is één regel: `setServerError("")` toevoegen aan `fillForm`.
+- **Een project zonder deelnemers kopiëren levert een kopie mét een deelnemer op.**
+  `POST /api/projects` behandelt een lege `memberIds` als afwezig en valt dan terug op de aanmaker
+  (`src/app/api/projects/route.ts:98-104`). Dat gedrag bestaat sinds traject 2 en is daar bewust zo
+  gekozen voor het conceptproject-knopje; voor kopiëren pakt het verrassend uit.
+- **De client stuurt de projectnaam ongetrimd.** Het zod-schema op de server trimt hem wel, dus de
+  opgeslagen naam en de uniciteitstoets kloppen. Alleen de melding "verplicht" van het formulier
+  slaat niet aan bij een naam die alleen uit spaties bestaat.
+
 Handmatig na te lopen na de deploy:
 
 - [ ] Een project hernoemen naar de naam van een ander project → `Er bestaat al een project met deze naam`.
