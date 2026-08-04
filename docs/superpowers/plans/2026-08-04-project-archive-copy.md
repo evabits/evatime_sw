@@ -709,12 +709,8 @@ projecten met 0 dubbele namen, hoofdletterongevoelig en getrimd vergeleken.
 
 ## Bekend en bewust blijven staan
 
-Drie punten die de reviews vonden, die zijn afgewogen en niet in dit traject zijn opgelost:
+Twee punten die de reviews vonden, die zijn afgewogen en niet in dit traject zijn opgelost:
 
-- **`fillForm` wist `serverError` niet** (`src/components/projects/projects-client.tsx`). Sluit je de
-  projectdialoog met Escape, de overlay of het kruisje, dan loopt dat niet via `close()`, en zie je
-  bij het volgende openen van bewerken of kopiëren nog de vorige foutmelding staan. Cosmetisch,
-  geen dataverlies. De fix is één regel: `setServerError("")` toevoegen aan `fillForm`.
 - **Een project zonder deelnemers kopiëren levert een kopie mét een deelnemer op.**
   `POST /api/projects` behandelt een lege `memberIds` als afwezig en valt dan terug op de aanmaker
   (`src/app/api/projects/route.ts:98-104`). Dat gedrag bestaat sinds traject 2 en is daar bewust zo

@@ -165,6 +165,10 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   // hebben; al het andere is identiek en hoort daarom in één functie, zodat een
   // nieuw veld niet in één van de twee vergeten kan worden.
   function fillForm(project: any, name: string, customerId: string) {
+    // Escape, de overlay en het kruisje sluiten de dialoog buiten close() om, dus
+    // een foutmelding van een vorige poging blijft anders staan als je daarna een
+    // ander project opent.
+    setServerError("");
     setSelectedTags(project.tags ?? []);
     form.reset({
       customerId,
