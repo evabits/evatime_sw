@@ -56,6 +56,11 @@ export function StandupClient() {
     try {
       const res = await fetch(`/api/standup?date=${d}`);
       const body = await res.json().catch(() => ({}));
+      // Zelfde probleem als bij save(): de gebruiker kan intussen naar een
+      // andere datum zijn gewisseld. Twee load()-verzoeken kunnen dan buiten
+      // volgorde terugkomen, dus een verlaten antwoord mag het scherm niet
+      // meer aanpassen.
+      if (d !== huidigeDatum.current) return;
       if (!res.ok) {
         setFout(body.error ?? `Fout ${res.status}`);
         setData(null);
@@ -65,10 +70,13 @@ export function StandupClient() {
       setConcept(Object.fromEntries(body.members.map((m: Member) => [m.userId, m.note])));
       setOpgeslagen([]);
     } catch {
+      if (d !== huidigeDatum.current) return;
       setFout("Netwerkfout, probeer opnieuw");
       setData(null);
     } finally {
-      setLaden(false);
+      // Alleen de spinner van dít verzoek uitzetten: een nog lopend verzoek
+      // voor de huidige datum moet 'm zelf nog uitzetten.
+      if (d === huidigeDatum.current) setLaden(false);
     }
   }, []);
 
