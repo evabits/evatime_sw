@@ -9,6 +9,7 @@ import { previousWorkingDay } from "@/lib/working-days";
 const ABSENCE_LABELS: Record<string, string> = {
   VACATION: "vakantie",
   SICK: "ziek",
+  PARENTAL_LEAVE: "ouderschapsverlof",
   SPECIAL_LEAVE: "bijzonder verlof",
   UNPAID_LEAVE: "onbetaald verlof",
 };

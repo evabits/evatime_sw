@@ -182,6 +182,12 @@ model TimeEntry {
   invoiced       Boolean       @default(false)
   invoiceLineId  String?
   invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
+  // Gezet op regels die uit een goedgekeurde afwezigheidsaanvraag zijn ontstaan.
+  // `absenceRequestId !== null` is precies de definitie van "dit is een
+  // verlofregel": daarop weigeren de bewerk- en verwijderroutes, en daarop
+  // vindt de goedkeuring terug wat hij eerder maakte.
+  absenceRequestId String?
+  absenceRequest   AbsenceRequest? @relation(fields: [absenceRequestId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -389,6 +395,7 @@ enum AbsenceStatus {
 enum AbsenceType {
   VACATION
   SICK
+  PARENTAL_LEAVE
   SPECIAL_LEAVE
   UNPAID_LEAVE
 }
@@ -418,6 +425,7 @@ model AbsenceRequest {
   reviewedBy  String?
   reviewer    User?         @relation("AbsenceReviewer", fields: [reviewedBy], references: [id])
   reviewedAt  DateTime?
+  timeEntries TimeEntry[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }

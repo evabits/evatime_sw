@@ -6,7 +6,7 @@ import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 
 const createSchema = z.object({
-  type: z.enum(["VACATION", "SICK", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).default("VACATION"),
+  type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).default("VACATION"),
   startDate: z.string(),
   endDate: z.string(),
   hours: z.number().positive(),

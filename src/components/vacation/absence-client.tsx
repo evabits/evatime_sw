@@ -15,12 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Copy, Check, Plus, Trash2, ThumbsUp, ThumbsDown, Pencil } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
-type AbsenceType = "VACATION" | "SICK" | "SPECIAL_LEAVE" | "UNPAID_LEAVE";
+type AbsenceType = "VACATION" | "SICK" | "PARENTAL_LEAVE" | "SPECIAL_LEAVE" | "UNPAID_LEAVE";
 type AbsenceStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   VACATION: "Vakantie",
   SICK: "Ziekteverlof",
+  PARENTAL_LEAVE: "Ouderschapsverlof",
   SPECIAL_LEAVE: "Bijzonder verlof",
   UNPAID_LEAVE: "Onbetaald verlof",
 };
@@ -82,7 +83,7 @@ function countWorkingHours(startStr: string, endStr: string, weeklyHours: number
 }
 
 const requestSchema = z.object({
-  type: z.enum(["VACATION", "SICK", "SPECIAL_LEAVE", "UNPAID_LEAVE"]),
+  type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]),
   startDate: z.string().min(1, "Verplicht"),
   endDate: z.string().min(1, "Verplicht"),
   hours: z.coerce.number({ invalid_type_error: "Verplicht" }).positive("Moet positief zijn"),
@@ -111,6 +112,7 @@ function typeBadge(type: AbsenceType) {
   const colors: Record<AbsenceType, string> = {
     VACATION: "bg-blue-100 text-blue-800 hover:bg-blue-100",
     SICK: "bg-orange-100 text-orange-800 hover:bg-orange-100",
+    PARENTAL_LEAVE: "bg-pink-100 text-pink-800 hover:bg-pink-100",
     SPECIAL_LEAVE: "bg-purple-100 text-purple-800 hover:bg-purple-100",
     UNPAID_LEAVE: "bg-gray-100 text-gray-800 hover:bg-gray-100",
   };

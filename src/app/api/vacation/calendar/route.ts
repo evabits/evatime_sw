@@ -12,6 +12,7 @@ function icalDate(date: Date): string {
 const TYPE_LABELS: Record<string, string> = {
   VACATION: "Vakantie",
   SICK: "Ziekteverlof",
+  PARENTAL_LEAVE: "Ouderschapsverlof",
   SPECIAL_LEAVE: "Bijzonder verlof",
   UNPAID_LEAVE: "Onbetaald verlof",
 };
