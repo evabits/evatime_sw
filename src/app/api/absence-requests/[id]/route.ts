@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { workingDaysBetween } from "@/lib/working-days";
+import { ABSENCE_PROJECT_NAMES, splitHoursOverDays } from "@/lib/absence-entries";
 
 const employeeUpdateSchema = z.object({
   type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).optional(),
@@ -33,14 +35,67 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     if (isAdmin(role) && "status" in body) {
       const data = adminUpdateSchema.parse(body);
-      const updated = await prisma.absenceRequest.update({
-        where: { id },
-        data: { status: data.status, reviewedBy: userId, reviewedAt: new Date() },
-        include: {
-          user: { select: { id: true, name: true } },
-          reviewer: { select: { id: true, name: true } },
-        },
+
+      // Bij goedkeuring eerst alles uitrekenen en pas daarna schrijven: een
+      // ontbrekend verlofproject of een periode zonder werkdagen moet de
+      // aanvraag onaangeroerd laten in plaats van hem half goed te keuren.
+      let projectId = "";
+      let regels: Array<{ date: string; hours: number }> = [];
+
+      if (data.status === "APPROVED") {
+        const naam = ABSENCE_PROJECT_NAMES[existing.type];
+        const project = await prisma.project.findUnique({
+          where: { name: naam },
+          select: { id: true },
+        });
+        if (!project) {
+          return NextResponse.json(
+            { error: `Het project "${naam}" bestaat nog niet` },
+            { status: 400 },
+          );
+        }
+        projectId = project.id;
+
+        const dagen = workingDaysBetween(
+          existing.startDate.toISOString().slice(0, 10),
+          existing.endDate.toISOString().slice(0, 10),
+        );
+        if (dagen.length === 0) {
+          return NextResponse.json({ error: "Deze periode bevat geen werkdagen" }, { status: 400 });
+        }
+        regels = splitHoursOverDays(Number(existing.hours), dagen);
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const aanvraag = await tx.absenceRequest.update({
+          where: { id },
+          data: { status: data.status, reviewedBy: userId, reviewedAt: new Date() },
+          include: {
+            user: { select: { id: true, name: true } },
+            reviewer: { select: { id: true, name: true } },
+          },
+        });
+
+        // Verwijderen-en-opnieuw-maken in plaats van bijwerken: zo komen
+        // gewijzigde datums vanzelf goed, en elke status behalve APPROVED laat
+        // het bij het verwijderen. Daarmee kan de tijdlijn niet uit de pas
+        // lopen met de aanvraag.
+        await tx.timeEntry.deleteMany({ where: { absenceRequestId: id } });
+        if (regels.length > 0) {
+          await tx.timeEntry.createMany({
+            data: regels.map((r) => ({
+              userId: existing.userId,
+              projectId,
+              date: new Date(`${r.date}T00:00:00Z`),
+              hours: r.hours,
+              description: existing.description,
+              absenceRequestId: id,
+            })),
+          });
+        }
+        return aanvraag;
       });
+
       return NextResponse.json({ ...updated, hours: Number(updated.hours) });
     }
 
