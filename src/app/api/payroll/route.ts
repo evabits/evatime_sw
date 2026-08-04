@@ -44,7 +44,14 @@ export async function GET(req: Request) {
         orderBy: { name: "asc" },
         select: { id: true, name: true, contracts: { select: contractSelect } },
       }),
-      prisma.timeEntry.groupBy({ by: ["userId"], where: { date }, _sum: { hours: true } }),
+      // Verlofregels tellen niet mee als gewerkte uren (en dus niet als bron
+      // van overwerk) — dat is precies waarvoor /uren-overzicht en de
+      // uren-reminder ze wel meetellen, maar hier gaat het om geld.
+      prisma.timeEntry.groupBy({
+        by: ["userId"],
+        where: { date, absenceRequestId: null },
+        _sum: { hours: true },
+      }),
       prisma.timeEntry.groupBy({
         by: ["userId"],
         where: {
