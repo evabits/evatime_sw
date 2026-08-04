@@ -28,7 +28,10 @@ async function main() {
     },
   });
 
-  const projecten = await db.project.findMany({ select: { id: true, name: true } });
+  const projecten = await db.project.findMany({
+    where: { billable: false, customerId: null },
+    select: { id: true, name: true },
+  });
   const projectPerNaam = new Map(projecten.map((p) => [p.name, p.id]));
 
   const plan: Array<{ id: string; userId: string; projectId: string; description: string | null; regels: Array<{ date: string; hours: number }>; label: string }> = [];

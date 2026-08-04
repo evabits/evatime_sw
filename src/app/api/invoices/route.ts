@@ -56,6 +56,19 @@ export async function POST(req: Request) {
   const body = await req.json();
   const data = schema.parse(body);
 
+  // Een verlofregel mag nooit op een factuur belanden. Het client-side filter
+  // in new-invoice-client.tsx is de enige andere plek die dit tegenhoudt, dus
+  // dezelfde alles-of-niets-controle als de bulkactie (entries/bulk/route.ts).
+  const timeEntryIds = data.lines.flatMap((l) => l.timeEntryIds ?? []);
+  if (timeEntryIds.length > 0) {
+    const verlof = await prisma.timeEntry.count({
+      where: { id: { in: timeEntryIds }, absenceRequestId: { not: null } },
+    });
+    if (verlof > 0) {
+      return NextResponse.json({ error: "Verlofregels kun je niet factureren" }, { status: 400 });
+    }
+  }
+
   const subtotal = data.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
   const vatAmount = (subtotal * data.vatRate) / 100;
   const total = subtotal + vatAmount;

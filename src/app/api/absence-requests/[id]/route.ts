@@ -44,8 +44,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
       if (data.status === "APPROVED") {
         const naam = ABSENCE_PROJECT_NAMES[existing.type];
-        const project = await prisma.project.findUnique({
-          where: { name: naam },
+        const project = await prisma.project.findFirst({
+          where: { name: naam, billable: false, customerId: null },
           select: { id: true },
         });
         if (!project) {

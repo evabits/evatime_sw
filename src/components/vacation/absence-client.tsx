@@ -243,10 +243,13 @@ export function AbsenceClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) {
-      const updated: AbsenceRequest = await res.json();
-      setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Er is een fout opgetreden");
+      return;
     }
+    const updated: AbsenceRequest = await res.json();
+    setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   }
 
   async function submitBudget(values: BudgetForm) {
