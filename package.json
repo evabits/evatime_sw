@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "backfill:members": "tsx prisma/backfill-members.ts",
+    "backfill:absence-entries": "tsx prisma/backfill-absence-entries.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
