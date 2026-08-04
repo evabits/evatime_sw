@@ -6,6 +6,8 @@ import { ContractsClient } from "@/components/personeel/contracts-client";
 import { reviewSelect, serializeReview } from "@/app/api/reviews/route";
 import { ReviewsAdminClient } from "@/components/personeel/reviews-admin-client";
 import { CommuteTemplateClient } from "@/components/personeel/commute-template-client";
+import { WorkScheduleClient } from "@/components/personeel/work-schedule-client";
+import { toWeekSchedule } from "@/lib/work-schedule";
 
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -15,7 +17,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
-      id: true, name: true, email: true, role: true,
+      id: true, name: true, email: true, role: true, weeklyHours: true, workSchedule: true,
       contracts: { orderBy: [{ startDate: "desc" }, { createdAt: "desc" }], select: contractSelect },
       reviews: { orderBy: { createdAt: "desc" }, select: reviewSelect },
       kmTemplates: {
@@ -46,6 +48,11 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
         employeeId={user.id}
         initialTemplates={user.kmTemplates.map((t) => ({ ...t, km: Number(t.km) }))}
         projects={projects}
+      />
+      <WorkScheduleClient
+        employeeId={user.id}
+        initialSchedule={toWeekSchedule(user.workSchedule)}
+        weeklyHours={user.weeklyHours === null ? null : Number(user.weeklyHours)}
       />
     </div>
   );
