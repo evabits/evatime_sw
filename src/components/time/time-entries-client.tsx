@@ -20,6 +20,8 @@ import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 
+const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
+
 const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
 const schema = z.object({
@@ -628,10 +630,10 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="font-mono text-sm font-medium w-12 text-right">{formatHours(Number(entry.hours))}</span>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(entry)} disabled={entry.invoiced}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(entry)} disabled={entry.invoiced || Boolean(entry.absenceRequestId)} title={entry.absenceRequestId ? VERLOF_UITLEG : undefined}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteEntry(entry.id)} disabled={entry.invoiced}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteEntry(entry.id)} disabled={entry.invoiced || Boolean(entry.absenceRequestId)} title={entry.absenceRequestId ? VERLOF_UITLEG : undefined}>
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </div>
@@ -689,10 +691,10 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                     )}
                     <TableCell>
                       <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => startEdit(entry)} disabled={entry.invoiced}>
+                        <Button variant="ghost" size="icon" onClick={() => startEdit(entry)} disabled={entry.invoiced || Boolean(entry.absenceRequestId)} title={entry.absenceRequestId ? VERLOF_UITLEG : undefined}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(entry.id)} disabled={entry.invoiced}>
+                        <Button variant="ghost" size="icon" onClick={() => deleteEntry(entry.id)} disabled={entry.invoiced || Boolean(entry.absenceRequestId)} title={entry.absenceRequestId ? VERLOF_UITLEG : undefined}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       </div>

@@ -25,9 +25,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!sessionUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, workLevel: true, projectId: true } });
+    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, workLevel: true, projectId: true, absenceRequestId: true } });
     const error = entryMutationError(checkEntryMutation(role, sessionUserId, existing));
     if (error || !existing) return error ?? NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Een verlofregel hoort bij een goedgekeurde aanvraag. Hem hier wijzigen
+    // laat de tijdlijn uit de pas lopen met die aanvraag, zonder dat iets dat
+    // herstelt. Ook voor admins: de aanvraag is de bron.
+    if (existing.absenceRequestId) {
+      return NextResponse.json(
+        { error: "Verlofregels wijzig je via de afwezigheidsaanvraag" },
+        { status: 400 },
+      );
+    }
 
     const data = schema.parse(await req.json());
 
@@ -76,9 +86,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!sessionUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
 
-    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true } });
+    const existing = await prisma.timeEntry.findUnique({ where: { id }, select: { userId: true, invoiced: true, absenceRequestId: true } });
     const error = entryMutationError(checkEntryMutation(role, sessionUserId, existing));
     if (error) return error;
+
+    if (existing?.absenceRequestId) {
+      return NextResponse.json(
+        { error: "Verlofregels wijzig je via de afwezigheidsaanvraag" },
+        { status: 400 },
+      );
+    }
 
     await prisma.timeEntry.delete({ where: { id } });
     return NextResponse.json({ success: true });

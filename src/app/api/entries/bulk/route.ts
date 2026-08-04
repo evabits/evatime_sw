@@ -29,6 +29,22 @@ export async function POST(req: Request) {
     const model =
       kind === "time" ? prisma.timeEntry : kind === "km" ? prisma.kmEntry : prisma.expense;
 
+    // Alleen tijdregels kunnen verlofregels zijn. Bevat de selectie er één, dan
+    // wordt de hele actie geweigerd — dezelfde alles-of-niets-vorm als de
+    // deelnemerscontrole verderop, en om dezelfde reden: gedeeltelijk toepassen
+    // met een melding die "gefactureerd" als oorzaak noemt zou misleiden.
+    if (kind === "time") {
+      const verlof = await prisma.timeEntry.count({
+        where: { ...buildBulkWhere(ids), absenceRequestId: { not: null } },
+      });
+      if (verlof > 0) {
+        return NextResponse.json(
+          { error: "Verlofregels wijzig je via de afwezigheidsaanvraag" },
+          { status: 400 },
+        );
+      }
+    }
+
     if (action.type === "project") {
       const project = await prisma.project.findUnique({ where: { id: action.projectId }, select: { id: true } });
       if (!project) return NextResponse.json({ error: "Onbekend project" }, { status: 400 });
