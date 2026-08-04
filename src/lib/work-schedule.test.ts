@@ -56,6 +56,16 @@ describe("targetSoFar", () => {
     // Sunday is day 0, which must not read as "no weekdays elapsed yet".
     expect(targetSoFar(MERLIJN, "2026-08-09")).toBe(32);
   });
+
+  it("does not leak floating-point noise in a partial sum", () => {
+    // 8.1 + 8.2 + 8.1 + 8.2 is 32.599999999999994 in floating point, in
+    // this reduce order (verified: the 3-day Monday-Wednesday partial sum
+    // happens to land back on exactly 24.4, so it would not catch a
+    // dropped rond() — the 4-day Thursday partial sum genuinely doesn't).
+    // Must read back as a clean 32.6.
+    const ONGELIJK = { monday: 8.1, tuesday: 8.2, wednesday: 8.1, thursday: 8.2, friday: 0 };
+    expect(targetSoFar(ONGELIJK, "2026-08-06")).toBe(32.6);
+  });
 });
 
 describe("weekTotal", () => {
@@ -68,9 +78,10 @@ describe("weekTotal", () => {
   });
 
   it("does not leak floating-point noise", () => {
-    // 6.4 * 5 is 32.00000000000001 in floating point. The column is
-    // Decimal(4,2), so the answer must read back as a clean 32.
-    expect(weekTotal({ monday: 6.4, tuesday: 6.4, wednesday: 6.4, thursday: 6.4, friday: 6.4 })).toBe(32);
+    // 8.1 + 8.2 + 8.1 + 8.2 + 0 is 32.599999999999994 in floating point, in
+    // this reduce order. The column is Decimal(4,2), so the answer must
+    // read back as a clean 32.6.
+    expect(weekTotal({ monday: 8.1, tuesday: 8.2, wednesday: 8.1, thursday: 8.2, friday: 0 })).toBe(32.6);
   });
 });
 
