@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canLeadStandup } from "@/lib/roles";
-import { previousWorkingDay } from "@/lib/standup";
+import { previousWorkingDay } from "@/lib/working-days";
 
 const ABSENCE_LABELS: Record<string, string> = {
   VACATION: "vakantie",
