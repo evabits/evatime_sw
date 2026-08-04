@@ -97,9 +97,11 @@ elkaar lopen.
 medewerker die een conceptproject aanmaakt met een naam die al bestaat, krijgt voortaan een
 weigering.
 
-Dat is de bedoeling, maar die melding moet daar zichtbaar worden: dat flowtje toont vandaag alleen
-een generieke fout. De weigeringstekst van de server moet in het urenformulier getoond worden,
-zodat de medewerker begrijpt dat hij een andere naam moet kiezen.
+Dat is de bedoeling, en het werkt vanzelf: `handleCreateConceptProject` in
+`src/components/time/time-entries-client.tsx` toont al `body.error ?? "Aanmaken mislukt"`, dus de
+weigeringstekst van de server komt daar ongewijzigd doorheen. Er is geen wijziging nodig; het
+staat hier alleen omdat het een gedragsverandering is voor medewerkers, en omdat het handmatig
+nagelopen moet worden.
 
 ## Deel 2: kopiëren
 
