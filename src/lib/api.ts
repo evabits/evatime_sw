@@ -45,3 +45,36 @@ export async function projectMembershipError(
     { status: 400 },
   );
 }
+
+/**
+ * Geeft een 400-response als er al een project met deze naam bestaat, en null
+ * als de naam vrij is.
+ *
+ * Hoofdletterongevoelig: "Onderhoud" en "onderhoud" zijn voor een mens dezelfde
+ * naam, terwijl de @unique in de database dat onderscheid wél maakt. Die unique
+ * ligt eronder als vangnet tegen twee mensen die tegelijk opslaan; deze functie
+ * is de echte regel.
+ *
+ * Gearchiveerde projecten worden NIET uitgesloten: die bezetten hun naam, zodat
+ * terugzetten nooit op een naamconflict stuit.
+ *
+ * exceptId sluit het project zelf uit, zodat een project bij het bewerken niet
+ * met zijn eigen naam botst.
+ */
+export async function projectNameTakenError(
+  name: string,
+  exceptId?: string,
+): Promise<NextResponse | null> {
+  const clash = await prisma.project.findFirst({
+    where: {
+      name: { equals: name, mode: "insensitive" },
+      ...(exceptId ? { id: { not: exceptId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (!clash) return null;
+  return NextResponse.json(
+    { error: "Er bestaat al een project met deze naam" },
+    { status: 400 },
+  );
+}

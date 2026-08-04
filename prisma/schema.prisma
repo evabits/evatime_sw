@@ -74,7 +74,7 @@ model Project {
   id                String                @id @default(cuid())
   customerId        String?
   customer          Customer?             @relation(fields: [customerId], references: [id])
-  name              String
+  name              String                @unique
   description       String?
   status            ProjectStatus         @default(ACTIVE)
   billable          Boolean               @default(true)

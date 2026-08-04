@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError } from "@/lib/api";
+import { handleError, projectNameTakenError } from "@/lib/api";
 import { projectCreateDenialReason } from "@/lib/projects";
 import { archivedWhere } from "@/lib/archive";
 import { levelRatesField } from "@/lib/rates";
@@ -10,7 +10,7 @@ import { canEditInvoices } from "@/lib/roles";
 
 const schema = z.object({
   customerId: z.string().min(1).optional().nullable(),
-  name: z.string().min(1),
+  name: z.string().trim().min(1),
   description: z.string().optional(),
   status: z.enum(["CONCEPT", "ACTIVE", "INACTIVE", "COMPLETED"]).default("ACTIVE"),
   defaultKmRate: z.number().positive().optional().nullable(),
@@ -64,6 +64,9 @@ export async function POST(req: Request) {
     const denial = projectCreateDenialReason(role, { ...rest, levelRates, memberIds });
     if (denial) return NextResponse.json({ error: denial }, { status: 403 });
 
+    const nameError = await projectNameTakenError(rest.name);
+    if (nameError) return nameError;
+
     const project = await prisma.project.create({
       data: {
         ...rest,
@@ -106,5 +109,11 @@ export async function POST(req: Request) {
       { ...project, ...(levelRates ? { levelRates } : {}), members: finalMemberIds.map((userId) => ({ userId })) },
       { status: 201 },
     );
-  } catch (e) { return handleError(e); }
+  } catch (e: any) {
+    // Vangnet voor de @unique: alleen bereikbaar bij twee gelijktijdige opslagen.
+    if (e?.code === "P2002") {
+      return NextResponse.json({ error: "Er bestaat al een project met deze naam" }, { status: 400 });
+    }
+    return handleError(e);
+  }
 }
