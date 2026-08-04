@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { weekTotal } from "@/lib/work-schedule";
 
 const dag = z.number().min(0).max(24);
 
@@ -24,6 +25,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ userId: 
     const { userId } = await params;
 
     const data = schema.parse(await req.json());
+    if (weekTotal(data) === 0) {
+      return NextResponse.json(
+        { error: "Een rooster van alleen nullen bestaat niet — verwijder het rooster in plaats daarvan." },
+        { status: 400 },
+      );
+    }
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
