@@ -227,11 +227,12 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   function startCopy(project: any) {
     setEditing(null);
     // Een gearchiveerde klant staat NIET in de `customers`-prop en dus niet in
-    // de keuzelijst. Zouden we zijn id toch invullen, dan toont de Select zijn
-    // placeholder terwijl er wel degelijk een waarde in het formulier zit, en
-    // slaat de kopie stilzwijgend op onder een klant die je niet zag staan.
-    // Daarom bewust leegmaken: de bestaande verplicht-melding dwingt dan een
-    // keuze af. Dat geldt net zo voor een kaal conceptproject zonder klant.
+    // de keuzelijst. Zouden we zijn id toch invullen, dan slaat de kopie
+    // stilzwijgend op onder een klant die je niet in het veld zag staan.
+    // Daarom bewust leegmaken. Sinds de klant optioneel is, blokkeert dat het
+    // opslaan niet meer — maar het veld toont dan zichtbaar "Geen klant" in
+    // plaats van een lege plek, dus de keuze staat er wel. Datzelfde geldt voor
+    // een kaal conceptproject dat sowieso geen klant heeft.
     const klantBeschikbaar = customers.some((c: any) => c.id === project.customerId);
     fillForm(project, `${project.name} (kopie)`, klantBeschikbaar ? project.customerId : "");
   }
