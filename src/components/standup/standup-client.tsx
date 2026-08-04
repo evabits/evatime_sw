@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,10 @@ export function StandupClient() {
   const [fout, setFout] = useState("");
   const [concept, setConcept] = useState<Record<string, string>>({});
   const [opgeslagen, setOpgeslagen] = useState<string[]>([]);
+  // Houdt de datum die nu op het scherm staat bij, ook tijdens een lopend
+  // save()-verzoek: zo kan een antwoord van een verlaten dag herkend worden.
+  const huidigeDatum = useRef(date);
+  useEffect(() => { huidigeDatum.current = date; }, [date]);
 
   const load = useCallback(async (d: string) => {
     setLaden(true);
@@ -77,12 +81,21 @@ export function StandupClient() {
     const origineel = data?.members.find((m) => m.userId === userId)?.note ?? "";
     if (note.trim() === origineel.trim()) return;
 
+    const datumBijOpslaan = date;
+
     const res = await fetch("/api/standup/note", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date, userId, note }),
     });
     const body = await res.json().catch(() => ({}));
+
+    // De gebruiker kan intussen naar een andere datum zijn gewisseld: het
+    // schrijven op de server is dan nog steeds correct (de datum stond in de
+    // request), maar het scherm toont inmiddels een andere dag en mag dat
+    // antwoord niet meer overnemen.
+    if (datumBijOpslaan !== huidigeDatum.current) return;
+
     if (!res.ok) {
       setFout(body.error ?? `Fout ${res.status}`);
       return;
