@@ -5,6 +5,7 @@ import { handleError } from "@/lib/api";
 import { buildPayrollRows, weeksInMonth, type PayrollUser } from "@/lib/payroll";
 import { getEffectiveContract } from "@/lib/contracts";
 import { serializeContract, contractSelect } from "@/app/api/contracts/route";
+import { RESERVED_TAG_NAME } from "@/lib/tags";
 
 export async function GET(req: Request) {
   try {
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
         by: ["userId"],
         where: {
           date,
-          project: { tags: { some: { name: { equals: "wbso", mode: "insensitive" } } } },
+          project: { tags: { some: { name: { equals: RESERVED_TAG_NAME, mode: "insensitive" } } } },
         },
         _sum: { hours: true },
       }),
