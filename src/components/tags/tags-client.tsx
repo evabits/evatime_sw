@@ -32,7 +32,6 @@ interface Conflict {
 
 export function TagsClient({ initialTags }: { initialTags: TagRow[] }) {
   const router = useRouter();
-  const [tags, setTags] = useState(initialTags);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -58,9 +57,10 @@ export function TagsClient({ initialTags }: { initialTags: TagRow[] }) {
       setServerError(body.error ?? `Fout ${res.status}`);
       return;
     }
-    setTags((prev) => [...prev, { id: body.id, name: body.name, projects: [] }].sort((a, b) => a.name.localeCompare(b.name)));
     setNewName("");
     setAdding(false);
+    // De servercomponent is de bron van waarheid voor wat de tabel toont.
+    router.refresh();
   }
 
   async function rename(id: string) {
@@ -77,7 +77,7 @@ export function TagsClient({ initialTags }: { initialTags: TagRow[] }) {
       return;
     }
     if (body.conflict) {
-      const bron = tags.find((t) => t.id === id);
+      const bron = initialTags.find((t) => t.id === id);
       setConflict({
         bronId: id,
         bronNaam: bron?.name ?? "",
@@ -88,10 +88,9 @@ export function TagsClient({ initialTags }: { initialTags: TagRow[] }) {
       });
       return;
     }
-    setTags((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, name: body.name } : t)).sort((a, b) => a.name.localeCompare(b.name)),
-    );
     setEditingId(null);
+    // De servercomponent is de bron van waarheid voor wat de tabel toont.
+    router.refresh();
   }
 
   async function merge() {
@@ -162,10 +161,10 @@ export function TagsClient({ initialTags }: { initialTags: TagRow[] }) {
                   </TableCell>
                 </TableRow>
               )}
-              {tags.length === 0 && !adding && (
+              {initialTags.length === 0 && !adding && (
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen tags gevonden</TableCell></TableRow>
               )}
-              {tags.map((t) => {
+              {initialTags.map((t) => {
                 const actief = t.projects.filter((p) => !p.archived);
                 const gearchiveerd = t.projects.length - actief.length;
                 const uitgeklapt = open.includes(t.id);
