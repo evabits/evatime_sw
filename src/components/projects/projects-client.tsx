@@ -63,6 +63,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   // never "save an empty member list" — a missing `include` upstream must not
   // silently lock everyone out of the project.
   const [memberIdsKnown, setMemberIdsKnown] = useState(true);
+  const [selected, setSelected] = useState<string[]>([]);
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -211,6 +212,32 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     if (res.ok) loadProjects(showArchived);
   }
 
+  async function archiveSelected() {
+    // selectedVisible, niet selected: wie eerst aanvinkt en daarna het
+    // statusfilter wijzigt, mag niet iets archiveren dat hij niet meer ziet.
+    const ids = selectedVisible.map((p) => p.id);
+    const woord = ids.length === 1 ? "project" : "projecten";
+    if (!confirm(`Weet u zeker dat u ${ids.length} ${woord} wilt archiveren?`)) return;
+    const res = await fetch("/api/projects/bulk-archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (res.ok) {
+      setSelected([]);
+      loadProjects(showArchived);
+    }
+  }
+
+  // Eén lijst waar de tabel, de kopcheckbox én de bulkknop uit lezen, zodat
+  // "selecteer alles" nooit meer archiveert dan er op het scherm staat.
+  const visible = projects
+    .filter((p) => statusFilter === "all" || p.status === statusFilter)
+    .filter((p) => !noCustomerOnly || !p.customer);
+  const selectable = visible.filter((p) => !p.archivedAt);
+  const selectedVisible = selectable.filter((p) => selected.includes(p.id));
+  const allSelected = selectable.length > 0 && selectedVisible.length === selectable.length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -244,6 +271,11 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               <SelectItem value="COMPLETED">Afgerond</SelectItem>
             </SelectContent>
           </Select>
+          {selectedVisible.length > 0 && (
+            <Button variant="destructive" onClick={archiveSelected}>
+              Archiveer geselecteerde ({selectedVisible.length})
+            </Button>
+          )}
           <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setMemberIds([]); setMemberIdsKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Project toevoegen
           </Button>
@@ -255,6 +287,18 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    checked={allSelected}
+                    disabled={selectable.length === 0}
+                    onChange={(e) =>
+                      setSelected(e.target.checked ? selectable.map((p) => p.id) : [])
+                    }
+                    title="Alle zichtbare projecten selecteren"
+                  />
+                </TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Klant</TableHead>
                 <TableHead>Status</TableHead>
@@ -268,13 +312,24 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
             </TableHeader>
             <TableBody>
               {projects.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
-              {projects
-              .filter((p) => statusFilter === "all" || p.status === statusFilter)
-              .filter((p) => !noCustomerOnly || !p.customer)
-              .map((p) => (
+              {visible.map((p) => (
                 <TableRow key={p.id} className={p.archivedAt ? "opacity-60" : undefined}>
+                  <TableCell>
+                    {!p.archivedAt && (
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-input accent-primary"
+                        checked={selected.includes(p.id)}
+                        onChange={(e) =>
+                          setSelected((prev) =>
+                            e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id),
+                          )
+                        }
+                      />
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium">
                     {p.name}
                     {p.archivedAt && <span className="ml-2 text-xs text-muted-foreground">(gearchiveerd)</span>}
