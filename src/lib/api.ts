@@ -78,3 +78,18 @@ export async function projectNameTakenError(
     { status: 400 },
   );
 }
+
+/**
+ * Zoekt een tag op naam, hoofdletterongevoelig en getrimd. Geeft de BESTAANDE
+ * schrijfwijze terug, niet de ingetypte — aanroepers hebben die nodig om te
+ * kunnen tonen waar iets mee botst, en om te koppelen aan de tag die er al is.
+ *
+ * De @unique op Tag.name is hoofdlettergevoelig; deze functie is de echte regel
+ * en die unique blijft eronder liggen als vangnet.
+ */
+export async function findTagByName(name: string): Promise<{ id: string; name: string } | null> {
+  return prisma.tag.findFirst({
+    where: { name: { equals: name.trim(), mode: "insensitive" } },
+    select: { id: true, name: true },
+  });
+}
