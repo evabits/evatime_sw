@@ -31,6 +31,7 @@ model User {
   projectMemberships  ProjectMember[]
   standupsLed         Standup[]           @relation("StandupLeader")
   standupNotes        StandupNote[]       @relation("StandupSubject")
+  workSchedule        WorkSchedule?
 }
 
 enum Role {
@@ -410,6 +411,24 @@ model VacationBudget {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, year])
+}
+
+model WorkSchedule {
+  // userId is meteen de sleutel: één rooster per persoon, of geen. Dat
+  // onderscheid draagt het ontwerp — het ontbreken van een rij betekent overal
+  // "reken zoals je nu rekent", en een rij die bestaat is een bewuste keuze
+  // van een admin, geen default die per ongeluk voor iedereen aan staat.
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Verplicht en niet nullable: een dag leeg laten is dubbelzinnig — nul uur,
+  // of niet ingevuld? Nul is nul.
+  monday    Decimal  @db.Decimal(4, 2)
+  tuesday   Decimal  @db.Decimal(4, 2)
+  wednesday Decimal  @db.Decimal(4, 2)
+  thursday  Decimal  @db.Decimal(4, 2)
+  friday    Decimal  @db.Decimal(4, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AbsenceRequest {
