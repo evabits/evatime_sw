@@ -69,6 +69,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
     await prisma.customer.update({ where: { id }, data: { archivedAt: new Date() } });
     return NextResponse.json({ success: true });
@@ -79,6 +81,8 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ id: s
   try {
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
     await prisma.customer.update({ where: { id }, data: { archivedAt: null } });
     return NextResponse.json({ success: true });
