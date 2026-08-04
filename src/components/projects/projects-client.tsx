@@ -47,6 +47,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
   const [selectedTags, setSelectedTags] = useState<{ name: string }[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -90,6 +91,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
 
   async function onSubmit(data: FormData) {
     setLoading(true);
+    setServerError("");
     const payload = {
       ...data,
       defaultKmRate: data.defaultKmRate === "" ? null : data.defaultKmRate || null,
@@ -118,6 +120,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
           const updated = await res.json();
           setProjects((prev) => prev.map((p) => p.id === editing ? { ...p, ...updated, customer: customers.find(c => c.id === updated.customerId) } : p));
           close();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          setServerError(err.error ?? `Fout ${res.status}`);
         }
       } else {
         const res = await fetch("/api/projects", {
@@ -130,8 +135,13 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
           const customer = customers.find((c) => c.id === created.customerId);
           setProjects((prev) => [...prev, { ...created, customer, _count: { timeEntries: 0, kmEntries: 0 } }].sort((a, b) => a.name.localeCompare(b.name)));
           close();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          setServerError(err.error ?? `Fout ${res.status}`);
         }
       }
+    } catch {
+      setServerError("Netwerkfout, probeer opnieuw");
     } finally {
       setLoading(false);
     }
@@ -140,6 +150,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   function close() {
     setDialogOpen(false);
     setEditing(null);
+    setServerError("");
     setSelectedTags([]);
     setTagInput("");
     form.reset({ status: "ACTIVE", billable: true });
@@ -223,10 +234,19 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
     });
-    if (res.ok) {
-      setSelected([]);
-      loadProjects(showArchived);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      alert(payload.error ?? "Archiveren mislukt");
+      return;
     }
+    // count is hoeveel er daadwerkelijk gearchiveerd zijn (where: archivedAt: null),
+    // dus lager dan ids.length als iemand anders er ondertussen al één archiveerde.
+    const { count } = await res.json();
+    if (count < ids.length) {
+      alert(`${count} van de ${ids.length} ${woord} gearchiveerd, de rest was al gearchiveerd`);
+    }
+    setSelected([]);
+    loadProjects(showArchived);
   }
 
   // Eén lijst waar de tabel, de kopcheckbox én de bulkknop uit lezen, zodat
@@ -276,7 +296,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               Archiveer geselecteerde ({selectedVisible.length})
             </Button>
           )}
-          <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setMemberIds([]); setMemberIdsKnown(true); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset({ status: "ACTIVE", billable: true }); setEditing(null); setServerError(""); setSelectedTags([]); setLevelRates({}); setLevelRatesKnown(true); setMemberIds([]); setMemberIdsKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Project toevoegen
           </Button>
         </div>
@@ -524,6 +544,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
                 ))}
               </div>
             </div>
+            {serverError && (
+              <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>
+            )}
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={close}>Annuleren</Button>
               <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
