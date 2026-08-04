@@ -5,6 +5,7 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canLeadStandup } from "@/lib/roles";
 import { previousWorkingDay } from "@/lib/working-days";
+import { scheduledHoursOn, toWeekSchedule } from "@/lib/work-schedule";
 
 const ABSENCE_LABELS: Record<string, string> = {
   VACATION: "vakantie",
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
       prisma.user.findMany({
         where: { archivedAt: null },
         orderBy: { name: "asc" },
-        select: { id: true, name: true },
+        select: { id: true, name: true, workSchedule: true },
       }),
       prisma.timeEntry.findMany({
         where: { date: dag },
@@ -86,14 +87,20 @@ export async function GET(req: Request) {
       date,
       previousWorkingDay: vorigeWerkdag,
       previousStandupDate: vorige ? vorige.date.toISOString().slice(0, 10) : null,
-      members: users.map((u) => ({
-        userId: u.id,
-        userName: u.name,
-        entries: urenPer.get(u.id) ?? [],
-        absence: afwezigPer.get(u.id) ?? null,
-        previousNote: vorigePer.get(u.id) ?? null,
-        note: huidigePer.get(u.id) ?? "",
-      })),
+      members: users.map((u) => {
+        // null betekent "geen rooster" en niet "nul uur": het scherm mag dan
+        // niets zeggen over werkdagen.
+        const rooster = toWeekSchedule(u.workSchedule);
+        return {
+          userId: u.id,
+          userName: u.name,
+          entries: urenPer.get(u.id) ?? [],
+          absence: afwezigPer.get(u.id) ?? null,
+          scheduledHours: rooster ? scheduledHoursOn(rooster, vorigeWerkdag) : null,
+          previousNote: vorigePer.get(u.id) ?? null,
+          note: huidigePer.get(u.id) ?? "",
+        };
+      }),
     });
   } catch (e) { return handleError(e); }
 }

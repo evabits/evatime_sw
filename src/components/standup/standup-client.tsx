@@ -19,6 +19,7 @@ interface Member {
   userName: string | null;
   entries: Entry[];
   absence: string | null;
+  scheduledHours: number | null;
   previousNote: string | null;
   note: string;
 }
@@ -36,6 +37,10 @@ function nl(d: string) {
     month: "long",
     timeZone: "UTC",
   });
+}
+
+function weekdag(d: string) {
+  return new Date(`${d}T00:00:00Z`).toLocaleDateString("nl-NL", { weekday: "long", timeZone: "UTC" });
 }
 
 export function StandupClient() {
@@ -163,7 +168,14 @@ export function StandupClient() {
 
             <div className="text-sm">
               {m.entries.length === 0 ? (
-                <p className="text-muted-foreground">geen uren geboekt</p>
+                // Een afwezigheid is de uitzonderlijkere mededeling en wint
+                // daarom van het rooster: wie op zijn vaste vrije dag ook nog
+                // vakantie opnam, ziet die badge al naast zijn naam staan.
+                <p className="text-muted-foreground">
+                  {m.scheduledHours === 0 && !m.absence
+                    ? `werkt niet op ${weekdag(data.previousWorkingDay)}`
+                    : "geen uren geboekt"}
+                </p>
               ) : (
                 <ul className="space-y-0.5">
                   {m.entries.map((e, i) => (
