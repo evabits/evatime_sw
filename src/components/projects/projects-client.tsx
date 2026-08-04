@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, RotateCcw } from "lucide-react";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
 
 const schema = z.object({
@@ -148,29 +148,61 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     setMemberIdsKnown(true);
   }
 
-  function startEdit(project: any) {
-    setEditing(project.id);
+  // Vult het formulier vanuit een bestaand project. `name` en `customerId`
+  // staan er los in omdat bewerken en kopiëren daar elk hun eigen regel voor
+  // hebben; al het andere is identiek en hoort daarom in één functie, zodat een
+  // nieuw veld niet in één van de twee vergeten kan worden.
+  function fillForm(project: any, name: string, customerId: string) {
     setSelectedTags(project.tags ?? []);
     form.reset({
-      customerId: project.customerId,
-      name: project.name,
+      customerId,
+      name,
       description: project.description ?? "",
       status: project.status,
       defaultKmRate: project.defaultKmRate ? Number(project.defaultKmRate) : "",
       billable: project.billable,
     });
-    // project.levelRates is only absent when the query that loaded this project
-    // forgot to include it — not a legitimate "zero rates" state, which is `[]`.
-    const known = Array.isArray(project.levelRates);
-    setLevelRatesKnown(known);
+    // project.levelRates is alleen afwezig wanneer de query die dit project laadde
+    // zijn include vergeten is — niet een legitieme "geen tarieven"-staat, want dat is [].
+    const ratesKnown = Array.isArray(project.levelRates);
+    setLevelRatesKnown(ratesKnown);
     setLevelRates(
-      known
+      ratesKnown
         ? Object.fromEntries(project.levelRates.map((r: any) => [r.level, String(r.rate)]))
         : {},
     );
     setMemberIdsKnown(Array.isArray(project.members));
     setMemberIds((project.members ?? []).map((m: any) => m.userId));
     setDialogOpen(true);
+  }
+
+  function startEdit(project: any) {
+    setEditing(project.id);
+    // Bewerken houdt de klant die er staat, ook als die inmiddels gearchiveerd
+    // is: iemand die een typefout in de omschrijving herstelt, moet niet
+    // gedwongen worden het project aan een andere klant te hangen.
+    fillForm(project, project.name, project.customerId ?? "");
+  }
+
+  // Kopiëren opent hetzelfde formulier in AANMAAKSTAND: editing blijft null, dus
+  // opslaan doet een POST en er ontstaat pas een project als de gebruiker opslaat.
+  //
+  // De twee *Known-vlaggen zijn hier het gevoelige punt. Ze staan in fillForm op
+  // Array.isArray(...), en de projectenpagina laadt levelRates én members mee, dus
+  // ze komen op true te staan en het formulier stuurt beide velden mee. Zou een van
+  // beide false zijn, dan laat het formulier het veld weg en levert de kopie
+  // stilzwijgend een project op zonder tarieven of zonder deelnemers. Controleer dat
+  // met de hand na iedere wijziging aan de query op src/app/(app)/projects/page.tsx.
+  function startCopy(project: any) {
+    setEditing(null);
+    // Een gearchiveerde klant staat NIET in de `customers`-prop en dus niet in
+    // de keuzelijst. Zouden we zijn id toch invullen, dan toont de Select zijn
+    // placeholder terwijl er wel degelijk een waarde in het formulier zit, en
+    // slaat de kopie stilzwijgend op onder een klant die je niet zag staan.
+    // Daarom bewust leegmaken: de bestaande verplicht-melding dwingt dan een
+    // keuze af. Dat geldt net zo voor een kaal conceptproject zonder klant.
+    const klantBeschikbaar = customers.some((c: any) => c.id === project.customerId);
+    fillForm(project, `${project.name} (kopie)`, klantBeschikbaar ? project.customerId : "");
   }
 
   async function archiveProject(id: string) {
@@ -278,6 +310,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
                         <>
                           <Button variant="ghost" size="icon" onClick={() => startEdit(p)}>
                             <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => startCopy(p)} title="Kopiëren">
+                            <Copy className="h-3.5 w-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => archiveProject(p.id)} title="Archiveren">
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
