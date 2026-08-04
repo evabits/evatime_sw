@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Copy, Trash2, RotateCcw } from "lucide-react";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
+import { isReservedTagName } from "@/lib/tags";
 
 const schema = z.object({
   customerId: z.string().min(1, "Verplicht"),
@@ -260,6 +261,21 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     // selectedVisible, niet selected: wie eerst aanvinkt en daarna het filter
     // wijzigt, mag geen project taggen dat hij niet meer ziet staan.
     const ids = selectedVisible.map((p) => p.id);
+    // Verwijderen van de gereserveerde tag (WBSO) is toegestaan — een admin mag
+    // een project terecht van de loonverwerking afhalen — maar niet zonder dat
+    // hij weet wat dat betekent. Toevoegen heeft dit gevolg niet, dus alleen
+    // hier vragen.
+    const tagNaam = allTags.find((t) => t.id === tagKeuze)?.name ?? "";
+    if (tagActie === "remove" && isReservedTagName(tagNaam)) {
+      if (
+        !confirm(
+          `Weet u zeker dat u de tag "${tagNaam}" wilt verwijderen bij ${ids.length} project(en)? ` +
+            `Deze projecten tellen daarna niet meer mee voor de WBSO-uren in de loonverwerking.`,
+        )
+      ) {
+        return;
+      }
+    }
     const res = await fetch("/api/projects/bulk-tag", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -614,7 +630,12 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
             <Select onValueChange={setTagKeuze} value={tagKeuze}>
               <SelectTrigger><SelectValue placeholder="Kies een tag" /></SelectTrigger>
               <SelectContent>
-                {allTags.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                {allTags.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                    {isReservedTagName(t.name) && " — gebruikt door de loonverwerking"}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
