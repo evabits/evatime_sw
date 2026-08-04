@@ -23,7 +23,7 @@
 - Lint: `npm run lint`. **De baseline is niet schoon:** 301 errors en 20 warnings, vrijwel allemaal `@typescript-eslint/no-explicit-any`, want deze codebase gebruikt `any` overal. De gate is *geen nieuwe soorten lint-fouten*.
 - **`npx tsc --noEmit` meldt 0 fouten over de hele repo en moet dat blijven doen.** Dat is een echt signaal en je belangrijkste gereedschap.
 - `npm run build` kan niet draaien zonder `.env`; gebruik `tsc` als vangnet.
-- **Dit traject levert bewust weinig unittests op.** De naamcontrole is een database-query, geen berekening, en bulk archiveren is één `updateMany`. De repo test uitsluitend pure functies in `src/lib/*.test.ts`; er zijn geen component- of API-tests en die worden hier ook niet geïntroduceerd. Waar een taak geen test oplevert staat dat expliciet vermeld — dat is een constatering, geen omissie, en hoort niet als bevinding gerapporteerd te worden.
+- **Testconventie van deze repo, als feit:** er wordt uitsluitend getest op pure functies in `src/lib/*.test.ts` met vitest. Er bestaan geen component-, integratie- of API-tests, en dit traject introduceert dat testtype niet. Dit traject levert daardoor waarschijnlijk geen nieuwe unittests op — de naamcontrole is een database-query en bulk archiveren is één `updateMany`. Blijkt er tijdens het bouwen tóch pure logica te ontstaan die het waard is, voeg dan een test toe volgens dat patroon.
 
 ---
 
