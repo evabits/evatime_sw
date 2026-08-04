@@ -81,7 +81,13 @@ export function StandupClient() {
   }, []);
 
   useEffect(() => {
-    if (!date) return;
+    if (!date) {
+      // Een leeg datumveld levert geen verzoek op. De spinner moet hier wél uit:
+      // een verzoek dat nog liep herkent zichzelf niet meer in huidigeDatum ("")
+      // en laat 'm anders voorgoed aan staan.
+      setLaden(false);
+      return;
+    }
     load(date);
   }, [date, load]);
 
