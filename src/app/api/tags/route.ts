@@ -29,9 +29,7 @@ export async function POST(req: Request) {
     }
 
     const tag = await prisma.tag.create({ data: { name } });
-    // projects: [] zodat de beheerpagina de nieuwe rij direct in zijn state kan
-    // zetten zonder een tweede rondje naar de server.
-    return NextResponse.json({ ...tag, projects: [] }, { status: 201 });
+    return NextResponse.json(tag, { status: 201 });
   } catch (e: any) {
     // Vangnet voor de @unique: alleen bereikbaar wanneer twee mensen tegelijk
     // dezelfde naam opslaan, want de controle hierboven is ruimer dan de index.

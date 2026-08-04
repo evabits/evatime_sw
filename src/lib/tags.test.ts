@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeTagName, isReservedTagName, RESERVED_TAG_NAME } from "./tags";
+import { normalizeTagName, isReservedTagName, RESERVED_TAG_NAME, canonicalizeTagNames } from "./tags";
 
 describe("normalizeTagName", () => {
   it("trims surrounding whitespace", () => {
@@ -36,8 +36,6 @@ describe("isReservedTagName", () => {
     expect(RESERVED_TAG_NAME).toBe("wbso");
   });
 });
-
-import { canonicalizeTagNames } from "./tags";
 
 describe("canonicalizeTagNames", () => {
   it("replaces a typed spelling with the existing one", () => {

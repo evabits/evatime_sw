@@ -35,6 +35,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     if (mergeInto) {
+      // `name` is hier bewust ongebruikt: samenvoegen hernoemt de doeltag niet,
+      // dat gebeurt alleen via het hernoempad hieronder.
       if (mergeInto === id) {
         return NextResponse.json({ error: "Een tag kan niet met zichzelf samengevoegd worden" }, { status: 400 });
       }
