@@ -331,7 +331,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.length === 0 && (
+              {visible.length === 0 && (
                 <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Geen projecten gevonden</TableCell></TableRow>
               )}
               {visible.map((p) => (

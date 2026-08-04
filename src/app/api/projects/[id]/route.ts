@@ -97,7 +97,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       ...(memberIds ? { members: memberIds.map((userId) => ({ userId })) } : {}),
     });
   } catch (e: any) {
-    // Vangnet voor de @unique: alleen bereikbaar bij twee gelijktijdige opslagen.
+    // Vangnet voor de @unique: die is hoofdlettergevoelig, projectNameTakenError
+    // hierboven niet — dus die check heeft dit al afgevangen, behalve wanneer
+    // twee opslagen tegelijk langs die check heen komen.
     if (e?.code === "P2002") {
       return NextResponse.json({ error: "Er bestaat al een project met deze naam" }, { status: 400 });
     }
