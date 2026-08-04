@@ -80,7 +80,10 @@ export function StandupClient() {
     }
   }, []);
 
-  useEffect(() => { load(date); }, [date, load]);
+  useEffect(() => {
+    if (!date) return;
+    load(date);
+  }, [date, load]);
 
   async function save(userId: string) {
     const note = concept[userId] ?? "";
