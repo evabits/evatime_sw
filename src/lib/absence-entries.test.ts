@@ -63,3 +63,93 @@ describe("splitHoursOverDays", () => {
     }
   });
 });
+
+import { patternedEntries, patternSummary } from "./absence-entries";
+
+// Weekdagen, nagerekend tegen de kalender: 2026-08-03 en 2026-08-10 zijn
+// maandagen, 2026-08-05 en 2026-08-12 woensdagen, 2026-08-07 en 2026-08-14
+// vrijdagen, 2026-08-08 een zaterdag.
+const WOENSDAG = { monday: 0, tuesday: 0, wednesday: 8, thursday: 0, friday: 0 };
+const MA_WO = { monday: 4, tuesday: 0, wednesday: 4, thursday: 0, friday: 0 };
+const NIETS = { monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0 };
+const WERKWEEK = ["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"];
+
+describe("patternedEntries", () => {
+  it("keeps only the day the pattern names", () => {
+    expect(patternedEntries(WOENSDAG, WERKWEEK)).toEqual([
+      { date: "2026-08-05", hours: 8 },
+    ]);
+  });
+
+  it("keeps every day the pattern names", () => {
+    expect(patternedEntries(MA_WO, WERKWEEK)).toEqual([
+      { date: "2026-08-03", hours: 4 },
+      { date: "2026-08-05", hours: 4 },
+    ]);
+  });
+
+  it("repeats across weeks", () => {
+    const tweeWeken = [...WERKWEEK, "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"];
+    expect(patternedEntries(WOENSDAG, tweeWeken)).toEqual([
+      { date: "2026-08-05", hours: 8 },
+      { date: "2026-08-12", hours: 8 },
+    ]);
+  });
+
+  it("drops a Saturday even when the pattern is not empty", () => {
+    // Het patroon kent geen weekendvelden, dus scheduledHoursOn geeft daar 0.
+    expect(patternedEntries(WOENSDAG, ["2026-08-08"])).toEqual([]);
+  });
+
+  it("returns nothing for an all-zero pattern", () => {
+    expect(patternedEntries(NIETS, WERKWEEK)).toEqual([]);
+  });
+
+  it("returns nothing for an empty list of days", () => {
+    expect(patternedEntries(WOENSDAG, [])).toEqual([]);
+  });
+});
+
+describe("patternSummary", () => {
+  it("counts one working week", () => {
+    const { entries, total } = patternSummary(WOENSDAG, "2026-08-03", "2026-08-07");
+    expect(entries).toEqual([{ date: "2026-08-05", hours: 8 }]);
+    expect(total).toBe(8);
+  });
+
+  it("adds up the hours of every matching day", () => {
+    const { entries, total } = patternSummary(MA_WO, "2026-08-03", "2026-08-14");
+    expect(entries).toHaveLength(4);
+    expect(total).toBe(16);
+  });
+
+  it("counts a full year of Wednesdays", () => {
+    // De aanvraag uit de aanleiding. 11 januari 2026 is een zondag, dus de
+    // eerste woensdag is de 14e. Nagerekend tegen de kalender: 52 dagen.
+    const { entries, total } = patternSummary(WOENSDAG, "2026-01-11", "2027-01-10");
+    expect(entries).toHaveLength(52);
+    expect(total).toBe(416);
+  });
+
+  it("returns nothing when the period contains no matching day", () => {
+    // Maandag tot en met dinsdag bevat geen woensdag.
+    const { entries, total } = patternSummary(WOENSDAG, "2026-08-03", "2026-08-04");
+    expect(entries).toEqual([]);
+    expect(total).toBe(0);
+  });
+
+  it("does not leak floating-point noise into the total", () => {
+    // 6.1 + 6.1 + 6.1 is 18.299999999999997 zonder afronding.
+    //
+    // Waarom juist deze waarde: kwartieren drijven nooit af, want 0.25 is
+    // 2^-2 en dus exact in binair. Met de step="0.25" van het formulier is
+    // deze afronding onbereikbaar — maar de route accepteert elk getal tussen
+    // 0 en 24, en dáár komt hij vandaan. Een fixture van hele of kwartieruren
+    // zou even hard slagen zonder de afronding en dus niets bewijzen.
+    const zesEen = { monday: 0, tuesday: 0, wednesday: 6.1, thursday: 0, friday: 0 };
+    // 2026-08-05, 2026-08-12 en 2026-08-19 zijn woensdagen.
+    const { entries, total } = patternSummary(zesEen, "2026-08-03", "2026-08-21");
+    expect(entries).toHaveLength(3);
+    expect(total).toBe(18.3);
+  });
+});
