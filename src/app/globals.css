@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind 4 laat `dark:` standaard naar prefers-color-scheme kijken. Wij
+   sturen het thema met een klasse op <html>, omdat de gebruiker het expliciet
+   moet kunnen kiezen. Zonder deze regel doet elke dark:-utility het
+   verkeerde: hij volgt dan het besturingssysteem in plaats van de keuze. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -21,6 +27,37 @@
   --input: 214.3 31.8% 91.4%;
   --ring: 121 37% 36%;
   --radius: 0.5rem;
+}
+
+/* Dezelfde negentien kleurtokens als hierboven, in het donker. --radius hoort
+   niet bij het thema en staat daarom alleen in :root. */
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  /* Lichter dan --background, waar de lichte variant ze allebei op wit heeft:
+     een kaart die exact de paginakleur heeft, verdwijnt in het donker. */
+  --card: 222 40% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 40% 11%;
+  --popover-foreground: 210 40% 98%;
+  /* Zelfde tint als het EVAbits-groen in :root, maar lichter: tegen wit
+     gekozen, en tegen bijna-zwart zakt 36% weg. */
+  --primary: 121 40% 55%;
+  --primary-foreground: 222 47% 9%;
+  --secondary: 217 33% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 18%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 18%;
+  --accent-foreground: 210 40% 98%;
+  /* Minder verzadigd dan in :root, want fel rood op bijna-zwart trilt. De
+     helderheid blijft vrijwel gelijk: deze token staat hier vooral op
+     foutmeldingen, en dan telt leesbaarheid. */
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 121 40% 55%;
 }
 
 @theme inline {
