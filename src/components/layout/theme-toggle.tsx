@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
-import { resolveTheme, THEME_STORAGE_KEY, type ThemeChoice } from "@/lib/theme";
+import { resolveTheme, readStoredTheme, THEME_STORAGE_KEY, type ThemeChoice } from "@/lib/theme";
 
 const KEUZES: Array<{ waarde: ThemeChoice; label: string; Icon: typeof Sun }> = [
   { waarde: "light", label: "Licht", Icon: Sun },
@@ -17,8 +17,7 @@ export function ThemeToggle() {
   const [keuze, setKeuze] = useState<ThemeChoice | null>(null);
 
   useEffect(() => {
-    const opgeslagen = localStorage.getItem(THEME_STORAGE_KEY);
-    setKeuze(opgeslagen === "light" || opgeslagen === "dark" ? opgeslagen : "system");
+    setKeuze(readStoredTheme(localStorage));
   }, []);
 
   useEffect(() => {
@@ -37,7 +36,13 @@ export function ThemeToggle() {
   }, [keuze]);
 
   function kies(waarde: ThemeChoice) {
-    localStorage.setItem(THEME_STORAGE_KEY, waarde);
+    // Een geblokkeerde write mag de klik niet breken: de in-memory keuze
+    // geldt dan nog steeds voor deze sessie, alleen onthoudt de browser hem niet.
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, waarde);
+    } catch {
+      // stil negeren
+    }
     setKeuze(waarde);
   }
 

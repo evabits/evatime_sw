@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveTheme, THEME_STORAGE_KEY } from "./theme";
+import { resolveTheme, readStoredTheme, THEME_STORAGE_KEY } from "./theme";
 
 describe("THEME_STORAGE_KEY", () => {
   it("is the key the inline script in layout.tsx also reads", () => {
@@ -35,5 +35,36 @@ describe("resolveTheme", () => {
     // half thema opleveren; hij valt terug op wat het systeem zegt.
     expect(resolveTheme("blauw", true)).toBe("dark");
     expect(resolveTheme("", false)).toBe("light");
+  });
+});
+
+describe("readStoredTheme", () => {
+  it("returns the stored value when it is light", () => {
+    expect(readStoredTheme({ getItem: () => "light" })).toBe("light");
+  });
+
+  it("returns the stored value when it is dark", () => {
+    expect(readStoredTheme({ getItem: () => "dark" })).toBe("dark");
+  });
+
+  it("returns system when nothing is stored", () => {
+    expect(readStoredTheme({ getItem: () => null })).toBe("system");
+  });
+
+  it("returns system when the stored value is not recognised", () => {
+    expect(readStoredTheme({ getItem: () => "blauw" })).toBe("system");
+  });
+
+  it("returns system when getItem throws (blocked site data)", () => {
+    // Chrome "Alle cookies blokkeren", Firefox "Cookies: Alles", of het
+    // enterprise-beleid DefaultCookiesSetting=2 laten localStorage.getItem
+    // een SecurityError gooien in plaats van null teruggeven.
+    expect(
+      readStoredTheme({
+        getItem: () => {
+          throw new DOMException("blocked", "SecurityError");
+        },
+      })
+    ).toBe("system");
   });
 });

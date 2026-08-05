@@ -128,7 +128,14 @@ export function Sidebar({ user, role }: SidebarProps) {
         >
           <Menu className="h-6 w-6" />
         </button>
-        <Image src="/logo.png" alt="EvaTime" width={100} height={34} className="object-contain" priority />
+        <Image
+          src="/logo.png"
+          alt="EvaTime"
+          width={100}
+          height={34}
+          className="object-contain dark:bg-white dark:rounded dark:p-1"
+          priority
+        />
       </header>
 
       {/* Backdrop */}
@@ -147,7 +154,14 @@ export function Sidebar({ user, role }: SidebarProps) {
         )}
       >
         <div className="p-5 border-b flex items-center justify-between">
-          <Image src="/logo.png" alt="EvaTime" width={110} height={37} className="object-contain" priority />
+          <Image
+            src="/logo.png"
+            alt="EvaTime"
+            width={110}
+            height={37}
+            className="object-contain dark:bg-white dark:rounded dark:p-1"
+            priority
+          />
           <button
             onClick={close}
             className="md:hidden p-1 rounded-md text-muted-foreground hover:text-foreground"

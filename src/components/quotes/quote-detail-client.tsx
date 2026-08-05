@@ -268,7 +268,13 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
               <p className="text-sm font-medium text-muted-foreground mb-1">Van</p>
               {settings ? (
                 <div className="text-sm space-y-0.5">
-                  {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" className="h-12 mb-2 object-contain" />}
+                  {settings.logoUrl && (
+                    <img
+                      src={settings.logoUrl}
+                      alt="Logo"
+                      className="h-12 mb-2 object-contain dark:bg-white dark:rounded dark:p-1"
+                    />
+                  )}
                   <p className="font-medium">{settings.name}</p>
                   {settings.address && <p className="text-muted-foreground">{settings.address}</p>}
                   {settings.city && <p className="text-muted-foreground">{settings.postalCode} {settings.city}</p>}

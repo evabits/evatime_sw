@@ -27,6 +27,9 @@
   --input: 214.3 31.8% 91.4%;
   --ring: 121 37% 36%;
   --radius: 0.5rem;
+  /* Stuurt native UI die niet via de kleurtokens loopt: het datum/tijd-icoon
+     in <input>'s, spinners op number-velden, en scrollbars. */
+  color-scheme: light;
 }
 
 /* Dezelfde negentien kleurtokens als hierboven, in het donker. --radius hoort
@@ -58,6 +61,10 @@
   --border: 217 33% 20%;
   --input: 217 33% 20%;
   --ring: 121 40% 55%;
+  /* Zelfde als bij :root, maar dan donker: zonder deze regel blijft het
+     date-picker icoon, de number-spinner en de scrollbar licht op een
+     donkere pagina. */
+  color-scheme: dark;
 }
 
 @theme inline {

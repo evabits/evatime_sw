@@ -28,3 +28,23 @@ export function resolveTheme(stored: string | null, prefersDark: boolean): Appli
   if (stored === "light" || stored === "dark") return stored;
   return prefersDark ? "dark" : "light";
 }
+
+/**
+ * Leest de opgeslagen keuze uit een storage-achtig object.
+ *
+ * `localStorage.getItem` gooit een `SecurityError` wanneer de browser site-data
+ * blokkeert (bv. Chrome "Alle cookies blokkeren"). Die throw gebeurt in een
+ * effect, dus React geeft hem door aan de dichtstbijzijnde error boundary —
+ * en die is er hier niet, dus valt de hele pagina om. Vandaar apart, puur en
+ * testbaar: de aanroeper geeft het storage-object mee, zodat een test een
+ * stub kan geven die gooit.
+ */
+export function readStoredTheme(storage: Pick<Storage, "getItem">): ThemeChoice {
+  let opgeslagen: string | null;
+  try {
+    opgeslagen = storage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    return "system";
+  }
+  return opgeslagen === "light" || opgeslagen === "dark" ? opgeslagen : "system";
+}
