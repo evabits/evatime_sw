@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { serialize } from "@/lib/utils";
 import { isAdmin } from "@/lib/roles";
 import { AbsenceClient } from "@/components/vacation/absence-client";
+import { toWeekSchedule } from "@/lib/work-schedule";
 
 export default async function AbsencePage() {
   const session = await auth();
@@ -22,6 +23,7 @@ export default async function AbsencePage() {
       include: {
         user: { select: { id: true, name: true } },
         reviewer: { select: { id: true, name: true } },
+        pattern: true,
       },
       orderBy: { startDate: "desc" },
     }),
@@ -47,7 +49,15 @@ export default async function AbsencePage() {
 
   return (
     <AbsenceClient
-      initialRequests={serialize(requests).map((r: any) => ({ ...r, hours: Number(r.hours) }))}
+      // toWeekSchedule maakt er null van als er geen patroon is. Zonder die
+      // omzetting is pattern hier undefined en leest het formulier dat als
+      // "wel een patroon", waardoor het vinkje bij elke bestaande aanvraag
+      // aanstaat. serialize() laat de Decimals bovendien als string achter.
+      initialRequests={serialize(requests).map((r: any) => ({
+        ...r,
+        hours: Number(r.hours),
+        pattern: toWeekSchedule(r.pattern),
+      }))}
       initialBudgets={serialize(budgets).map((b: any) => ({ ...b, hours: Number(b.hours) }))}
       users={users}
       currentUserId={userId}

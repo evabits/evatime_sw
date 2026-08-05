@@ -104,6 +104,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           include: {
             user: { select: { id: true, name: true } },
             reviewer: { select: { id: true, name: true } },
+            pattern: true,
           },
         });
 
@@ -127,7 +128,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         return aanvraag;
       });
 
-      return NextResponse.json({ ...updated, hours: Number(updated.hours) });
+      // Ook hier het patroon meegeven: het scherm vervangt de rij met dit
+      // antwoord, en een ontbrekend veld leest het formulier als "wel een
+      // patroon".
+      return NextResponse.json({
+        ...updated,
+        hours: Number(updated.hours),
+        pattern: toWeekSchedule(updated.pattern),
+      });
     }
 
     if (existing.userId !== userId) {

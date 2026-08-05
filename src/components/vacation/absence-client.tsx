@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarDays, Copy, Check, Plus, Trash2, ThumbsUp, ThumbsDown, Pencil } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { patternSummary } from "@/lib/absence-entries";
+import type { WeekSchedule } from "@/lib/work-schedule";
 
 type AbsenceType = "VACATION" | "SICK" | "PARENTAL_LEAVE" | "SPECIAL_LEAVE" | "UNPAID_LEAVE";
 type AbsenceStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -28,6 +30,16 @@ const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
 
 const ABSENCE_TYPES = Object.entries(ABSENCE_TYPE_LABELS) as [AbsenceType, string][];
 
+const LEEG_PATROON: WeekSchedule = { monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0 };
+
+const PATROON_VELDEN: Array<{ key: keyof WeekSchedule; label: string }> = [
+  { key: "monday", label: "Ma" },
+  { key: "tuesday", label: "Di" },
+  { key: "wednesday", label: "Wo" },
+  { key: "thursday", label: "Do" },
+  { key: "friday", label: "Vr" },
+];
+
 interface AbsenceRequest {
   id: string;
   userId: string;
@@ -35,6 +47,7 @@ interface AbsenceRequest {
   startDate: string;
   endDate: string;
   hours: number;
+  pattern: WeekSchedule | null;
   description?: string | null;
   status: AbsenceStatus;
   user: { id: string; name: string };
@@ -135,6 +148,8 @@ export function AbsenceClient({
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<AbsenceRequest | null>(null);
+  const [herhaald, setHerhaald] = useState(false);
+  const [patroon, setPatroon] = useState<WeekSchedule>(LEEG_PATROON);
   const [editingBudget, setEditingBudget] = useState<VacationBudget | null>(null);
   const [serverError, setServerError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -180,10 +195,13 @@ export function AbsenceClient({
       : "";
 
   useEffect(() => {
+    // Met een patroon leidt de server het totaal af; deze berekening zou dat
+    // getal overschrijven zodra je een datum aanraakt.
+    if (herhaald) return;
     if (!watchedStart || !watchedEnd) return;
     const calculated = countWorkingHours(watchedStart, watchedEnd, weeklyHours);
     if (calculated > 0) requestForm.setValue("hours", calculated, { shouldValidate: false });
-  }, [watchedStart, watchedEnd, weeklyHours, requestForm]);
+  }, [herhaald, watchedStart, watchedEnd, weeklyHours, requestForm]);
 
   function openRequestDialog(req?: AbsenceRequest) {
     setServerError("");
@@ -196,9 +214,13 @@ export function AbsenceClient({
         hours: req.hours,
         description: req.description ?? "",
       });
+      setHerhaald(req.pattern !== null);
+      setPatroon(req.pattern ?? LEEG_PATROON);
     } else {
       setEditingRequest(null);
       requestForm.reset({ type: "VACATION", startDate: "", endDate: "", hours: "" as any, description: "" });
+      setHerhaald(false);
+      setPatroon(LEEG_PATROON);
     }
     setRequestDialogOpen(true);
   }
@@ -219,7 +241,13 @@ export function AbsenceClient({
     setServerError("");
     const url = editingRequest ? `/api/absence-requests/${editingRequest.id}` : "/api/absence-requests";
     const method = editingRequest ? "PUT" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      // Altijd expliciet: null betekent "geen patroon", en dat is wat het
+      // uitgezette vinkje bedoelt.
+      body: JSON.stringify({ ...values, pattern: herhaald ? patroon : null }),
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       setServerError(err.error ?? "Er is een fout opgetreden");
@@ -300,6 +328,15 @@ export function AbsenceClient({
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
+  // Berekend met exact dezelfde functie als de server gebruikt, zodat het
+  // getal dat je ziet het getal is dat je krijgt.
+  const patroonSamenvatting = (() => {
+    if (!herhaald || !watchedStart || !watchedEnd) return "Vul een periode en de uren per dag in.";
+    const { entries, total } = patternSummary(patroon, watchedStart, watchedEnd);
+    if (entries.length === 0) return "Deze periode bevat geen dagen die op het patroon passen.";
+    return `${entries.length} dagen, ${total.toFixed(2)} uur in totaal`;
+  })();
 
   return (
     <div className="space-y-6">
@@ -566,6 +603,43 @@ export function AbsenceClient({
                 <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
                   Saldo na aanvraag: {balanceAfterRequest}u (van {myBudgetHours}u budget)
                 </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input accent-primary"
+                  checked={herhaald}
+                  onChange={(e) => setHerhaald(e.target.checked)}
+                />
+                Herhaald per week
+              </label>
+
+              {herhaald && (
+                <>
+                  <div className="flex flex-wrap gap-3">
+                    {PATROON_VELDEN.map((v) => (
+                      <div key={v.key} className="space-y-1">
+                        <Label>{v.label}</Label>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          max="24"
+                          className="w-20"
+                          value={patroon[v.key]}
+                          onChange={(e) =>
+                            setPatroon((prev) => ({ ...prev, [v.key]: Number(e.target.value) || 0 }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {patroonSamenvatting}
+                  </p>
+                </>
               )}
             </div>
             <div className="space-y-1.5">
