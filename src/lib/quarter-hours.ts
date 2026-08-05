@@ -20,14 +20,20 @@ export const NOT_A_QUARTER = "Uren moeten in stappen van 15 minuten (0,25 uur)";
  * invoerfout maar "die dag niet".
  *
  * Er wordt in kwartiereenheden gerekend in plaats van met `hours % 0.25`,
- * omdat een modulo op floating point net naast nul kan landen. De marge vangt
- * waarden op die uit een som van kwartieren komen; een echte tiende van een uur
- * ligt daar ruim buiten.
+ * omdat een modulo op floating point net naast nul kan landen. Dat vergt hier
+ * geen marge: 0,25 is een macht van twee (2⁻²) en dus exact weer te geven in
+ * binaire floating point, dus elk geldig veelvoud van een kwartier deelt
+ * precies op — een tolerantie zou alleen een net-niet-kwartier als
+ * `0,2500000001` ten onrechte doorlaten. `Number.isInteger` geeft vanzelf
+ * `false` voor `NaN` en `Infinity`, dus een aparte `Number.isFinite`-check is
+ * overbodig.
+ *
+ * De functie oordeelt alleen over de stap, niet over het teken of het bereik:
+ * `isQuarter(-0.5)` is `true`. Callers die alleen positieve of niet-negatieve
+ * uren toestaan, moeten dat zelf afdwingen (`.positive()`, `.min(0)`, e.d.).
  */
 export function isQuarter(hours: number): boolean {
-  if (!Number.isFinite(hours)) return false;
-  const units = hours / QUARTER;
-  return Math.abs(units - Math.round(units)) < 1e-9;
+  return Number.isInteger(hours / QUARTER);
 }
 
 /**

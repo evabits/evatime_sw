@@ -638,6 +638,14 @@ export function AbsenceClient({
 
               {herhaald && (
                 <>
+                  {/* De uren-invoer hierboven is dan readOnly en toont het
+                      berekende totaal, dus de gebruiker kan een fout daarin
+                      niet corrigeren. Wat dat totaal wél op een kwartier houdt,
+                      is dat elke dagveld hier `step="0.25"` heeft binnen een
+                      `<form>` zonder `noValidate`: de browser blokkeert zelf al
+                      een niet-kwartier daginvoer. `noValidate` toevoegen aan dit
+                      formulier, of `readOnly` hierboven vervangen door
+                      `disabled`, zou die garantie stilletjes wegnemen. */}
                   <div className="flex flex-wrap gap-3">
                     {PATROON_VELDEN.map((v) => (
                       <div key={v.key} className="space-y-1">

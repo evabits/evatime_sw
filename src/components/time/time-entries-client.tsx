@@ -67,6 +67,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
   const [filterProject, setFilterProject] = useState("all");
   const [fetching, setFetching] = useState(false);
@@ -293,6 +294,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
 
   async function onSubmit(data: FormData) {
     setLoading(true);
+    setSubmitError(null);
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
@@ -314,6 +316,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
             const updated = await res.json();
             setEntries((prev) => prev.map((e) => (e.id === editing ? { ...e, ...updated } : e)));
           }
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setSubmitError(body.issues ? "Controleer de ingevulde velden." : (body.error ?? "Opslaan mislukt"));
         }
       } else {
         const res = await fetch("/api/time", {
@@ -340,6 +345,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
               setEntries((prev) => [created, ...prev]);
             }
           }
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setSubmitError(body.issues ? "Controleer de ingevulde velden." : (body.error ?? "Opslaan mislukt"));
         }
       }
     } finally {
@@ -499,6 +507,10 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
               <Label>Omschrijving</Label>
               <Textarea placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
             </div>
+
+            {submitError && (
+              <p className="text-xs text-destructive sm:col-span-2">{submitError}</p>
+            )}
 
             <div className="sm:col-span-2 flex gap-2">
               <Button type="submit" disabled={loading}>

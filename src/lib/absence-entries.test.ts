@@ -94,6 +94,13 @@ describe("splitHoursOverDays", () => {
     // kwartierregel ging gelden. 3,30 wordt 13 kwartieren, dus 3,25.
     expect(totaalInCenten(splitHoursOverDays(3.3, ["2026-08-03"]))).toBe(325);
   });
+
+  it("returns nothing for a legacy total below half a quarter", () => {
+    // Ook alleen bereikbaar via een oud, niet-kwartier totaal: 0,1 rondt af
+    // naar 0 kwartieren. De goedkeuringsroute weigert zo'n aanvraag inmiddels
+    // aan de poort; dit pint alleen dat de functie hier niets verzint.
+    expect(splitHoursOverDays(0.1, week)).toEqual([]);
+  });
 });
 
 import { patternedEntries, patternSummary } from "./absence-entries";
