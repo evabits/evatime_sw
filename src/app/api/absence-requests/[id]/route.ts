@@ -5,7 +5,8 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { workingDaysBetween } from "@/lib/working-days";
-import { ABSENCE_PROJECT_NAMES, splitHoursOverDays } from "@/lib/absence-entries";
+import { ABSENCE_PROJECT_NAMES, splitHoursOverDays, patternSummary } from "@/lib/absence-entries";
+import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
 
 const employeeUpdateSchema = z.object({
   type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).optional(),
@@ -13,6 +14,13 @@ const employeeUpdateSchema = z.object({
   endDate: z.string(),
   hours: z.number().positive(),
   description: z.string().optional(),
+  pattern: z.object({
+    monday: z.number().min(0).max(24),
+    tuesday: z.number().min(0).max(24),
+    wednesday: z.number().min(0).max(24),
+    thursday: z.number().min(0).max(24),
+    friday: z.number().min(0).max(24),
+  }).nullable().optional(),
 });
 
 const adminUpdateSchema = z.object({
@@ -107,21 +115,55 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const data = employeeUpdateSchema.parse(body);
-    const updated = await prisma.absenceRequest.update({
-      where: { id },
-      data: {
-        ...(data.type ? { type: data.type } : {}),
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        hours: data.hours,
-        description: data.description ?? null,
-      },
-      include: {
-        user: { select: { id: true, name: true } },
-        reviewer: { select: { id: true, name: true } },
-      },
+
+    let hours = data.hours;
+    if (data.pattern) {
+      if (weekTotal(data.pattern) === 0) {
+        return NextResponse.json(
+          { error: "Een patroon van alleen nullen levert geen verlofdagen op" },
+          { status: 400 },
+        );
+      }
+      const { entries, total } = patternSummary(data.pattern, data.startDate, data.endDate);
+      if (entries.length === 0) {
+        return NextResponse.json(
+          { error: "Deze periode bevat geen dagen die op het patroon passen" },
+          { status: 400 },
+        );
+      }
+      hours = total;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Het patroon eerst wegschrijven en pas daarna de aanvraag bijwerken, zodat
+      // de include op de update het NIEUWE patroon teruggeeft en niet het oude.
+      // Verwijderen-en-opnieuw-maken: geen patroon in de body betekent dat een
+      // bestaand patroon verdwijnt.
+      await tx.absencePattern.deleteMany({ where: { absenceRequestId: id } });
+      if (data.pattern) {
+        await tx.absencePattern.create({ data: { absenceRequestId: id, ...data.pattern } });
+      }
+      return tx.absenceRequest.update({
+        where: { id },
+        data: {
+          ...(data.type ? { type: data.type } : {}),
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          hours,
+          description: data.description ?? null,
+        },
+        include: {
+          user: { select: { id: true, name: true } },
+          reviewer: { select: { id: true, name: true } },
+          pattern: true,
+        },
+      });
     });
-    return NextResponse.json({ ...updated, hours: Number(updated.hours) });
+    return NextResponse.json({
+      ...updated,
+      hours: Number(updated.hours),
+      pattern: toWeekSchedule(updated.pattern),
+    });
   } catch (e) { return handleError(e); }
 }
 
