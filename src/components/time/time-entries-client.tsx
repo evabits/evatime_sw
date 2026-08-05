@@ -363,6 +363,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
 
   function startEdit(entry: any) {
     setEditing(entry.id);
+    setSubmitError(null);
     // De tijden zijn niet opgeslagen, dus bij het bewerken van een bestaande
     // regel is er niets om te tonen. Leeg laten is eerlijker dan gokken.
     setVanTijd("");
@@ -523,6 +524,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   form.reset({ date: selectedDay ?? today, userId });
                   setVanTijd("");
                   setTotTijd("");
+                  setSubmitError(null);
                 }}>Annuleren</Button>
               )}
             </div>
