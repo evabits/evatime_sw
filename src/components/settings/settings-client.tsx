@@ -200,7 +200,7 @@ export function SettingsClient({ initialSettings }: Props) {
             {serverError && <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>}
             <div className="sm:col-span-2 flex items-center gap-3">
               <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
-              {saved && <p className="text-sm text-green-600">Opgeslagen!</p>}
+              {saved && <p className="text-sm text-green-600 dark:text-green-400">Opgeslagen!</p>}
             </div>
           </form>
         </CardContent>

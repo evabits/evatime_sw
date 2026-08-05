@@ -308,7 +308,7 @@ export function ContractsClient({
               <Textarea {...form.register("notes")} placeholder="Optionele opmerkingen" />
             </div>
             {hasOverlap && (
-              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2 dark:text-amber-400 dark:bg-amber-950/30 dark:border-amber-900">
                 Let op: deze periode overlapt met een bestaand contract
               </p>
             )}

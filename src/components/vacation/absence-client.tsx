@@ -116,19 +116,19 @@ type BudgetForm = z.infer<typeof budgetSchema>;
 type Tab = "requests" | "budgets" | "calendar";
 
 function statusBadge(status: AbsenceStatus) {
-  if (status === "APPROVED") return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Goedgekeurd</Badge>;
-  if (status === "REJECTED") return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Afgewezen</Badge>;
-  return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">In afwachting</Badge>;
+  if (status === "APPROVED") return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/40">Goedgekeurd</Badge>;
+  if (status === "REJECTED") return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/40 dark:text-red-200 dark:hover:bg-red-900/40">Afgewezen</Badge>;
+  return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-200 dark:hover:bg-yellow-900/40">In afwachting</Badge>;
 }
 
 function typeBadge(type: AbsenceType) {
   const label = ABSENCE_TYPE_LABELS[type];
   const colors: Record<AbsenceType, string> = {
-    VACATION: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-    SICK: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-    PARENTAL_LEAVE: "bg-pink-100 text-pink-800 hover:bg-pink-100",
-    SPECIAL_LEAVE: "bg-purple-100 text-purple-800 hover:bg-purple-100",
-    UNPAID_LEAVE: "bg-gray-100 text-gray-800 hover:bg-gray-100",
+    VACATION: "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-900/40",
+    SICK: "bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-900/40 dark:text-orange-200 dark:hover:bg-orange-900/40",
+    PARENTAL_LEAVE: "bg-pink-100 text-pink-800 hover:bg-pink-100 dark:bg-pink-900/40 dark:text-pink-200 dark:hover:bg-pink-900/40",
+    SPECIAL_LEAVE: "bg-purple-100 text-purple-800 hover:bg-purple-100 dark:bg-purple-900/40 dark:text-purple-200 dark:hover:bg-purple-900/40",
+    UNPAID_LEAVE: "bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-800/60",
   };
   return <Badge className={colors[type]}>{label}</Badge>;
 }
@@ -395,7 +395,7 @@ export function AbsenceClient({
             <CardTitle className="text-sm font-medium">Vakantie resterend</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${myRemaining < 0 ? "text-red-600" : ""}`}>
+            <div className={`text-2xl font-bold ${myRemaining < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
               {myRemaining}u
             </div>
             <p className="text-xs text-muted-foreground">beschikbaar</p>
@@ -487,7 +487,7 @@ export function AbsenceClient({
                           <td className="px-4 py-3">{b.year}</td>
                           <td className="px-4 py-3 text-right">{b.hours}</td>
                           <td className="px-4 py-3 text-right">{used}</td>
-                          <td className={`px-4 py-3 text-right font-medium ${remaining < 0 ? "text-red-600" : ""}`}>
+                          <td className={`px-4 py-3 text-right font-medium ${remaining < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                             {remaining}
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -538,7 +538,7 @@ export function AbsenceClient({
                     className="font-mono text-xs"
                   />
                   <Button variant="outline" size="icon" onClick={copyCalendarUrl} disabled={!calendarToken}>
-                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    {copied ? <Check className="h-4 w-4 text-green-600 dark:text-green-400" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </CardContent>
@@ -620,7 +620,7 @@ export function AbsenceClient({
                 <p className="text-xs text-destructive">{requestForm.formState.errors.hours.message}</p>
               )}
               {balanceAfterRequest !== null && myBudgetHours > 0 && dialogRequestedHours > 0 && (
-                <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
                   Saldo na aanvraag: {balanceAfterRequest}u (van {myBudgetHours}u budget)
                 </p>
               )}
@@ -816,7 +816,7 @@ function RequestsTable({
               {isAdmin && (
                 <td className="px-4 py-3 text-right">
                   {balanceAfter !== null ? (
-                    <span className={`font-medium tabular-nums ${balanceAfter < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                    <span className={`font-medium tabular-nums ${balanceAfter < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
                       {balanceAfter}u
                     </span>
                   ) : (
@@ -831,7 +831,7 @@ function RequestsTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-green-600"
+                        className="h-7 w-7 text-green-600 dark:text-green-400"
                         title="Goedkeuren"
                         onClick={() => onReview(r.id, "APPROVED")}
                       >
@@ -840,7 +840,7 @@ function RequestsTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-red-600"
+                        className="h-7 w-7 text-red-600 dark:text-red-400"
                         title="Afwijzen"
                         onClick={() => onReview(r.id, "REJECTED")}
                       >

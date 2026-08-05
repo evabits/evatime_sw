@@ -195,7 +195,7 @@ function ReviewEditor({ review, onClose }: { review: Review; onClose: () => void
       </div>
 
       {completed && review.resultingContractId && (
-        <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 dark:text-green-400 dark:bg-green-950/30 dark:border-green-900">
           Salaris aangepast (nieuw contract aangemaakt)
         </p>
       )}

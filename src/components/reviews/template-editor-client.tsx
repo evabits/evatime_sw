@@ -180,7 +180,7 @@ export function TemplateEditorClient({ initialDefinition }: { initialDefinition:
           {saving ? "Opslaan..." : "Opslaan"}
         </Button>
         {status && (
-          <p className={`text-sm ${status.ok ? "text-green-600" : "text-destructive"}`}>{status.msg}</p>
+          <p className={`text-sm ${status.ok ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>{status.msg}</p>
         )}
       </div>
     </div>

@@ -213,7 +213,7 @@ export function ReportsClient({ customers, projects, users, tags, categories, ro
                           <TableCell className="text-right font-mono">{formatHours(emp.hours)}</TableCell>
                           <TableCell className="text-right font-mono">
                             {extraHours != null && extraHours > 0
-                              ? <span className="text-amber-600 font-medium">+{formatHours(extraHours)}</span>
+                              ? <span className="text-amber-600 dark:text-amber-400 font-medium">+{formatHours(extraHours)}</span>
                               : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="text-right font-mono">{emp.km.toFixed(1)} km</TableCell>

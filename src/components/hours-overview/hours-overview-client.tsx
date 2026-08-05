@@ -51,9 +51,9 @@ function navigate(mode: Mode, ref: Date, dir: 1 | -1): Date {
 
 function deltaColor(delta: number | null) {
   if (delta == null) return "";
-  if (delta >= 0) return "text-green-600";
-  if (delta >= -10) return "text-amber-600";
-  return "text-red-600";
+  if (delta >= 0) return "text-green-600 dark:text-green-400";
+  if (delta >= -10) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
 }
 
 export function HoursOverviewClient({ isAdmin }: Props) {
@@ -194,7 +194,7 @@ export function HoursOverviewClient({ isAdmin }: Props) {
                     {isAdmin && (
                       <TableCell className="text-right">
                         {hasSent ? (
-                          <span className="flex items-center gap-1 text-xs text-green-600 justify-end">
+                          <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 justify-end">
                             <Check className="h-3.5 w-3.5" /> Verzonden
                           </span>
                         ) : (

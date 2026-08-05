@@ -151,9 +151,9 @@ export default async function DashboardPage() {
 
       {isAdmin && customerlessProjects > 0 && (
         <Link href="/projects?filter=no-customer" className="block">
-          <Card className="border-amber-500/40 bg-amber-500/5">
+          <Card className="border-amber-500/40 bg-amber-500/5 dark:border-amber-900 dark:bg-amber-950/30">
             <CardContent className="p-4 flex items-center gap-3">
-              <FolderOpen className="h-5 w-5 text-amber-600" />
+              <FolderOpen className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               <div>
                 <p className="font-medium">
                   {customerlessProjects} {customerlessProjects === 1 ? "project" : "projecten"} zonder klant
@@ -221,7 +221,7 @@ export default async function DashboardPage() {
             <Umbrella className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${vacRemainingHours < 0 ? "text-red-600" : ""}`}>
+            <div className={`text-2xl font-bold ${vacRemainingHours < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
               {vacRemainingHours}u
             </div>
             <p className="text-xs text-muted-foreground">
