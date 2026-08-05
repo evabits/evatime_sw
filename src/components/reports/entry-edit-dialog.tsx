@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 
 const TITLE: Record<BulkKind, string> = { time: "Uren aanpassen", km: "Rit aanpassen", expense: "Uitgave aanpassen" };
 
@@ -61,6 +62,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
       if (!form.projectId) return "Project is verplicht";
       if (!form.date) return "Datum is verplicht";
       if (kind === "time" && !(Number(form.hours) > 0)) return "Uren moet groter dan 0 zijn";
+      if (kind === "time" && !isQuarter(Number(form.hours))) return NOT_A_QUARTER;
       if (kind === "km" && !(Number(form.km) > 0)) return "Kilometers moet groter dan 0 zijn";
     }
     if (form.rateOverride !== "" && !(Number(form.rateOverride) > 0)) return "Tarief moet positief zijn";

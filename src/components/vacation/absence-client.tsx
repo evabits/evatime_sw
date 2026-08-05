@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Copy, Check, Plus, Trash2, ThumbsUp, ThumbsDown, Pencil } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { patternSummary } from "@/lib/absence-entries";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 import type { WeekSchedule } from "@/lib/work-schedule";
 
 type AbsenceType = "VACATION" | "SICK" | "PARENTAL_LEAVE" | "SPECIAL_LEAVE" | "UNPAID_LEAVE";
@@ -99,7 +100,7 @@ const requestSchema = z.object({
   type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]),
   startDate: z.string().min(1, "Verplicht"),
   endDate: z.string().min(1, "Verplicht"),
-  hours: z.coerce.number({ invalid_type_error: "Verplicht" }).positive("Moet positief zijn"),
+  hours: z.coerce.number({ invalid_type_error: "Verplicht" }).positive("Moet positief zijn").refine(isQuarter, NOT_A_QUARTER),
   description: z.string().optional(),
 });
 
@@ -609,8 +610,8 @@ export function AbsenceClient({
               <Input
                 id="hours"
                 type="number"
-                step="0.5"
-                min="0.5"
+                step="0.25"
+                min="0.25"
                 readOnly={herhaald}
                 className={herhaald ? "bg-muted text-muted-foreground" : undefined}
                 {...requestForm.register("hours")}
