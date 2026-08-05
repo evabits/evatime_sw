@@ -445,8 +445,26 @@ model AbsenceRequest {
   reviewer    User?         @relation("AbsenceReviewer", fields: [reviewedBy], references: [id])
   reviewedAt  DateTime?
   timeEntries TimeEntry[]
+  pattern     AbsencePattern?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+}
+
+model AbsencePattern {
+  // absenceRequestId is meteen de sleutel: één patroon per aanvraag, of geen.
+  // Vijf nullable kolommen op AbsenceRequest zouden "alle vijf leeg" niet van
+  // "geen patroon" kunnen onderscheiden, en juist dat onderscheid draagt het
+  // ontwerp — zonder rij gebeurt er exact wat er nu gebeurt.
+  absenceRequestId String         @id
+  absenceRequest   AbsenceRequest @relation(fields: [absenceRequestId], references: [id], onDelete: Cascade)
+  // Verplicht en niet nullable: een dag leeg laten is dubbelzinnig. Nul is nul.
+  // De vorm is gelijk aan WeekSchedule uit src/lib/work-schedule.ts, zodat
+  // scheduledHoursOn, weekTotal en toWeekSchedule er ongewijzigd op werken.
+  monday    Decimal @db.Decimal(4, 2)
+  tuesday   Decimal @db.Decimal(4, 2)
+  wednesday Decimal @db.Decimal(4, 2)
+  thursday  Decimal @db.Decimal(4, 2)
+  friday    Decimal @db.Decimal(4, 2)
 }
 
 model Contract {
