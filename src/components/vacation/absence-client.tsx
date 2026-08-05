@@ -194,14 +194,26 @@ export function AbsenceClient({
       ? `${window.location.origin}/api/vacation/calendar?token=${calendarToken}`
       : "";
 
+  // Wat het patroon over de gekozen periode oplevert. Eén berekening voor het
+  // urenveld en de regel eronder, met exact dezelfde functie als de server
+  // gebruikt — zodat het getal dat je ziet het getal is dat je krijgt.
+  const patroonInfo =
+    herhaald && watchedStart && watchedEnd ? patternSummary(patroon, watchedStart, watchedEnd) : null;
+  const patroonTotaal = patroonInfo?.total ?? 0;
+
   useEffect(() => {
-    // Met een patroon leidt de server het totaal af; deze berekening zou dat
-    // getal overschrijven zodra je een datum aanraakt.
-    if (herhaald) return;
+    // Met een patroon is het urenveld alleen-lezen en toont het het afgeleide
+    // totaal. De werkdagentelling zou dat overschrijven zodra je een datum
+    // aanraakt, en zonder een waarde in het veld komt het formulier niet langs
+    // zijn eigen "moet positief zijn".
+    if (herhaald) {
+      requestForm.setValue("hours", patroonTotaal, { shouldValidate: false });
+      return;
+    }
     if (!watchedStart || !watchedEnd) return;
     const calculated = countWorkingHours(watchedStart, watchedEnd, weeklyHours);
     if (calculated > 0) requestForm.setValue("hours", calculated, { shouldValidate: false });
-  }, [herhaald, watchedStart, watchedEnd, weeklyHours, requestForm]);
+  }, [herhaald, patroonTotaal, watchedStart, watchedEnd, weeklyHours, requestForm]);
 
   function openRequestDialog(req?: AbsenceRequest) {
     setServerError("");
@@ -329,14 +341,11 @@ export function AbsenceClient({
     });
   }
 
-  // Berekend met exact dezelfde functie als de server gebruikt, zodat het
-  // getal dat je ziet het getal is dat je krijgt.
-  const patroonSamenvatting = (() => {
-    if (!herhaald || !watchedStart || !watchedEnd) return "Vul een periode en de uren per dag in.";
-    const { entries, total } = patternSummary(patroon, watchedStart, watchedEnd);
-    if (entries.length === 0) return "Deze periode bevat geen dagen die op het patroon passen.";
-    return `${entries.length} dagen, ${total.toFixed(2)} uur in totaal`;
-  })();
+  const patroonSamenvatting = !patroonInfo
+    ? "Vul een periode en de uren per dag in."
+    : patroonInfo.entries.length === 0
+      ? "Deze periode bevat geen dagen die op het patroon passen."
+      : `${patroonInfo.entries.length} dagen, ${patroonTotaal.toFixed(2)} uur in totaal`;
 
   return (
     <div className="space-y-6">
@@ -595,7 +604,17 @@ export function AbsenceClient({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="hours">Uren</Label>
-              <Input id="hours" type="number" step="0.5" min="0.5" {...requestForm.register("hours")} />
+              {/* readOnly en niet disabled: een disabled veld stuurt niets mee
+                  en valt dan over zijn eigen "verplicht". */}
+              <Input
+                id="hours"
+                type="number"
+                step="0.5"
+                min="0.5"
+                readOnly={herhaald}
+                className={herhaald ? "bg-muted text-muted-foreground" : undefined}
+                {...requestForm.register("hours")}
+              />
               {requestForm.formState.errors.hours && (
                 <p className="text-xs text-destructive">{requestForm.formState.errors.hours.message}</p>
               )}
