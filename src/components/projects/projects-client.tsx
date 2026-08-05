@@ -64,7 +64,10 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   const [tagInput, setTagInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
-  const [noCustomerOnly, setNoCustomerOnly] = useState(initialNoCustomerOnly);
+  // "all", de sentinel GEEN_KLANT, of een customerId. De dashboardlink
+  // /projects?filter=no-customer komt hier binnen als initialNoCustomerOnly en
+  // zet de lijst meteen op "Zonder klant".
+  const [customerFilter, setCustomerFilter] = useState(initialNoCustomerOnly ? GEEN_KLANT : "all");
   const customerlessCount = projects.filter((p) => !p.customer).length;
   const [levelRates, setLevelRates] = useState<Record<string, string>>({});
   // Whether levelRates was actually loaded for the project being edited (vs. the
@@ -314,7 +317,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   // "selecteer alles" nooit meer archiveert dan er op het scherm staat.
   const visible = projects
     .filter((p) => statusFilter === "all" || p.status === statusFilter)
-    .filter((p) => !noCustomerOnly || !p.customer);
+    .filter((p) => customerFilter === "all"
+      || (customerFilter === GEEN_KLANT ? !p.customer : p.customerId === customerFilter));
   const selectable = visible.filter((p) => !p.archivedAt);
   const selectedVisible = selectable.filter((p) => selected.includes(p.id));
   const allSelected = selectable.length > 0 && selectedVisible.length === selectable.length;
@@ -333,15 +337,18 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               onChange={(e) => { setShowArchived(e.target.checked); loadProjects(e.target.checked); }} />
             Toon gearchiveerd
           </label>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer mr-1">
-            <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
-              checked={noCustomerOnly}
-              onChange={(e) => setNoCustomerOnly(e.target.checked)} />
-            Zonder klant
-            {customerlessCount > 0 && (
-              <Badge variant="secondary" className="ml-1">{customerlessCount}</Badge>
-            )}
-          </label>
+          <Select onValueChange={setCustomerFilter} value={customerFilter}>
+            <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle klanten</SelectItem>
+              <SelectItem value={GEEN_KLANT}>
+                Zonder klant{customerlessCount > 0 ? ` (${customerlessCount})` : ""}
+              </SelectItem>
+              {customers.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select onValueChange={setStatusFilter} value={statusFilter}>
             <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
             <SelectContent>
