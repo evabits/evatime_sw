@@ -6,20 +6,25 @@ import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { patternSummary } from "@/lib/absence-entries";
 import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+
+// De vijf waarden zijn urenregistratie zodra de aanvraag goedgekeurd wordt, dus
+// ze vallen onder dezelfde kwartierregel. Nul mag: dat betekent "die dag niet".
+const patroonUren = z.number().min(0).max(24).refine(isQuarter, NOT_A_QUARTER);
 
 const patternSchema = z.object({
-  monday: z.number().min(0).max(24),
-  tuesday: z.number().min(0).max(24),
-  wednesday: z.number().min(0).max(24),
-  thursday: z.number().min(0).max(24),
-  friday: z.number().min(0).max(24),
+  monday: patroonUren,
+  tuesday: patroonUren,
+  wednesday: patroonUren,
+  thursday: patroonUren,
+  friday: patroonUren,
 });
 
 const createSchema = z.object({
   type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).default("VACATION"),
   startDate: z.string(),
   endDate: z.string(),
-  hours: z.number().positive(),
+  hours: z.number().positive().refine(isQuarter, NOT_A_QUARTER),
   description: z.string().optional(),
   // null én ontbrekend betekenen allebei "geen patroon". Dat wijkt af van de
   // *Known-guard bij levelRates en memberIds, waar ontbrekend "niet aanraken"

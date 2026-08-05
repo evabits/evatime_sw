@@ -6,11 +6,12 @@ import { handleError, entryMutationError, projectMembershipError } from "@/lib/a
 import { isAdmin } from "@/lib/roles";
 import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
 import { membershipCheckNeeded } from "@/lib/project-members";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 
 const schema = z.object({
   projectId: z.string().min(1),
   date: z.string(),
-  hours: z.number().positive(),
+  hours: z.number().positive().refine(isQuarter, NOT_A_QUARTER),
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   userId: z.string().optional().nullable(),

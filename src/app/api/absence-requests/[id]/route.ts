@@ -12,19 +12,22 @@ import {
   patternedEntries,
 } from "@/lib/absence-entries";
 import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+
+const patroonUren = z.number().min(0).max(24).refine(isQuarter, NOT_A_QUARTER);
 
 const employeeUpdateSchema = z.object({
   type: z.enum(["VACATION", "SICK", "PARENTAL_LEAVE", "SPECIAL_LEAVE", "UNPAID_LEAVE"]).optional(),
   startDate: z.string(),
   endDate: z.string(),
-  hours: z.number().positive(),
+  hours: z.number().positive().refine(isQuarter, NOT_A_QUARTER),
   description: z.string().optional(),
   pattern: z.object({
-    monday: z.number().min(0).max(24),
-    tuesday: z.number().min(0).max(24),
-    wednesday: z.number().min(0).max(24),
-    thursday: z.number().min(0).max(24),
-    friday: z.number().min(0).max(24),
+    monday: patroonUren,
+    tuesday: patroonUren,
+    wednesday: patroonUren,
+    thursday: patroonUren,
+    friday: patroonUren,
   }).nullable().optional(),
 });
 
