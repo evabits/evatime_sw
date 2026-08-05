@@ -47,8 +47,20 @@ function abonneer(onStoreChange: Listener) {
 // Geeft de ThemeChoice-string zelf terug, nooit een nieuw object: bij
 // ongewijzigde inhoud moet dit voor React via Object.is gelijk blijven aan
 // de vorige aanroep, anders rendert useSyncExternalStore eindeloos door.
+//
+// De try/catch hier vangt iets anders dan die in readStoredTheme: een
+// geblokkeerde browser (Chrome "Alle cookies blokkeren" e.d.) laat al de
+// property-access `localStorage` zélf een SecurityError gooien, nog vóór
+// `.getItem` wordt aangeroepen. readStoredTheme vangt alleen een gooiende
+// getItem op; zonder deze extra laag gooit haalSnapshot tijdens het
+// hydrateren, en zonder error boundary onder src/app neemt dat de hele app
+// mee. Beide guards blijven dus nodig — niet "vereenvoudigen" tot één.
 function haalSnapshot(): ThemeChoice {
-  return noodgeheugen ?? readStoredTheme(localStorage);
+  try {
+    return noodgeheugen ?? readStoredTheme(localStorage);
+  } catch {
+    return "system";
+  }
 }
 
 // Op de server bestaat localStorage niet; deze waarde moet gelijk zijn aan
