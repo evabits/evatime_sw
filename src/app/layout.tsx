@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -53,18 +52,19 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-full antialiased">
+        {/* Geen handgeschreven <head> (zie
+            node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/layout.md:
+            geen <title>/<meta> zelf zetten, ivm de Metadata API). Dit is een
+            gewoon <script>-element, geen next/script: de inline-variant van
+            next/script met strategy="beforeInteractive" wordt in de App
+            Router niet als uitvoerbaar script uitgestuurd maar als stub die
+            pas na het laden van de clientbundel wordt gedraind
+            (node_modules/next/dist/client/script.js en app-bootstrap.js) —
+            te laat om de flits te voorkomen. Een kaal <script>-element vóór
+            children wordt door de browser tijdens het parsen van de <body>
+            uitgevoerd, dus vóór er iets geschilderd is. */}
+        <script dangerouslySetInnerHTML={{ __html: themaScript }} />
         {children}
-        {/* App Router-lagouts mogen geen handgeschreven <head> hebben (zie
-            node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/layout.md,
-            "You should not manually add <head> tags"). next/script met
-            strategy="beforeInteractive" is het gedocumenteerde alternatief:
-            het draait vóór hydratatie en Next.js hijst het zelf naar <head>,
-            ongeacht waar het component staat (zie .../02-components/script.md). */}
-        <Script
-          id="theme-script"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: themaScript }}
-        />
       </body>
     </html>
   );
