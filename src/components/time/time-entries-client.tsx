@@ -20,6 +20,7 @@ import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { isQuarter, NOT_A_QUARTER, hoursBetween } from "@/lib/quarter-hours";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
 
@@ -28,7 +29,7 @@ const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
   date: z.string().min(1, "Verplicht"),
-  hours: z.coerce.number().positive("Moet positief zijn"),
+  hours: z.coerce.number().positive("Moet positief zijn").refine(isQuarter, NOT_A_QUARTER),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
   userId: z.string().optional(),
@@ -146,6 +147,19 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     resolver: zodResolver(schema),
     defaultValues: { date: today, userId },
   });
+
+  // Van-tot is invoerhulp en geen veld: het wordt niet meegestuurd en niet
+  // opgeslagen. Daarom losse toestand naast het formulier in plaats van in het
+  // zod-schema.
+  const [vanTijd, setVanTijd] = useState("");
+  const [totTijd, setTotTijd] = useState("");
+  const tijdvak = hoursBetween(vanTijd, totTijd);
+  const tijdvakFout = vanTijd !== "" && totTijd !== "" && tijdvak === null;
+
+  useEffect(() => {
+    if (tijdvak === null) return;
+    form.setValue("hours", tijdvak, { shouldValidate: true });
+  }, [tijdvak, form]);
 
   const selectedProjectId = form.watch("projectId");
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
@@ -293,6 +307,8 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
         if (res.ok) {
           setEditing(null);
           form.reset({ date: selectedDay ?? today, userId });
+          setVanTijd("");
+          setTotTijd("");
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
             const updated = await res.json();
@@ -310,6 +326,8 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
           form.reset({ date: data.date, userId: data.userId ?? userId });
+          setVanTijd("");
+          setTotTijd("");
           if (switchedFilter) {
             await handleUserChange(targetUser);
           } else if (viewMode === "week") {
@@ -337,6 +355,10 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
 
   function startEdit(entry: any) {
     setEditing(entry.id);
+    // De tijden zijn niet opgeslagen, dus bij het bewerken van een bestaande
+    // regel is er niets om te tonen. Leeg laten is eerlijker dan gokken.
+    setVanTijd("");
+    setTotTijd("");
     setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
@@ -427,6 +449,35 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
             </div>
 
             <div className="space-y-2">
+              <Label>Van — tot</Label>
+              <div className="flex items-center gap-2">
+                {/* step={900} is de native kwartierstap: de browser levert de
+                    keuze-UI en de validatie, dus hier komt geen tijdbibliotheek
+                    aan te pas. */}
+                <Input
+                  type="time"
+                  step={900}
+                  value={vanTijd}
+                  onChange={(e) => setVanTijd(e.target.value)}
+                  className="w-32"
+                />
+                <span className="text-muted-foreground">—</span>
+                <Input
+                  type="time"
+                  step={900}
+                  value={totTijd}
+                  onChange={(e) => setTotTijd(e.target.value)}
+                  className="w-32"
+                />
+              </div>
+              {tijdvakFout ? (
+                <p className="text-xs text-destructive">De eindtijd moet ná de begintijd liggen</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Optioneel — vult het aantal uren voor u in</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label>Uren *</Label>
               <Input type="number" step="0.25" min="0.25" placeholder="1.5" {...form.register("hours")} />
               {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
@@ -458,6 +509,8 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   setEditing(null);
                   setSelectedCustomerId("");
                   form.reset({ date: selectedDay ?? today, userId });
+                  setVanTijd("");
+                  setTotTijd("");
                 }}>Annuleren</Button>
               )}
             </div>
