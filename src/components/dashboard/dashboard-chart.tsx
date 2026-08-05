@@ -22,11 +22,12 @@ export function DashboardChart({ data }: Props) {
                   Tailwind-klassen, dus de tokens gaan hier met de hand mee.
                   Ze zijn niet hardgecodeerd maar verwijzen naar dezelfde
                   variabelen als de rest van de app, zodat de grafiek meekantelt. */}
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <XAxis dataKey="name" stroke="hsl(var(--border))" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis stroke="hsl(var(--border))" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               <Tooltip
                 formatter={(value) => [`${Number(value).toFixed(2)} uur`, "Uren"]}
                 labelFormatter={(label) => `Project: ${label}`}
+                cursor={{ fill: "hsl(var(--muted))", stroke: "hsl(var(--border))" }}
                 contentStyle={{
                   background: "hsl(var(--popover))",
                   border: "1px solid hsl(var(--border))",
