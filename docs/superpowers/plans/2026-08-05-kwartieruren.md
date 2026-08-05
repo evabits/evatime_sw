@@ -14,7 +14,7 @@
 - **Er is een live PRODUCTIEDATABASE bereikbaar via `.env.local`.** Dit traject raakt het datamodel niet: er is geen `prisma`-commando nodig, geen migratie, geen `db:push`, geen backfill. Draai ze niet.
 - **Dit is niet de Next.js die je kent.** Lees `node_modules/next/dist/docs/` voordat je aannames doet. (`AGENTS.md` is een echte, door het team gecommitte projectafspraak.)
 - **Alle zichtbare tekst is Nederlands.** De weigering luidt overal exact `Uren moeten in stappen van 15 minuten (0,25 uur)` en komt uit één gedeelde constante, zodat scherm en server nooit iets anders zeggen.
-- **Afwijzen, nooit stilzwijgend afronden.** Uren worden gefactureerd. De enige plek waar wél afgerond wordt is `hoursBetween`, op twee decimalen, omdat dat een berekening is en geen invoer.
+- **Ingevoerde uren worden afgewezen, nooit stilzwijgend afgerond.** Uren worden gefactureerd, dus een getal dat een mens intypt en dat geen kwartier is levert een foutmelding op en geen correctie. Afronden gebeurt alleen in twee berekeningen, allebei ver van de invoer: `hoursBetween` rondt op twee decimalen af omdat de uitkomst in een `Decimal(5,2)` belandt, en `splitHoursOverDays` rondt een oud totaal dat van vóór de kwartierregel stamt op het dichtstbijzijnde kwartier. Nieuwe invoer bereikt die tweede plek nooit, want de servergrens laat hem niet door.
 - Uren zijn `Decimal(5,2)` op `TimeEntry` en `Decimal(4,2)` op de verlofkolommen — **twee decimalen**. Elk veelvoud van 0,25 past daar exact in.
 - Testcommando: `npm test`. Baseline: **22 bestanden, 229 tests groen.**
 - Lint: `npm run lint`. **De baseline is niet schoon:** 323 errors en 20 warnings, vrijwel allemaal `@typescript-eslint/no-explicit-any`. De gate is *geen nieuwe soorten lint-fouten*.
