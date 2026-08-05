@@ -18,13 +18,25 @@ export function DashboardChart({ data }: Props) {
         ) : (
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              {/* Recharts tekent met inline SVG-attributen en kent geen
+                  Tailwind-klassen, dus de tokens gaan hier met de hand mee.
+                  Ze zijn niet hardgecodeerd maar verwijzen naar dezelfde
+                  variabelen als de rest van de app, zodat de grafiek meekantelt. */}
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               <Tooltip
                 formatter={(value) => [`${Number(value).toFixed(2)} uur`, "Uren"]}
                 labelFormatter={(label) => `Project: ${label}`}
+                contentStyle={{
+                  background: "hsl(var(--popover))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "var(--radius)",
+                  color: "hsl(var(--popover-foreground))",
+                }}
+                labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                itemStyle={{ color: "hsl(var(--popover-foreground))" }}
               />
-              <Bar dataKey="hours" fill="hsl(121 37% 36%)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
