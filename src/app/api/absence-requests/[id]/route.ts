@@ -5,7 +5,12 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { workingDaysBetween } from "@/lib/working-days";
-import { ABSENCE_PROJECT_NAMES, splitHoursOverDays, patternSummary } from "@/lib/absence-entries";
+import {
+  ABSENCE_PROJECT_NAMES,
+  splitHoursOverDays,
+  patternSummary,
+  patternedEntries,
+} from "@/lib/absence-entries";
 import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
 
 const employeeUpdateSchema = z.object({
@@ -36,7 +41,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const role = (session.user as any)?.role ?? "EMPLOYEE";
     const { id } = await params;
 
-    const existing = await prisma.absenceRequest.findUnique({ where: { id } });
+    const existing = await prisma.absenceRequest.findUnique({
+      where: { id },
+      include: { pattern: true },
+    });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = await req.json();
@@ -71,7 +79,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         if (dagen.length === 0) {
           return NextResponse.json({ error: "Deze periode bevat geen werkdagen" }, { status: 400 });
         }
-        regels = splitHoursOverDays(Number(existing.hours), dagen);
+        // Met patroon: alleen de dagen die erop passen, met de uren van die dag.
+        // Zonder patroon: het totaal gelijk over alle werkdagen, ongewijzigd.
+        const patroon = toWeekSchedule(existing.pattern);
+        regels = patroon
+          ? patternedEntries(patroon, dagen)
+          : splitHoursOverDays(Number(existing.hours), dagen);
+
+        // Een periode kan werkdagen bevatten zonder dat er één op het patroon
+        // past — een woensdagpatroon over maandag en dinsdag. Dat is een andere
+        // fout dan een periode zonder werkdagen en verdient een eigen melding.
+        if (regels.length === 0) {
+          return NextResponse.json(
+            { error: "Deze periode bevat geen dagen die op het patroon passen" },
+            { status: 400 },
+          );
+        }
       }
 
       const updated = await prisma.$transaction(async (tx) => {
