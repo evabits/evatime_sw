@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 interface NavItem {
   href: string;
@@ -208,6 +209,9 @@ export function Sidebar({ user, role }: SidebarProps) {
           <div className="mb-2 px-3">
             <p className="text-sm font-medium truncate">{user.name}</p>
             <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          </div>
+          <div className="mb-2 px-3">
+            <ThemeToggle />
           </div>
           <Button
             variant="ghost"
