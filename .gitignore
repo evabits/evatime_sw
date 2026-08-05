@@ -45,3 +45,9 @@ next-env.d.ts
 
 # superpowers SDD scratch
 .superpowers/
+
+# Data-exports die in de root belanden (TimeChimp-urenexport en dergelijke).
+# Die bevatten namen, uren en factuurstatus en horen niet in de repo. Alleen de
+# root, zodat een CSV die wél code is — een testfixture onder src/ of prisma/ —
+# gewoon meegaat.
+/*.csv
