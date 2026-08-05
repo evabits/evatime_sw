@@ -1,5 +1,6 @@
 import { workingDaysBetween } from "./working-days";
 import { scheduledHoursOn, type WeekSchedule } from "./work-schedule";
+import { QUARTER } from "./quarter-hours";
 
 /**
  * Het project waarop verlof van een bepaalde soort geboekt wordt.
@@ -27,16 +28,22 @@ export const ABSENCE_PROJECT_NAMES: Record<string, string> = {
 };
 
 /**
- * Verdeelt het totaal van een aanvraag over de gegeven dagen.
+ * Verdeelt het totaal van een aanvraag over de gegeven dagen, in kwartieren.
  *
- * Elke dag behalve de laatste krijgt het totaal gedeeld door het aantal dagen,
- * naar BENEDEN afgerond op twee decimalen; de laatste dag krijgt het totaal
- * minus de som van de voorgaande. Daarmee is de som exact het aangevraagde
- * totaal — een goedkeuring mag nooit stilzwijgend meer of minder uren boeken
- * dan de medewerker opgaf.
+ * Er wordt in hele kwartiereenheden gerekend en niet in centen: daardoor is elk
+ * getal dat hieruit komt per constructie een kwartier, net als elk urengetal dat
+ * een mens zelf invoert. De eerste dagen krijgen het restje erbij, niet de
+ * laatste — bij een lange periode zou de laatste dag anders structureel de
+ * vreemde eend zijn.
  *
- * Twee decimalen omdat `TimeEntry.hours` een `Decimal(5,2)` is. Fijner afronden
- * laat de database alsnog afkappen en de dagsom stil afwijken.
+ * De som is exact het aangevraagde totaal zolang dat totaal zelf een kwartier
+ * is, en dat bewaakt de invoercontrole aan de voorkant. Een oude aanvraag van
+ * vóór die regel wordt op het dichtstbijzijnde kwartier afgerond; dat scheelt
+ * hooguit 7½ minuut en alleen bij wat er al stond.
+ *
+ * Een dag die geen kwartier krijgt levert geen urenregel op. Een regel van nul
+ * uur boeken heeft geen betekenis, en `patternedEntries` doet hetzelfde voor
+ * dagen waarop het patroon nul staat.
  */
 export function splitHoursOverDays(
   totalHours: number,
@@ -44,11 +51,13 @@ export function splitHoursOverDays(
 ): Array<{ date: string; hours: number }> {
   if (days.length === 0) return [];
 
-  const perDag = Math.floor((totalHours / days.length) * 100) / 100;
-  const regels = days.slice(0, -1).map((date) => ({ date, hours: perDag }));
-  const rest = Math.round((totalHours - perDag * (days.length - 1)) * 100) / 100;
-  regels.push({ date: days[days.length - 1], hours: rest });
-  return regels;
+  const units = Math.round(totalHours / QUARTER);
+  const basis = Math.floor(units / days.length);
+  const rest = units % days.length;
+
+  return days
+    .map((date, i) => ({ date, hours: (basis + (i < rest ? 1 : 0)) * QUARTER }))
+    .filter((r) => r.hours > 0);
 }
 
 /**

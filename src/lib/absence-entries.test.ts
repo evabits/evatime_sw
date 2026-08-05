@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ABSENCE_PROJECT_NAMES, splitHoursOverDays } from "./absence-entries";
+import { isQuarter } from "./quarter-hours";
 
 /** Optellen in centen: 3.33 + 3.33 + 3.34 is in floating point net geen 10. */
 function totaalInCenten(regels: Array<{ hours: number }>): number {
@@ -31,12 +32,14 @@ describe("splitHoursOverDays", () => {
     ]);
   });
 
-  it("puts the remainder on the last day", () => {
-    // 10 / 3 does not divide into two decimals; the last day absorbs the rest.
+  it("spreads the leftover quarters over the first days", () => {
+    // 10 uur is 40 kwartieren; 40 / 3 is 13 kwartieren met 1 over, en die gaat
+    // naar de eerste dag. Niet naar de laatste: dan zou de laatste dag van een
+    // lange periode structureel de vreemde eend zijn.
     expect(splitHoursOverDays(10, ["2026-08-03", "2026-08-04", "2026-08-05"])).toEqual([
-      { date: "2026-08-03", hours: 3.33 },
-      { date: "2026-08-04", hours: 3.33 },
-      { date: "2026-08-05", hours: 3.34 },
+      { date: "2026-08-03", hours: 3.5 },
+      { date: "2026-08-04", hours: 3.25 },
+      { date: "2026-08-05", hours: 3.25 },
     ]);
   });
 
@@ -58,9 +61,38 @@ describe("splitHoursOverDays", () => {
   it("always sums to exactly the requested total", () => {
     // The property that matters: an approval must never quietly book more or
     // fewer hours than the employee asked for.
-    for (const totaal of [40, 10, 7.5, 1, 36.4, 13.33]) {
+    //
+    // De lijst bevat alleen kwartiertotalen, want dat is wat de invoercontrole
+    // voortaan doorlaat. 36,4 en 13,33 stonden hier vroeger ook in; die kunnen
+    // per definitie niet in kwartieren opgaan.
+    for (const totaal of [40, 10, 7.5, 1, 36.25, 13.75, 0.25]) {
       expect(totaalInCenten(splitHoursOverDays(totaal, week))).toBe(Math.round(totaal * 100));
     }
+  });
+
+  it("only ever produces quarters", () => {
+    for (const totaal of [40, 10, 7.5, 1, 36.25, 13.75]) {
+      for (const regel of splitHoursOverDays(totaal, week)) {
+        expect(isQuarter(regel.hours)).toBe(true);
+      }
+    }
+  });
+
+  it("skips days that do not get a quarter instead of booking nought hours", () => {
+    // Eén uur over vijf dagen is vier kwartieren. De vijfde dag krijgt niets en
+    // hoort dan geen urenregel op te leveren.
+    expect(splitHoursOverDays(1, week)).toEqual([
+      { date: "2026-08-03", hours: 0.25 },
+      { date: "2026-08-04", hours: 0.25 },
+      { date: "2026-08-05", hours: 0.25 },
+      { date: "2026-08-06", hours: 0.25 },
+    ]);
+  });
+
+  it("rounds a legacy total that is not a quarter to the nearest one", () => {
+    // Kan alleen bij aanvragen die al in productie stonden voordat de
+    // kwartierregel ging gelden. 3,30 wordt 13 kwartieren, dus 3,25.
+    expect(totaalInCenten(splitHoursOverDays(3.3, ["2026-08-03"]))).toBe(325);
   });
 });
 
