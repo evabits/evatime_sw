@@ -281,7 +281,8 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     if (
       !confirm(
         `"${mergeBron.name}" samenvoegen met "${doelNaam}"? ` +
-          `De uren, kilometers en uitgaven verhuizen mee en "${mergeBron.name}" wordt verwijderd.`,
+          `De uren, kilometers, km-sjablonen, uitgaven en deelnemers verhuizen mee en ` +
+          `"${mergeBron.name}" wordt verwijderd.`,
       )
     ) {
       return;

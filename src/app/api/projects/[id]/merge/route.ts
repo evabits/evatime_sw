@@ -8,6 +8,16 @@ import { projectMergeDenialReason } from "@/lib/projects";
 
 const schema = z.object({ targetId: z.string().min(1) });
 
+/**
+ * Gegooid binnen de transactie als er na de updateMany's nog een gefactureerde
+ * uitgave op de bron staat. Expense.projectId is optioneel (onDelete: SetNull),
+ * dus in tegenstelling tot TimeEntry en KmEntry blokkeert dat het verwijderen
+ * hieronder niet vanzelf — de uitgave zou stilletjes zijn project kwijtraken.
+ * Deze klasse bestaat zodat de route dit geval kan onderscheiden van een echte
+ * serverfout en er een schone 400 van kan maken.
+ */
+class GefactureerdTussentijdsError extends Error {}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -63,22 +73,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         select: { userId: true },
       });
 
-      const uren = await tx.timeEntry.updateMany({ where: { projectId: id }, data: { projectId: targetId } });
-      const km = await tx.kmEntry.updateMany({ where: { projectId: id }, data: { projectId: targetId } });
+      // invoiced: false in elke where — zie het commentaar boven de transactie.
+      // KmTemplate heeft geen invoiced-veld, die verhuist onvoorwaardelijk.
+      const uren = await tx.timeEntry.updateMany({
+        where: { projectId: id, invoiced: false },
+        data: { projectId: targetId },
+      });
+      const km = await tx.kmEntry.updateMany({
+        where: { projectId: id, invoiced: false },
+        data: { projectId: targetId },
+      });
       const sjablonen = await tx.kmTemplate.updateMany({ where: { projectId: id }, data: { projectId: targetId } });
-      const uitgaven = await tx.expense.updateMany({ where: { projectId: id }, data: { projectId: targetId } });
+      const uitgaven = await tx.expense.updateMany({
+        where: { projectId: id, invoiced: false },
+        data: { projectId: targetId },
+      });
+
+      // Zie GefactureerdTussentijdsError hierboven: TimeEntry en KmEntry vangt
+      // de foreign key straks vanzelf af bij het verwijderen, Expense niet.
+      const achtergeblevenUitgaven = await tx.expense.count({ where: { projectId: id, invoiced: true } });
+      if (achtergeblevenUitgaven > 0) {
+        throw new GefactureerdTussentijdsError(
+          "Er zijn tussentijds uitgaven gefactureerd; samenvoegen afgebroken",
+        );
+      }
 
       // skipDuplicates omdat de sleutel van ProjectMember [projectId, userId]
       // is: de aanvrager kan al deelnemer van het doel zijn, en dat is precies
       // het geval dat deze functie moet afvangen.
-      let leden_toegevoegd = 0;
-      if (leden.length > 0) {
-        const { count } = await tx.projectMember.createMany({
-          data: leden.map((l) => ({ projectId: targetId, userId: l.userId })),
-          skipDuplicates: true,
-        });
-        leden_toegevoegd = count;
-      }
+      const { count: leden_toegevoegd } = await tx.projectMember.createMany({
+        data: leden.map((l) => ({ projectId: targetId, userId: l.userId })),
+        skipDuplicates: true,
+      });
 
       await tx.project.delete({ where: { id } });
 
@@ -92,5 +118,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     return NextResponse.json(verplaatst);
-  } catch (e) { return handleError(e); }
+  } catch (e) {
+    if (e instanceof GefactureerdTussentijdsError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    return handleError(e);
+  }
 }
