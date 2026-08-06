@@ -12,14 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Copy, Check, Plus, Trash2, ThumbsUp, ThumbsDown, Pencil } from "lucide-react";
+import { CalendarDays, Copy, Check, Plus, Trash2, ThumbsUp, ThumbsDown, Pencil, Undo2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { patternSummary } from "@/lib/absence-entries";
 import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 import type { WeekSchedule } from "@/lib/work-schedule";
 
 type AbsenceType = "VACATION" | "SICK" | "PARENTAL_LEAVE" | "SPECIAL_LEAVE" | "UNPAID_LEAVE";
-type AbsenceStatus = "PENDING" | "APPROVED" | "REJECTED";
+type AbsenceStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   VACATION: "Vakantie",
@@ -118,6 +118,9 @@ type Tab = "requests" | "budgets" | "calendar";
 function statusBadge(status: AbsenceStatus) {
   if (status === "APPROVED") return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/40">Goedgekeurd</Badge>;
   if (status === "REJECTED") return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900/40 dark:text-red-200 dark:hover:bg-red-900/40">Afgewezen</Badge>;
+  // Expliciet, want de laatste regel is een vangnet: zonder deze tak zou een
+  // ingetrokken aanvraag "In afwachting" tonen, het omgekeerde van wat waar is.
+  if (status === "CANCELLED") return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-800/60">Ingetrokken</Badge>;
   return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-200 dark:hover:bg-yellow-900/40">In afwachting</Badge>;
 }
 
@@ -153,6 +156,9 @@ export function AbsenceClient({
   const [patroon, setPatroon] = useState<WeekSchedule>(LEEG_PATROON);
   const [editingBudget, setEditingBudget] = useState<VacationBudget | null>(null);
   const [serverError, setServerError] = useState("");
+  // Alleen zichtbaar en gebruikt voor een admin; een medewerker maakt altijd
+  // voor zichzelf aan en de server negeert het veld dan sowieso.
+  const [gekozenMedewerker, setGekozenMedewerker] = useState("");
   const [copied, setCopied] = useState(false);
 
   const requestForm = useForm<RequestForm>({
@@ -234,6 +240,7 @@ export function AbsenceClient({
       requestForm.reset({ type: "VACATION", startDate: "", endDate: "", hours: "" as any, description: "" });
       setHerhaald(false);
       setPatroon(LEEG_PATROON);
+      setGekozenMedewerker(currentUserId);
     }
     setRequestDialogOpen(true);
   }
@@ -259,7 +266,13 @@ export function AbsenceClient({
       headers: { "Content-Type": "application/json" },
       // Altijd expliciet: null betekent "geen patroon", en dat is wat het
       // uitgezette vinkje bedoelt.
-      body: JSON.stringify({ ...values, pattern: herhaald ? patroon : null }),
+      // userId gaat alleen mee bij het aanmaken: bewerken verplaatst een
+      // aanvraag nooit naar een andere medewerker, en PUT kent het veld niet.
+      body: JSON.stringify({
+        ...values,
+        pattern: herhaald ? patroon : null,
+        ...(editingRequest ? {} : { userId: gekozenMedewerker || currentUserId }),
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -276,6 +289,21 @@ export function AbsenceClient({
   async function deleteRequest(id: string) {
     const res = await fetch(`/api/absence-requests/${id}`, { method: "DELETE" });
     if (res.ok) setRequests((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  async function cancelRequest(id: string) {
+    const res = await fetch(`/api/absence-requests/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Er is een fout opgetreden");
+      return;
+    }
+    const updated: AbsenceRequest = await res.json();
+    setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   }
 
   async function reviewRequest(id: string, status: "APPROVED" | "REJECTED") {
@@ -445,6 +473,7 @@ export function AbsenceClient({
               onEdit={openRequestDialog}
               onDelete={deleteRequest}
               onReview={reviewRequest}
+              onCancel={cancelRequest}
             />
           )}
 
@@ -555,6 +584,7 @@ export function AbsenceClient({
           onEdit={openRequestDialog}
           onDelete={deleteRequest}
           onReview={reviewRequest}
+          onCancel={cancelRequest}
         />
       )}
 
@@ -565,6 +595,24 @@ export function AbsenceClient({
             <DialogTitle>{editingRequest ? "Aanvraag bewerken" : "Afwezigheid aanvragen"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={requestForm.handleSubmit(submitRequest)} className="space-y-4">
+            {isAdmin && !editingRequest && (
+              <div className="space-y-1.5">
+                <Label htmlFor="requestUser">Medewerker</Label>
+                <Select onValueChange={setGekozenMedewerker} value={gekozenMedewerker}>
+                  <SelectTrigger id="requestUser">
+                    <SelectValue placeholder="Selecteer medewerker" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Als beheerder leg je verlof meteen vast: de aanvraag is direct goedgekeurd.
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="absenceType">Type afwezigheid</Label>
               <Controller
@@ -755,6 +803,7 @@ function RequestsTable({
   onEdit,
   onDelete,
   onReview,
+  onCancel,
 }: {
   requests: AbsenceRequest[];
   allRequests: AbsenceRequest[];
@@ -764,7 +813,11 @@ function RequestsTable({
   onEdit: (r: AbsenceRequest) => void;
   onDelete: (id: string) => void;
   onReview: (id: string, status: "APPROVED" | "REJECTED") => void;
+  onCancel: (id: string) => void;
 }) {
+  // Eén keer bepalen in plaats van per rij. UTC, zoals overal in deze codebase.
+  const vandaag = new Date().toISOString().slice(0, 10);
+
   if (requests.length === 0) {
     return (
       <div className="rounded-md border p-8 text-center text-muted-foreground">
@@ -848,20 +901,37 @@ function RequestsTable({
                       </Button>
                     </>
                   )}
-                  {r.userId === currentUserId && r.status === "PENDING" && (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(r)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                  {/* Een admin bewerkt elke aanvraag; de medewerker alleen zijn
+                      eigen, en alleen zolang die in afwachting is. */}
+                  {(isAdmin || (r.userId === currentUserId && r.status === "PENDING")) && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(r)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {/* Intrekken kan alleen bij goedgekeurd verlof. De medewerker
+                      alleen zolang het nog niet begonnen is; een admin altijd,
+                      want fouten moeten te herstellen zijn. */}
+                  {r.status === "APPROVED" &&
+                    (isAdmin || (r.userId === currentUserId && r.startDate.slice(0, 10) > vandaag)) && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => onDelete(r.id)}
+                        className="h-7 w-7 text-muted-foreground"
+                        title="Intrekken"
+                        onClick={() => onCancel(r.id)}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Undo2 className="h-3.5 w-3.5" />
                       </Button>
-                    </>
+                    )}
+                  {r.userId === currentUserId && r.status === "PENDING" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => onDelete(r.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   )}
                 </div>
               </td>
