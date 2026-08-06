@@ -19,6 +19,8 @@ export type CancelVerdict =
   | "not-approved"
   | "already-started";
 
+const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function canCancelAbsence(
   role: string,
   sessionUserId: string,
@@ -29,6 +31,14 @@ export function canCancelAbsence(
   if (request.status !== "APPROVED") return "not-approved";
   if (isAdmin(role)) return "ok";
   if (request.userId !== sessionUserId) return "forbidden";
+  // De lexicografische vergelijking hieronder is alleen chronologisch correct
+  // voor exact YYYY-MM-DD. Een ISO-timestamp ("...T00:00:00.000Z") of
+  // Date#toString() ("Mon Aug 10 2026") sorteert anders en zou de vergelijking
+  // de verkeerde kant op laten uitvallen — dus bij een afwijkende vorm weigeren
+  // we net als bij "al begonnen", in plaats van te gokken.
+  if (!DATE_SHAPE.test(request.startDate) || !DATE_SHAPE.test(today)) {
+    return "already-started";
+  }
   // YYYY-MM-DD vergelijkt lexicografisch gelijk aan chronologisch. Gelijk aan
   // vandaag telt als begonnen: die dag is al bezig.
   if (request.startDate <= today) return "already-started";
