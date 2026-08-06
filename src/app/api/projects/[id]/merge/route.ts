@@ -46,6 +46,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // projectId is optioneel, dus daar geldt SetNull en zou een achtergebleven
     // uitgave stilletjes zijn project kwijtraken. Daarom staat hij hier
     // expliciet bij, niet omdat de huidige data hem bevat.
+    //
+    // Dat zijn de vier registratiemodellen. ProjectMember wordt hieronder
+    // eerst gekopieerd naar het doel en verdwijnt daarna vanzelf mee met het
+    // verwijderen van de bron (Cascade). Twee andere relaties op Project zijn
+    // ook Cascade en gaan bewust NIET mee: ProjectLevelRate en de tags-koppeling
+    // worden stilletjes verwijderd, niet verplaatst. Dat is geen gat maar het
+    // ontwerp — een conceptproject kan tarieven en tags hebben (admin-only, zie
+    // projects/route.ts), maar na het samenvoegen gelden gewoon de tarieven en
+    // tags van het doelproject; verplaatste uren blijven geprijsd volgens de
+    // rateOverride op de regel zelf of de kaart van het doel, nooit die van de
+    // verdwenen bron.
     const verplaatst = await prisma.$transaction(async (tx) => {
       const leden = await tx.projectMember.findMany({
         where: { projectId: id },
