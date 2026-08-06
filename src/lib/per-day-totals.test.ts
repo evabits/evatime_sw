@@ -50,6 +50,14 @@ describe("perDayTotals", () => {
       .toEqual([0, 0, 0, 0, 3, 0, 0]);
   });
 
+  it("lands on the right day for the production shape (UTC midnight with a Z)", () => {
+    // `date` is `DateTime @db.Date`, dus de API levert UTC-middernacht met een
+    // Z, niet lokale-tijd-middernacht. De testrunner draait op een vastgezette
+    // tijdzone (zie vitest.config.mts), zodat dit deterministisch is.
+    expect(perDayTotals([{ date: "2026-08-07T00:00:00.000Z", value: 5 }], week))
+      .toEqual([0, 0, 0, 0, 5, 0, 0]);
+  });
+
   it("keeps the order and length of the days it was given", () => {
     // Omgekeerde volgorde: de uitkomst volgt de dagen, niet de kalender.
     const omgekeerd = [...week].reverse();

@@ -249,7 +249,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             setTemplateError("");
             setTemplateDialogOpen(true);
           }
-          form.reset({ date: selectedDay ?? today, userId: data.userId ?? userId });
+          form.reset({ date: selectedDay ?? data.date, userId: data.userId ?? userId });
           setAppliedTemplate("");
         }
       }
