@@ -4,15 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
-import { workingDaysBetween } from "@/lib/working-days";
-import {
-  ABSENCE_PROJECT_NAMES,
-  splitHoursOverDays,
-  patternSummary,
-  patternedEntries,
-} from "@/lib/absence-entries";
+import { patternSummary, absenceLines } from "@/lib/absence-entries";
 import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
 import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+import { canCancelAbsence } from "@/lib/absence-permissions";
+import { findAbsenceProject } from "@/lib/absence-project";
 
 const patroonUren = z.number().min(0).max(24).refine(isQuarter, NOT_A_QUARTER);
 
@@ -52,6 +48,56 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const body = await req.json();
 
+    // Intrekken is een eigen actie en geen statuswijziging via adminUpdateSchema:
+    // die tak is admin-only en gaat over beoordelen, terwijl intrekken juist
+    // iets is wat de medewerker zelf doet. Ze samenvoegen zou betekenen dat de
+    // rechtencontrole van het beoordelen versoepeld moet worden.
+    if (body?.action === "cancel") {
+      const vandaag = new Date().toISOString().slice(0, 10);
+      const verdict = canCancelAbsence(role, userId, {
+        userId: existing.userId,
+        status: existing.status,
+        startDate: existing.startDate.toISOString().slice(0, 10),
+      }, vandaag);
+
+      if (verdict === "not-found") return NextResponse.json({ error: "Not found" }, { status: 404 });
+      if (verdict === "forbidden") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (verdict === "not-approved") {
+        return NextResponse.json(
+          { error: "Alleen goedgekeurd verlof kan worden ingetrokken" },
+          { status: 400 },
+        );
+      }
+      if (verdict === "already-started") {
+        return NextResponse.json(
+          { error: "Verlof dat al begonnen is kan alleen een beheerder intrekken" },
+          { status: 400 },
+        );
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const aanvraag = await tx.absenceRequest.update({
+          where: { id },
+          data: { status: "CANCELLED", reviewedBy: userId, reviewedAt: new Date() },
+          include: {
+            user: { select: { id: true, name: true } },
+            reviewer: { select: { id: true, name: true } },
+            pattern: true,
+          },
+        });
+        // De urenregels van een ingetrokken aanvraag horen te verdwijnen, net
+        // als bij een afwijzing.
+        await tx.timeEntry.deleteMany({ where: { absenceRequestId: id } });
+        return aanvraag;
+      });
+
+      return NextResponse.json({
+        ...updated,
+        hours: Number(updated.hours),
+        pattern: toWeekSchedule(updated.pattern),
+      });
+    }
+
     if (isAdmin(role) && "status" in body) {
       const data = adminUpdateSchema.parse(body);
 
@@ -62,42 +108,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       let regels: Array<{ date: string; hours: number }> = [];
 
       if (data.status === "APPROVED") {
-        const naam = ABSENCE_PROJECT_NAMES[existing.type];
-        const project = await prisma.project.findFirst({
-          where: { name: naam, billable: false, customerId: null },
-          select: { id: true },
-        });
-        if (!project) {
-          return NextResponse.json(
-            { error: `Het project "${naam}" bestaat nog niet` },
-            { status: 400 },
-          );
-        }
-        projectId = project.id;
+        const project = await findAbsenceProject(existing.type);
+        if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+        projectId = project.projectId;
 
-        const dagen = workingDaysBetween(
+        const uitkomst = absenceLines(
+          Number(existing.hours),
+          toWeekSchedule(existing.pattern),
           existing.startDate.toISOString().slice(0, 10),
           existing.endDate.toISOString().slice(0, 10),
         );
-        if (dagen.length === 0) {
-          return NextResponse.json({ error: "Deze periode bevat geen werkdagen" }, { status: 400 });
-        }
-        // Met patroon: alleen de dagen die erop passen, met de uren van die dag.
-        // Zonder patroon: het totaal gelijk over alle werkdagen, ongewijzigd.
-        const patroon = toWeekSchedule(existing.pattern);
-        regels = patroon
-          ? patternedEntries(patroon, dagen)
-          : splitHoursOverDays(Number(existing.hours), dagen);
-
-        // Een periode kan werkdagen bevatten zonder dat er één op het patroon
-        // past — een woensdagpatroon over maandag en dinsdag. Dat is een andere
-        // fout dan een periode zonder werkdagen en verdient een eigen melding.
-        if (regels.length === 0) {
-          return NextResponse.json(
-            { error: "Deze periode bevat geen dagen die op het patroon passen" },
-            { status: 400 },
-          );
-        }
+        if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
+        regels = uitkomst.entries;
       }
 
       const updated = await prisma.$transaction(async (tx) => {
@@ -141,11 +163,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       });
     }
 
-    if (existing.userId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (existing.status !== "PENDING") {
-      return NextResponse.json({ error: "Can only edit pending requests" }, { status: 400 });
+    // Een admin mag elke aanvraag bewerken, ook een goedgekeurde en ook die van
+    // een ander. De medewerker houdt zijn grens: alleen zijn eigen aanvraag, en
+    // alleen zolang die nog in afwachting is.
+    if (!isAdmin(role)) {
+      if (existing.userId !== userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (existing.status !== "PENDING") {
+        return NextResponse.json({ error: "Can only edit pending requests" }, { status: 400 });
+      }
     }
 
     const data = employeeUpdateSchema.parse(body);
@@ -168,6 +195,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       hours = total;
     }
 
+    // Wijzigt een admin een aanvraag die al goedgekeurd is, dan moeten de
+    // urenregels mee. Zonder dit loopt de tijdlijn stilzwijgend uit de pas met
+    // de aanvraag. De status blijft staan: bewerken is geen nieuwe beoordeling.
+    let projectId = "";
+    let regels: Array<{ date: string; hours: number }> = [];
+    if (existing.status === "APPROVED") {
+      // data.type ?? existing.type: het type mag bij het bewerken wijzigen, en
+      // dan verhuizen de urenregels naar het project van het nieuwe type.
+      const project = await findAbsenceProject(data.type ?? existing.type);
+      if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+      projectId = project.projectId;
+
+      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
+      if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
+      regels = uitkomst.entries;
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       // Het patroon eerst wegschrijven en pas daarna de aanvraag bijwerken, zodat
       // de include op de update het NIEUWE patroon teruggeeft en niet het oude.
@@ -177,7 +221,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (data.pattern) {
         await tx.absencePattern.create({ data: { absenceRequestId: id, ...data.pattern } });
       }
-      return tx.absenceRequest.update({
+      const aanvraag = await tx.absenceRequest.update({
         where: { id },
         data: {
           ...(data.type ? { type: data.type } : {}),
@@ -192,6 +236,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           pattern: true,
         },
       });
+
+      // Verwijderen-en-opnieuw-maken, net als bij het goedkeuren: zo komen
+      // gewijzigde datums vanzelf goed. Bij een aanvraag die niet goedgekeurd
+      // is, is regels leeg en gebeurt er niets — die heeft geen urenregels.
+      if (existing.status === "APPROVED") {
+        await tx.timeEntry.deleteMany({ where: { absenceRequestId: id } });
+        await tx.timeEntry.createMany({
+          data: regels.map((r) => ({
+            userId: existing.userId,
+            projectId,
+            date: new Date(`${r.date}T00:00:00Z`),
+            hours: r.hours,
+            description: data.description ?? null,
+            absenceRequestId: id,
+          })),
+        });
+      }
+      return aanvraag;
     });
     return NextResponse.json({
       ...updated,
