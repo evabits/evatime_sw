@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { isBillable } from "@/lib/billable";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
+import { WeekGrid } from "@/components/shared/week-grid";
+import { perDayTotals } from "@/lib/per-day-totals";
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
@@ -70,6 +72,34 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
   const [fetching, setFetching] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
+  // Weekweergave, gelijk aan het urenscherm: week is de standaard.
+  const [viewMode, setViewMode] = useState<"week" | "list">("week");
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+  const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 6);
+  const weekFrom = format(weekStart, "yyyy-MM-dd");
+  const weekTo = format(weekEnd, "yyyy-MM-dd");
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Filteren op het weekvenster werkt ook op de registraties die de pagina
+  // meegaf, zodat het raster meteen klopt zonder eerst te hoeven ophalen.
+  const weekEntries = entries.filter((e) => {
+    const d = format(new Date(e.date), "yyyy-MM-dd");
+    return d >= weekFrom && d <= weekTo;
+  });
+
+  const kmPerDay = perDayTotals(
+    weekEntries.map((e) => ({ date: e.date, value: Number(e.km) })),
+    weekDays.map((day) => format(day, "yyyy-MM-dd")),
+  );
+
+  const displayedEntries = viewMode === "week"
+    ? (selectedDay ? weekEntries.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === selectedDay) : weekEntries)
+    : entries;
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { date: format(new Date(), "yyyy-MM-dd"), userId },
@@ -97,6 +127,48 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
     form.setValue("description", t.description ?? "");
   }
 
+  async function fetchWeekEntries(offset: number, userFilter = filterUser) {
+    const ws = startOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 1 });
+    const we = addDays(ws, 6);
+    setFetching(true);
+    const params = new URLSearchParams({ from: format(ws, "yyyy-MM-dd"), to: format(we, "yyyy-MM-dd") });
+    if (userFilter !== "all") params.set("userId", userFilter);
+    const res = await fetch(`/api/km?${params}`);
+    if (res.ok) setEntries(await res.json());
+    setFetching(false);
+  }
+
+  async function handleWeekNav(newOffset: number) {
+    setWeekOffset(newOffset);
+    setSelectedDay(null);
+    await fetchWeekEntries(newOffset);
+  }
+
+  async function switchToWeek() {
+    setViewMode("week");
+    setWeekOffset(0);
+    setSelectedDay(null);
+    await fetchWeekEntries(0);
+  }
+
+  async function switchToList() {
+    setViewMode("list");
+    setSelectedDay(null);
+    await fetchEntries(filterMonth, filterProject);
+  }
+
+  function toggleDay(dayStr: string) {
+    setSelectedDay((prev) => (prev === dayStr ? null : dayStr));
+  }
+
+  // Een dag aanklikken zet het formulier op die datum, zodat invoeren en
+  // bekijken bij elkaar blijven.
+  useEffect(() => {
+    if (viewMode === "week" && selectedDay) {
+      form.setValue("date", selectedDay);
+    }
+  }, [selectedDay]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function fetchEntries(month: string, projectId: string, userFilter = filterUser) {
     setFetching(true);
     const { from, to } = monthBounds(month);
@@ -120,7 +192,8 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
   async function handleUserChange(uid: string) {
     setFilterUser(uid);
-    await fetchEntries(filterMonth, filterProject, uid);
+    if (viewMode === "week") await fetchWeekEntries(weekOffset, uid);
+    else await fetchEntries(filterMonth, filterProject, uid);
   }
 
   async function onSubmit(data: FormData) {
@@ -140,7 +213,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
           const updated = await res.json();
           setEntries((prev) => prev.map((e) => (e.id === editing ? { ...e, ...updated } : e)));
           setEditing(null);
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), userId });
+          form.reset({ date: selectedDay ?? today, userId });
         }
       } else {
         const res = await fetch("/api/km", {
@@ -154,6 +227,10 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
           if (switchedFilter) {
             await handleUserChange(targetUser);
+          } else if (viewMode === "week") {
+            // In weekmodus opnieuw ophalen in plaats van de lijst bijwerken: de
+            // maandgrens hieronder zegt niets over het weekvenster.
+            await fetchWeekEntries(weekOffset);
           } else {
             const created = await res.json();
             const { from, to } = monthBounds(filterMonth);
@@ -172,7 +249,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             setTemplateError("");
             setTemplateDialogOpen(true);
           }
-          form.reset({ date: format(new Date(), "yyyy-MM-dd"), userId: data.userId ?? userId });
+          form.reset({ date: selectedDay ?? today, userId: data.userId ?? userId });
           setAppliedTemplate("");
         }
       }
@@ -353,13 +430,34 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CardTitle>Registraties</CardTitle>
-              {entries.length > 0 && (
-                <span className="text-sm text-muted-foreground">{totalKm.toFixed(1)} km</span>
+            <div className="flex items-center gap-1.5">
+              {viewMode === "week" ? (
+                <>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleWeekNav(weekOffset - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium tabular-nums">
+                    {format(weekStart, "d MMM")} – {format(weekEnd, "d MMM yyyy")}
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleWeekNav(weekOffset + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  {weekOffset !== 0 && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => handleWeekNav(0)}>
+                      Deze week
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <CardTitle>Registraties</CardTitle>
+                  {entries.length > 0 && (
+                    <span className="text-sm text-muted-foreground">{totalKm.toFixed(1)} km</span>
+                  )}
+                </>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {isAdmin && users.length > 0 && (
                 <Select value={filterUser} onValueChange={handleUserChange}>
                   <SelectTrigger className="w-40 h-8 text-sm"><SelectValue /></SelectTrigger>
@@ -371,24 +469,60 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
                   </SelectContent>
                 </Select>
               )}
-              <Input
-                type="month"
-                value={filterMonth}
-                onChange={(e) => handleMonthChange(e.target.value)}
-                className="w-40 h-8 text-sm"
-              />
-              <Select value={filterProject} onValueChange={handleProjectChange}>
-                <SelectTrigger className="w-48 h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle projecten</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Maand en project alleen in lijstmodus: een weekvenster en een
+                  maandfilter tegelijk aanbieden spreekt elkaar tegen. */}
+              {viewMode === "list" && (
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    type="month"
+                    value={filterMonth}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    className="w-40 h-8 text-sm"
+                  />
+                  <Select value={filterProject} onValueChange={handleProjectChange}>
+                    <SelectTrigger className="w-48 h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Alle projecten</SelectItem>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="flex rounded-md border overflow-hidden">
+                <Button
+                  variant={viewMode === "week" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-8 px-2.5"
+                  onClick={switchToWeek}
+                  title="Weekoverzicht"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-8 px-2.5"
+                  onClick={switchToList}
+                  title="Lijstweergave"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
+        {viewMode === "week" && (
+          <WeekGrid
+            days={weekDays}
+            values={kmPerDay}
+            today={today}
+            selectedDay={selectedDay}
+            onSelect={toggleDay}
+            formatValue={(v) => v.toFixed(1)}
+          />
+        )}
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -406,10 +540,10 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
               {fetching && (
                 <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Laden...</TableCell></TableRow>
               )}
-              {!fetching && entries.length === 0 && (
+              {!fetching && displayedEntries.length === 0 && (
                 <TableRow><TableCell colSpan={isAdmin ? (filterUser === "all" ? 7 : 6) : 5} className="text-center text-muted-foreground py-8">Geen registraties gevonden</TableCell></TableRow>
               )}
-              {!fetching && entries.map((entry) => (
+              {!fetching && displayedEntries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="whitespace-nowrap">{formatDate(entry.date)}</TableCell>
                   <TableCell>
