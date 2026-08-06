@@ -37,6 +37,7 @@
 |---|---|
 | `src/lib/absence-permissions.ts` | `canCancelAbsence` — mag deze gebruiker deze aanvraag intrekken. |
 | `src/lib/absence-permissions.test.ts` | Tests daarvoor. |
+| `src/lib/absence-project.ts` | `findAbsenceProject` — het verlofproject opzoeken, één keer in plaats van drie. |
 
 **Gewijzigd:**
 
@@ -425,14 +426,61 @@ git commit -m "feat: rechtenregel voor het intrekken van verlof"
 ## Task 4: Aanmaken namens een medewerker
 
 **Files:**
+- Create: `src/lib/absence-project.ts`
 - Modify: `src/app/api/absence-requests/route.ts`
 
 **Interfaces:**
-- Consumes: `absenceLines` uit Task 2, `resolveEntryUserId` uit `src/lib/entry-owner.ts`, `ABSENCE_PROJECT_NAMES` uit `src/lib/absence-entries.ts`, `isAdmin` uit `src/lib/roles.ts`.
+- Consumes: `absenceLines` uit Task 2, `resolveEntryUserId` uit `src/lib/entry-owner.ts`, `isAdmin` uit `src/lib/roles.ts`. De nieuwe helper hieronder consumeert `ABSENCE_PROJECT_NAMES` uit `src/lib/absence-entries.ts`.
+- Produces:
+  ```ts
+  type AbsenceProjectResult =
+    | { ok: true; projectId: string }
+    | { ok: false; error: string };
 
-**Deze taak levert geen unittests op.** De rekenkant zit in Task 2; wat hier bijkomt is routewerk.
+  function findAbsenceProject(type: string): Promise<AbsenceProjectResult>
+  ```
+  Task 5 roept deze twee keer aan.
 
-- [ ] **Step 1: Breid de imports en het schema uit**
+**Deze taak levert geen unittests op.** De rekenkant zit in Task 2; wat hier bijkomt is routewerk, en `findAbsenceProject` raakt de database en valt daarmee buiten de testconventie van dit project.
+
+- [ ] **Step 1: Maak de gedeelde projectopzoeking**
+
+Zonder deze stap staat hetzelfde blok straks op drie plekken: hier, in de goedkeuringstak en in de bewerktak. Maak `src/lib/absence-project.ts`:
+
+```ts
+import { prisma } from "./prisma";
+import { ABSENCE_PROJECT_NAMES } from "./absence-entries";
+
+/**
+ * Het project waarop verlof van een bepaalde soort geboekt wordt.
+ *
+ * Drie plekken hebben dit nodig — een admin die een aanvraag aanmaakt, het
+ * goedkeuren, en een admin die een goedgekeurde aanvraag wijzigt. Drie keer
+ * dezelfde `findFirst` uitschrijven betekent dat een wijziging aan wat een
+ * verlofproject ís, bijvoorbeeld wanneer ze ooit wél een klant mogen hebben,
+ * op drie plekken moet en er dus één vergeten wordt.
+ *
+ * De weigering komt terug als waarde en niet als HTTP-antwoord; de aanroeper
+ * maakt er een 400 van.
+ */
+export type AbsenceProjectResult =
+  | { ok: true; projectId: string }
+  | { ok: false; error: string };
+
+export async function findAbsenceProject(type: string): Promise<AbsenceProjectResult> {
+  const naam = ABSENCE_PROJECT_NAMES[type];
+  const project = await prisma.project.findFirst({
+    where: { name: naam, billable: false, customerId: null },
+    select: { id: true },
+  });
+  if (!project) return { ok: false, error: `Het project "${naam}" bestaat nog niet` };
+  return { ok: true, projectId: project.id };
+}
+```
+
+`src/lib/api.ts` importeert `prisma` al vanuit `src/lib/`, dus dat precedent bestaat.
+
+- [ ] **Step 2: Breid de imports en het schema uit**
 
 Bovenaan `src/app/api/absence-requests/route.ts` staat:
 
@@ -443,8 +491,9 @@ import { patternSummary } from "@/lib/absence-entries";
 Vervang door:
 
 ```ts
-import { patternSummary, absenceLines, ABSENCE_PROJECT_NAMES } from "@/lib/absence-entries";
+import { patternSummary, absenceLines } from "@/lib/absence-entries";
 import { resolveEntryUserId } from "@/lib/entry-owner";
+import { findAbsenceProject } from "@/lib/absence-project";
 ```
 
 Voeg in `createSchema` toe, ná `pattern`:
@@ -456,7 +505,7 @@ Voeg in `createSchema` toe, ná `pattern`:
   userId: z.string().optional().nullable(),
 ```
 
-- [ ] **Step 2: Bepaal de eigenaar en de status**
+- [ ] **Step 3: Bepaal de eigenaar en de status**
 
 In `POST` staat nu:
 
@@ -482,7 +531,7 @@ Vervang door:
     const meteenGoedgekeurd = isAdmin(role);
 ```
 
-- [ ] **Step 3: Genereer de urenregels wanneer de aanvraag meteen goedgekeurd is**
+- [ ] **Step 4: Genereer de urenregels wanneer de aanvraag meteen goedgekeurd is**
 
 Ná het bestaande patroonblok dat `hours` bepaalt (dat eindigt met `hours = total;` en de sluitende `}`), en vóór `const request = await prisma.absenceRequest.create({`, voeg toe:
 
@@ -493,15 +542,9 @@ Ná het bestaande patroonblok dat `hours` bepaalt (dat eindigt met `hours = tota
     let projectId = "";
     let regels: Array<{ date: string; hours: number }> = [];
     if (meteenGoedgekeurd) {
-      const naam = ABSENCE_PROJECT_NAMES[data.type];
-      const project = await prisma.project.findFirst({
-        where: { name: naam, billable: false, customerId: null },
-        select: { id: true },
-      });
-      if (!project) {
-        return NextResponse.json({ error: `Het project "${naam}" bestaat nog niet` }, { status: 400 });
-      }
-      projectId = project.id;
+      const project = await findAbsenceProject(data.type);
+      if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+      projectId = project.projectId;
 
       const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
       if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
@@ -509,7 +552,7 @@ Ná het bestaande patroonblok dat `hours` bepaalt (dat eindigt met `hours = tota
     }
 ```
 
-- [ ] **Step 4: Schrijf de aanvraag en de regels in één transactie**
+- [ ] **Step 5: Schrijf de aanvraag en de regels in één transactie**
 
 Vervang het hele blok van `const request = await prisma.absenceRequest.create({` tot en met de afsluitende `});` door:
 
@@ -551,7 +594,7 @@ Vervang het hele blok van `const request = await prisma.absenceRequest.create({`
     });
 ```
 
-- [ ] **Step 5: Controleer de typen en de tests**
+- [ ] **Step 6: Controleer de typen en de tests**
 
 Run: `PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx tsc --noEmit`
 Expected: 0 fouten.
@@ -559,10 +602,10 @@ Expected: 0 fouten.
 Run: `PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npm test`
 Expected: 25 bestanden, 273 tests, groen.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/app/api/absence-requests/route.ts
+git add src/lib/absence-project.ts src/app/api/absence-requests/route.ts
 git commit -m "feat: admin maakt verlof aan namens een medewerker, meteen goedgekeurd"
 ```
 
@@ -580,10 +623,11 @@ git commit -m "feat: admin maakt verlof aan namens een medewerker, meteen goedge
 
 - [ ] **Step 1: Breid de imports uit**
 
-Bovenaan `src/app/api/absence-requests/[id]/route.ts` staat een import uit `@/lib/absence-entries` met meerdere namen. Voeg `absenceLines` daaraan toe, en voeg een regel toe:
+Bovenaan `src/app/api/absence-requests/[id]/route.ts` staat een import uit `@/lib/absence-entries` met meerdere namen. Voeg `absenceLines` daaraan toe, en voeg twee regels toe:
 
 ```ts
 import { canCancelAbsence } from "@/lib/absence-permissions";
+import { findAbsenceProject } from "@/lib/absence-project";
 ```
 
 - [ ] **Step 2: Voeg de intrekken-tak toe**
@@ -654,9 +698,34 @@ Voeg dáártussen de nieuwe tak toe, zodat het wordt:
     if (isAdmin(role) && "status" in body) {
 ```
 
-- [ ] **Step 3: Laat de goedkeuringstak de gedeelde functie gebruiken**
+- [ ] **Step 3: Laat de goedkeuringstak de gedeelde functies gebruiken**
 
-In de admintak staat nu:
+De admintak zoekt eerst het project op. Dat blok staat er nu zo:
+
+```ts
+        const naam = ABSENCE_PROJECT_NAMES[existing.type];
+        const project = await prisma.project.findFirst({
+          where: { name: naam, billable: false, customerId: null },
+          select: { id: true },
+        });
+        if (!project) {
+          return NextResponse.json(
+            { error: `Het project "${naam}" bestaat nog niet` },
+            { status: 400 },
+          );
+        }
+        projectId = project.id;
+```
+
+Vervang door:
+
+```ts
+        const project = await findAbsenceProject(existing.type);
+        if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+        projectId = project.projectId;
+```
+
+Direct daaronder staat de dagen- en regelberekening:
 
 ```ts
         const dagen = workingDaysBetween(
@@ -697,7 +766,7 @@ Vervang door:
         regels = uitkomst.entries;
 ```
 
-Zijn `workingDaysBetween`, `patternedEntries` of `splitHoursOverDays` daarna nergens meer in dit bestand in gebruik, verwijder ze dan uit de imports. Controleer dat met grep in plaats van op gevoel.
+Zijn `workingDaysBetween`, `patternedEntries`, `splitHoursOverDays` of `ABSENCE_PROJECT_NAMES` daarna nergens meer in dit bestand in gebruik, verwijder ze dan uit de imports. Controleer dat met grep in plaats van op gevoel.
 
 - [ ] **Step 4: Laat een admin elke aanvraag bewerken**
 
@@ -739,23 +808,17 @@ Ná het blok dat `hours` bepaalt (dat eindigt met `hours = total;` en de sluiten
     let projectId = "";
     let regels: Array<{ date: string; hours: number }> = [];
     if (existing.status === "APPROVED") {
-      const naam = ABSENCE_PROJECT_NAMES[data.type ?? existing.type];
-      const project = await prisma.project.findFirst({
-        where: { name: naam, billable: false, customerId: null },
-        select: { id: true },
-      });
-      if (!project) {
-        return NextResponse.json({ error: `Het project "${naam}" bestaat nog niet` }, { status: 400 });
-      }
-      projectId = project.id;
+      // data.type ?? existing.type: het type mag bij het bewerken wijzigen, en
+      // dan verhuizen de urenregels naar het project van het nieuwe type.
+      const project = await findAbsenceProject(data.type ?? existing.type);
+      if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+      projectId = project.projectId;
 
       const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
       if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
       regels = uitkomst.entries;
     }
 ```
-
-`ABSENCE_PROJECT_NAMES` wordt in dit bestand al geïmporteerd; controleer dat en voeg niets toe als dat zo is.
 
 - [ ] **Step 6: Schrijf de regels weg in dezelfde transactie**
 
