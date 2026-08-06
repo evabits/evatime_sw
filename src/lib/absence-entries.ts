@@ -100,3 +100,47 @@ export function patternSummary(
   const total = Math.round(entries.reduce((som, e) => som + e.hours, 0) * 100) / 100;
   return { entries, total };
 }
+
+/**
+ * Wat een verlofaanvraag oplevert: de urenregels, of de reden dat het er geen
+ * zijn.
+ *
+ * Deze functie bestaat omdat drie plekken hem nodig hebben — een admin die een
+ * aanvraag aanmaakt, het goedkeuren, en een admin die een goedgekeurde aanvraag
+ * wijzigt. Drie kopieën van deze keuze zouden vroeg of laat uiteenlopen, en dan
+ * wijkt de tijdlijn af van de aanvraag zonder dat iets klaagt.
+ *
+ * Hij geeft de weigering terug als waarde en niet als HTTP-antwoord, zodat hij
+ * los van een route te testen is. De aanroeper maakt er een 400 van.
+ */
+export type AbsenceLinesResult =
+  | { ok: true; entries: Array<{ date: string; hours: number }> }
+  | { ok: false; error: string };
+
+export function absenceLines(
+  hours: number,
+  pattern: WeekSchedule | null,
+  from: string,
+  to: string,
+): AbsenceLinesResult {
+  const dagen = workingDaysBetween(from, to);
+  if (dagen.length === 0) {
+    return { ok: false, error: "Deze periode bevat geen werkdagen" };
+  }
+
+  // Met patroon: alleen de dagen die erop passen, met de uren van die dag; het
+  // opgegeven totaal doet dan niet mee. Zonder patroon: het totaal gelijk over
+  // alle werkdagen.
+  const entries = pattern
+    ? patternedEntries(pattern, dagen)
+    : splitHoursOverDays(hours, dagen);
+
+  // Alleen bereikbaar mét patroon: een woensdagpatroon over maandag en dinsdag.
+  // Zonder patroon kan dit niet, want de invoercontrole eist een positief
+  // veelvoud van 0,25 en dat levert altijd minstens één kwartier op.
+  if (entries.length === 0) {
+    return { ok: false, error: "Deze periode bevat geen dagen die op het patroon passen" };
+  }
+
+  return { ok: true, entries };
+}

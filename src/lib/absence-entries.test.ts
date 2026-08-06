@@ -192,3 +192,60 @@ describe("patternSummary", () => {
     expect(total).toBe(18.3);
   });
 });
+
+import { absenceLines } from "./absence-entries";
+
+describe("absenceLines", () => {
+  const patroon = { monday: 0, tuesday: 0, wednesday: 8, thursday: 0, friday: 0 };
+
+  it("splits an unpatterned request evenly over the working days", () => {
+    // 2026-08-03 is een maandag, 2026-08-07 een vrijdag.
+    const uitkomst = absenceLines(40, null, "2026-08-03", "2026-08-07");
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-03", hours: 8 },
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
+  });
+
+  it("keeps only the days the pattern names, and ignores the hours it was given", () => {
+    // Het totaal van 999 wordt genegeerd: met een patroon bepalen de
+    // dagwaarden de uren, niet het opgegeven totaal.
+    const uitkomst = absenceLines(999, patroon, "2026-08-03", "2026-08-14");
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-12", hours: 8 },
+      ],
+    });
+  });
+
+  it("refuses a period without working days", () => {
+    // 2026-08-08 is een zaterdag, 2026-08-09 een zondag.
+    expect(absenceLines(8, null, "2026-08-08", "2026-08-09")).toEqual({
+      ok: false,
+      error: "Deze periode bevat geen werkdagen",
+    });
+  });
+
+  it("refuses a period in which no day matches the pattern", () => {
+    // Maandag en dinsdag, met een woensdagpatroon.
+    expect(absenceLines(8, patroon, "2026-08-03", "2026-08-04")).toEqual({
+      ok: false,
+      error: "Deze periode bevat geen dagen die op het patroon passen",
+    });
+  });
+
+  it("produces lines that sum to the requested total without a pattern", () => {
+    const uitkomst = absenceLines(10, null, "2026-08-03", "2026-08-05");
+    if (!uitkomst.ok) throw new Error("verwachtte regels");
+    const som = uitkomst.entries.reduce((s, e) => s + Math.round(e.hours * 100), 0);
+    expect(som).toBe(1000);
+  });
+});
