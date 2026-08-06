@@ -6,10 +6,15 @@ import { QUARTER } from "./quarter-hours";
  * Het project waarop verlof van een bepaalde soort geboekt wordt.
  *
  * De projecten worden NIET automatisch aangemaakt: een admin zet ze klaar op
- * /projects, zonder klant, niet-factureerbaar en zonder deelnemers. Dat laatste
- * maakt ze onbereikbaar voor handmatige invoer — de invoerformulieren tonen
- * alleen projecten waarvan je deelnemer bent — zodat goedkeuring de enige weg
- * naar een verlofregel is.
+ * /projects, niet-factureerbaar en zonder deelnemers. Dat laatste maakt ze
+ * onbereikbaar voor handmatige invoer — de invoerformulieren tonen alleen
+ * projecten waarvan je deelnemer bent — zodat goedkeuring de enige weg naar een
+ * verlofregel is.
+ *
+ * Een klant mógen ze hebben, en in dit bedrijf hangen ze onder EVAbits B.V. Het
+ * dashboard waarschuwt namelijk over projecten zonder klant, en die waarschuwing
+ * sloeg voorheen uitsluitend op deze vijf. Zie findAbsenceProject in
+ * absence-project.ts: dat zoekt op naam en filtert niet meer op klant.
  *
  * Ontbreekt een project, dan weigert de goedkeuring met de naam erbij. Een
  * project dat uit het niets verschijnt is later moeilijk te doorgronden; een
