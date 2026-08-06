@@ -53,3 +53,38 @@ export function partitionProjectsByCustomer<T extends ProjectLike>(
       : projects.filter((p) => p.customer?.id === selectedCustomerId);
   return { matched, customerless };
 }
+
+export type MergeProject = { id: string; status: string; archivedAt: Date | null };
+
+export type InvoicedCounts = { timeEntries: number; kmEntries: number; expenses: number };
+
+/**
+ * Waarom een conceptproject NIET met een doelproject mag worden samengevoegd,
+ * of null als het mag. Zelfde vorm als projectCreateDenialReason hierboven.
+ *
+ * De volgorde is opzet. Bestaan gaat voor alles, want zonder de projecten valt
+ * er niets te zeggen. "Met zichzelf" komt vóór de statuscontrole omdat dat de
+ * begrijpelijkste melding is voor wat overduidelijk een vergissing is. De
+ * factuurcontroles staan achteraan: ze zijn het duurst om op te halen en het
+ * zeldzaamst, en de goedkopere weigeringen hebben dan al afgevangen.
+ *
+ * Gefactureerd is een harde stop en geen waarschuwing: een factuurregel die na
+ * het samenvoegen naar een ander project verwijst, is niet uit te leggen aan
+ * wie die factuur controleert.
+ */
+export function projectMergeDenialReason(
+  source: MergeProject | null,
+  target: MergeProject | null,
+  invoiced: InvoicedCounts,
+): string | null {
+  if (!source) return "Het bronproject bestaat niet";
+  if (!target) return "Het doelproject bestaat niet";
+  if (source.id === target.id) return "Een project kan niet met zichzelf worden samengevoegd";
+  if (source.status !== "CONCEPT") return "Alleen een conceptproject kan worden samengevoegd";
+  if (source.archivedAt) return "Een gearchiveerd project kan niet worden samengevoegd";
+  if (target.archivedAt) return "Het doelproject is gearchiveerd";
+  if (invoiced.timeEntries > 0) return "Er staan gefactureerde uren op dit project";
+  if (invoiced.kmEntries > 0) return "Er staan gefactureerde kilometers op dit project";
+  if (invoiced.expenses > 0) return "Er staan gefactureerde uitgaven op dit project";
+  return null;
+}

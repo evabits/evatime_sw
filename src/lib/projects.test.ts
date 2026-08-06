@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { projectCreateDenialReason, partitionProjectsByCustomer } from "./projects";
+import {
+  projectCreateDenialReason,
+  partitionProjectsByCustomer,
+  projectMergeDenialReason,
+} from "./projects";
 
 describe("projects", () => {
   it("admins may create anything (active with customer)", () => {
@@ -78,5 +82,73 @@ describe("partitionProjectsByCustomer", () => {
     const projects = [p("a", "c1"), p("c", "c2")];
     const { customerless } = partitionProjectsByCustomer(projects, "c1");
     expect(customerless).toEqual([]);
+  });
+});
+
+describe("projectMergeDenialReason", () => {
+  const concept = { id: "p1", status: "CONCEPT", archivedAt: null };
+  const doel = { id: "p2", status: "ACTIVE", archivedAt: null };
+  const schoon = { timeEntries: 0, kmEntries: 0, expenses: 0 };
+
+  it("allows merging a bare concept project into an active one", () => {
+    expect(projectMergeDenialReason(concept, doel, schoon)).toBeNull();
+  });
+
+  it("allows a concept project as the target too", () => {
+    // Twee mensen die hetzelfde aanvragen is een reeel geval.
+    expect(
+      projectMergeDenialReason(concept, { id: "p3", status: "CONCEPT", archivedAt: null }, schoon),
+    ).toBeNull();
+  });
+
+  it("refuses a missing source", () => {
+    expect(projectMergeDenialReason(null, doel, schoon)).toBe("Het bronproject bestaat niet");
+  });
+
+  it("refuses a missing target", () => {
+    expect(projectMergeDenialReason(concept, null, schoon)).toBe("Het doelproject bestaat niet");
+  });
+
+  it("refuses merging a project with itself", () => {
+    expect(projectMergeDenialReason(concept, concept, schoon)).toBe(
+      "Een project kan niet met zichzelf worden samengevoegd",
+    );
+  });
+
+  it("refuses a source that is not a concept project", () => {
+    // Twee echte projecten samenvoegen raakt facturatie en tarieven.
+    expect(projectMergeDenialReason({ ...concept, status: "ACTIVE" }, doel, schoon)).toBe(
+      "Alleen een conceptproject kan worden samengevoegd",
+    );
+  });
+
+  it("refuses an archived source", () => {
+    expect(
+      projectMergeDenialReason({ ...concept, archivedAt: new Date("2026-01-01") }, doel, schoon),
+    ).toBe("Een gearchiveerd project kan niet worden samengevoegd");
+  });
+
+  it("refuses an archived target", () => {
+    expect(
+      projectMergeDenialReason(concept, { ...doel, archivedAt: new Date("2026-01-01") }, schoon),
+    ).toBe("Het doelproject is gearchiveerd");
+  });
+
+  it("refuses when hours are already invoiced", () => {
+    expect(projectMergeDenialReason(concept, doel, { ...schoon, timeEntries: 1 })).toBe(
+      "Er staan gefactureerde uren op dit project",
+    );
+  });
+
+  it("refuses when kilometres are already invoiced", () => {
+    expect(projectMergeDenialReason(concept, doel, { ...schoon, kmEntries: 1 })).toBe(
+      "Er staan gefactureerde kilometers op dit project",
+    );
+  });
+
+  it("refuses when expenses are already invoiced", () => {
+    expect(projectMergeDenialReason(concept, doel, { ...schoon, expenses: 1 })).toBe(
+      "Er staan gefactureerde uitgaven op dit project",
+    );
   });
 });
