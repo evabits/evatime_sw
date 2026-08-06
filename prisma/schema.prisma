@@ -391,6 +391,12 @@ enum AbsenceStatus {
   PENDING
   APPROVED
   REJECTED
+  // Ingetrokken door de medewerker of door een admin namens hem. Een eigen
+  // waarde en geen hergebruik van REJECTED, omdat "de admin weigerde" en "de
+  // medewerker trok terug" verschillende dingen zijn. De urenregels worden bij
+  // deze status verwijderd, net als bij REJECTED, en het vakantiesaldo telt
+  // alleen APPROVED — dus een ingetrokken aanvraag valt daar vanzelf uit.
+  CANCELLED
 }
 
 enum AbsenceType {
