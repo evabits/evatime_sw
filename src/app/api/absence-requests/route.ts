@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
-import { patternSummary } from "@/lib/absence-entries";
+import { patternSummary, absenceLines } from "@/lib/absence-entries";
+import { resolveEntryUserId } from "@/lib/entry-owner";
+import { findAbsenceProject } from "@/lib/absence-project";
 import { weekTotal, toWeekSchedule } from "@/lib/work-schedule";
 import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 
@@ -33,6 +35,10 @@ const createSchema = z.object({
   // aanvraag altijd volledig inclusief patroon, en de goedkeuringstak loopt
   // door een andere vertakking. Ontbrekend kan hier alleen "vinkje uit" zijn.
   pattern: patternSchema.nullable().optional(),
+  // Alleen een admin mag hiermee een andere medewerker opgeven; bij iedereen
+  // anders negeert resolveEntryUserId het veld. Zelfde patroon als op
+  // POST /api/time.
+  userId: z.string().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -79,7 +85,19 @@ export async function POST(req: Request) {
     const userId = session.user?.id;
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
     const data = createSchema.parse(await req.json());
+
+    const ownerId = resolveEntryUserId(role, userId, data.userId);
+    if (ownerId !== userId) {
+      const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+      if (!owner) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
+    }
+
+    // Een admin die een aanvraag aanmaakt keurt hem daarmee goed — ook voor
+    // zichzelf. Hij ís de goedkeurder, dus een tussenstap waarin hij zijn eigen
+    // invoer nog moet goedkeuren voegt niets toe.
+    const meteenGoedgekeurd = isAdmin(role);
 
     // Met een patroon bepaalt de server het totaal en negeert hij wat de
     // client stuurde. Mocht de client een getal mogen opgeven dat niet klopt
@@ -103,21 +121,55 @@ export async function POST(req: Request) {
       hours = total;
     }
 
-    const request = await prisma.absenceRequest.create({
-      data: {
-        userId,
-        type: data.type,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        hours,
-        description: data.description ?? null,
-        ...(data.pattern ? { pattern: { create: data.pattern } } : {}),
-      },
-      include: {
-        user: { select: { id: true, name: true } },
-        reviewer: { select: { id: true, name: true } },
-        pattern: true,
-      },
+    // Bij een meteen goedgekeurde aanvraag eerst alles uitrekenen en pas daarna
+    // schrijven: een ontbrekend verlofproject of een periode zonder werkdagen
+    // moet niets achterlaten in plaats van een halve aanvraag.
+    let projectId = "";
+    let regels: Array<{ date: string; hours: number }> = [];
+    if (meteenGoedgekeurd) {
+      const project = await findAbsenceProject(data.type);
+      if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
+      projectId = project.projectId;
+
+      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
+      if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
+      regels = uitkomst.entries;
+    }
+
+    const request = await prisma.$transaction(async (tx) => {
+      const aanvraag = await tx.absenceRequest.create({
+        data: {
+          userId: ownerId,
+          type: data.type,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          hours,
+          description: data.description ?? null,
+          ...(meteenGoedgekeurd
+            ? { status: "APPROVED" as const, reviewedBy: userId, reviewedAt: new Date() }
+            : {}),
+          ...(data.pattern ? { pattern: { create: data.pattern } } : {}),
+        },
+        include: {
+          user: { select: { id: true, name: true } },
+          reviewer: { select: { id: true, name: true } },
+          pattern: true,
+        },
+      });
+
+      if (regels.length > 0) {
+        await tx.timeEntry.createMany({
+          data: regels.map((r) => ({
+            userId: ownerId,
+            projectId,
+            date: new Date(`${r.date}T00:00:00Z`),
+            hours: r.hours,
+            description: data.description ?? null,
+            absenceRequestId: aanvraag.id,
+          })),
+        });
+      }
+      return aanvraag;
     });
     return NextResponse.json(
       { ...request, hours: Number(request.hours), pattern: toWeekSchedule(request.pattern) },
