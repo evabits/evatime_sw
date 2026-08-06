@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { formatDate, formatHours, formatCurrency, cn } from "@/lib/utils";
+import { WeekGrid } from "@/components/shared/week-grid";
+import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { partitionProjectsByCustomer } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
@@ -21,10 +22,9 @@ import type { WorkLevel } from "@/lib/work-levels";
 import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import { isQuarter, NOT_A_QUARTER, hoursBetween } from "@/lib/quarter-hours";
+import { perDayTotals } from "@/lib/per-day-totals";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
-
-const DAY_ABBR = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
@@ -132,13 +132,10 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     return d >= weekFrom && d <= weekTo;
   });
 
-  const hoursPerDay = weekDays.map((day) => {
-    const dayStr = format(day, "yyyy-MM-dd");
-    return weekEntries
-      .filter((e) => format(new Date(e.date), "yyyy-MM-dd") === dayStr)
-      .reduce((s, e) => s + Number(e.hours), 0);
-  });
-  const weekTotal = hoursPerDay.reduce((s, h) => s + h, 0);
+  const hoursPerDay = perDayTotals(
+    weekEntries.map((e) => ({ date: e.date, value: Number(e.hours) })),
+    weekDays.map((day) => format(day, "yyyy-MM-dd")),
+  );
 
   const displayedEntries = viewMode === "week"
     ? (selectedDay ? weekEntries.filter((e) => format(new Date(e.date), "yyyy-MM-dd") === selectedDay) : weekEntries)
@@ -626,56 +623,29 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
         {/* ── Week view ── */}
         {viewMode === "week" && (
           <CardContent className="p-0">
-            {/* Day header */}
-            <div className="overflow-x-auto border-b">
-              <div className="grid grid-cols-8 min-w-[560px]">
-                {weekDays.map((day, i) => {
-                  const dayStr = format(day, "yyyy-MM-dd");
-                  const isToday = dayStr === today;
-                  const isSelected = selectedDay === dayStr;
-                  const h = hoursPerDay[i];
-                  // Alleen markeren als er ook niets geboekt is: boekte je toch
-                  // uren op je vrije dag, dan is dát de informatie die telt.
-                  // En alleen wanneer het raster ook echt eigen uren toont (niet
-                  // andermans, gefilterd of niet) en op een werkdag (het weekend
-                  // heeft geen vaste vrije dag, dat is gewoon niemands werkdag).
-                  const eigenRooster = !isAdmin || filterUser === userId;
-                  const vrijeDag =
-                    eigenRooster &&
-                    i < 5 &&
-                    workSchedule !== null &&
-                    scheduledHoursOn(workSchedule, dayStr) === 0 &&
-                    h === 0;
-                  return (
-                    <button
-                      key={dayStr}
-                      onClick={() => toggleDay(dayStr)}
-                      className={cn(
-                        "flex flex-col items-start px-3 py-2.5 hover:bg-muted/50 transition-colors text-left",
-                        isSelected && "bg-muted/50"
-                      )}
-                    >
-                      <span className={cn(
-                        "text-xs font-semibold pb-0.5",
-                        isToday ? "border-b-2 border-primary text-primary" : "text-muted-foreground"
-                      )}>
-                        {DAY_ABBR[i]} {format(day, "d")}
-                      </span>
-                      <span className={cn("text-sm tabular-nums mt-1", h === 0 ? "text-muted-foreground" : "font-medium")}>
-                        {vrijeDag ? "vrij" : formatHours(h)}
-                      </span>
-                    </button>
-                  );
-                })}
-                {/* Totaal column */}
-                <div className="flex flex-col items-end px-3 py-2.5">
-                  <span className="text-xs font-semibold text-muted-foreground pb-0.5">Totaal</span>
-                  <span className={cn("text-sm tabular-nums mt-1", weekTotal === 0 ? "text-muted-foreground" : "font-medium")}>
-                    {formatHours(weekTotal)}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <WeekGrid
+              days={weekDays}
+              values={hoursPerDay}
+              today={today}
+              selectedDay={selectedDay}
+              onSelect={toggleDay}
+              formatValue={formatHours}
+              // Alleen markeren als er ook niets geboekt is: boekte je toch uren
+              // op je vrije dag, dan is dát de informatie die telt. En alleen
+              // wanneer het raster ook echt eigen uren toont (niet andermans,
+              // gefilterd of niet) en op een werkdag — het weekend heeft geen
+              // vaste vrije dag, dat is gewoon niemands werkdag.
+              noteFor={(dayStr, i, h) => {
+                const eigenRooster = !isAdmin || filterUser === userId;
+                const vrijeDag =
+                  eigenRooster &&
+                  i < 5 &&
+                  workSchedule !== null &&
+                  scheduledHoursOn(workSchedule, dayStr) === 0 &&
+                  h === 0;
+                return vrijeDag ? "vrij" : null;
+              }}
+            />
 
             {/* Entry list */}
             {fetching ? (
