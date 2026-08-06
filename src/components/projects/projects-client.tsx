@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Copy, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, RotateCcw, Merge } from "lucide-react";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
 import { isReservedTagName } from "@/lib/tags";
 
@@ -82,6 +82,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   const [selected, setSelected] = useState<string[]>([]);
   const [tagActie, setTagActie] = useState<"add" | "remove" | null>(null);
   const [tagKeuze, setTagKeuze] = useState("");
+  // Het conceptproject dat wordt samengevoegd, of null als het dialoog dicht is.
+  const [mergeBron, setMergeBron] = useState<any>(null);
+  const [mergeDoel, setMergeDoel] = useState("");
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -269,6 +272,34 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
       alert(`${count} van de ${ids.length} ${woord} gearchiveerd, de rest was al gearchiveerd`);
     }
     setSelected([]);
+    loadProjects(showArchived);
+  }
+
+  async function applyMerge() {
+    if (!mergeBron || !mergeDoel) return;
+    const doelNaam = projects.find((p) => p.id === mergeDoel)?.name ?? "";
+    if (
+      !confirm(
+        `"${mergeBron.name}" samenvoegen met "${doelNaam}"? ` +
+          `De uren, kilometers en uitgaven verhuizen mee en "${mergeBron.name}" wordt verwijderd.`,
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/projects/${mergeBron.id}/merge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetId: mergeDoel }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(body.error ?? `Fout ${res.status}`);
+      return;
+    }
+    setMergeBron(null);
+    setMergeDoel("");
+    // Herladen in plaats van de lijst bijwerken: er is een project verdwenen en
+    // de urentellingen van het doelproject zijn veranderd.
     loadProjects(showArchived);
   }
 
@@ -467,6 +498,16 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
                           <Button variant="ghost" size="icon" onClick={() => startCopy(p)} title="Kopiëren">
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
+                          {p.status === "CONCEPT" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Samenvoegen met een bestaand project"
+                              onClick={() => { setMergeBron(p); setMergeDoel(""); }}
+                            >
+                              <Merge className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" onClick={() => archiveProject(p.id)} title="Archiveren">
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
@@ -635,6 +676,37 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               <Button type="submit" disabled={loading}>{loading ? "Opslaan..." : "Opslaan"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mergeBron !== null} onOpenChange={(o) => { if (!o) setMergeBron(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Samenvoegen met een bestaand project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              De uren, kilometers en uitgaven van &quot;{mergeBron?.name}&quot; verhuizen naar het
+              gekozen project, en de deelnemers krijgen daar boekrecht. &quot;{mergeBron?.name}&quot;
+              wordt daarna verwijderd.
+            </p>
+            <Select onValueChange={setMergeDoel} value={mergeDoel}>
+              <SelectTrigger><SelectValue placeholder="Kies een doelproject" /></SelectTrigger>
+              <SelectContent>
+                {projects
+                  .filter((p) => p.id !== mergeBron?.id && !p.archivedAt)
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.customer ? `${p.customer.name} — ` : ""}{p.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergeBron(null)}>Annuleren</Button>
+            <Button onClick={applyMerge} disabled={!mergeDoel}>Samenvoegen</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
