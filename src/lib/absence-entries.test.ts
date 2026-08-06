@@ -234,6 +234,14 @@ describe("absenceLines", () => {
     });
   });
 
+  it("reports no working days before checking the pattern, even with a pattern set", () => {
+    // Pint de volgorde van de twee weigeringen: een weekend-only periode moet
+    // "geen werkdagen" melden, niet de patroonmelding, ook al is er een patroon.
+    // 2026-08-08 is een zaterdag, 2026-08-09 een zondag.
+    expect(absenceLines(8, patroon, "2026-08-08", "2026-08-09"))
+      .toEqual({ ok: false, error: "Deze periode bevat geen werkdagen" });
+  });
+
   it("refuses a period in which no day matches the pattern", () => {
     // Maandag en dinsdag, met een woensdagpatroon.
     expect(absenceLines(8, patroon, "2026-08-03", "2026-08-04")).toEqual({

@@ -19,6 +19,11 @@ export type AbsenceProjectResult =
 
 export async function findAbsenceProject(type: string): Promise<AbsenceProjectResult> {
   const naam = ABSENCE_PROJECT_NAMES[type];
+  // Een onbekende type-sleutel maakt naam undefined; Prisma laat een undefined
+  // filter dan gewoon vallen en findFirst matcht zomaar het eerste
+  // niet-declarabele project zonder klant. Dat is stil fout boeken, dus hier
+  // hard weigeren in plaats van de query te laten gokken.
+  if (!naam) return { ok: false, error: `Onbekende verlofsoort "${type}"` };
   const project = await prisma.project.findFirst({
     where: { name: naam, billable: false, customerId: null },
     select: { id: true },

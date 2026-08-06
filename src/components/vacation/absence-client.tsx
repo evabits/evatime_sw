@@ -188,12 +188,24 @@ export function AbsenceClient({
   const myRemaining = myBudgetHours - myApprovedVacation;
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
-  // Balance preview shown inside the request dialog
+  // Balance preview shown inside the request dialog. Gaat over de medewerker
+  // waar de dialoog daadwerkelijk over gaat — het bewerkte verzoek, of de
+  // gekozen medewerker bij het aanmaken — niet over de ingelogde gebruiker.
+  // Anders toont een admin die voor een collega verlof aanvraagt zijn eigen
+  // saldo in plaats van dat van de collega.
+  const doelMedewerkerId = editingRequest?.userId ?? gekozenMedewerker ?? currentUserId;
+  const doelBudget = budgets.find((b) => b.userId === doelMedewerkerId);
+  const doelApprovedVacation = requests
+    .filter((r) => r.userId === doelMedewerkerId && r.status === "APPROVED" && r.type === "VACATION")
+    .reduce((s, r) => s + r.hours, 0);
+  const doelBudgetHours = doelBudget?.hours ?? 0;
+  const doelRemaining = doelBudgetHours - doelApprovedVacation;
+
   const dialogRequestedHours = Number(watchedHours) || 0;
   const isVacationType = watchedType === "VACATION";
   const editingOwnHours = editingRequest?.type === "VACATION" ? editingRequest.hours : 0;
   const balanceAfterRequest = isVacationType
-    ? myRemaining - dialogRequestedHours + (editingRequest ? editingOwnHours : 0)
+    ? doelRemaining - dialogRequestedHours + (editingRequest ? editingOwnHours : 0)
     : null;
 
   const calendarUrl =
@@ -667,9 +679,9 @@ export function AbsenceClient({
               {requestForm.formState.errors.hours && (
                 <p className="text-xs text-destructive">{requestForm.formState.errors.hours.message}</p>
               )}
-              {balanceAfterRequest !== null && myBudgetHours > 0 && dialogRequestedHours > 0 && (
+              {balanceAfterRequest !== null && doelBudget !== undefined && dialogRequestedHours > 0 && (
                 <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
-                  Saldo na aanvraag: {balanceAfterRequest}u (van {myBudgetHours}u budget)
+                  Saldo na aanvraag: {balanceAfterRequest}u (van {doelBudgetHours}u budget)
                 </p>
               )}
             </div>
