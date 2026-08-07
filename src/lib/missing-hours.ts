@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { absenceTypesOn } from "./absence-days";
 import { missingHours, scheduledHoursOn, toWeekSchedule } from "./work-schedule";
 
 /**
@@ -16,7 +17,7 @@ import { missingHours, scheduledHoursOn, toWeekSchedule } from "./work-schedule"
 export async function countMissingHours(date: string): Promise<number> {
   const dag = new Date(`${date}T00:00:00Z`);
 
-  const [users, geboekt, afwezigen] = await Promise.all([
+  const [users, geboekt, afwezig] = await Promise.all([
     prisma.user.findMany({
       where: { archivedAt: null },
       select: { id: true, workSchedule: true },
@@ -26,14 +27,10 @@ export async function countMissingHours(date: string): Promise<number> {
       where: { date: dag },
       _sum: { hours: true },
     }),
-    prisma.absenceRequest.findMany({
-      where: { status: "APPROVED", startDate: { lte: dag }, endDate: { gte: dag } },
-      select: { userId: true },
-    }),
+    absenceTypesOn(date),
   ]);
 
   const urenPer = new Map(geboekt.map((g) => [g.userId, Number(g._sum.hours ?? 0)]));
-  const afwezig = new Set(afwezigen.map((a) => a.userId));
 
   return users.filter((u) => {
     const rooster = toWeekSchedule(u.workSchedule);

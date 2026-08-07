@@ -227,66 +227,69 @@ export function StandupClient({ userId }: { userId: string }) {
       )}
 
       {data && zichtbareLeden.map((m) => {
-          const geboekt = m.entries.reduce((som, e) => som + e.hours, 0);
-          const mist = missingHours(m.scheduledHours, geboekt, !!m.absence);
-          return (
-        <Card key={m.userId}>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{m.userName}</span>
-              {m.absence && <Badge variant="secondary">afwezig — {m.absence}</Badge>}
-              {mist > 0 && (
-                <Badge variant="outline" className="border-amber-500/60 text-amber-700 dark:text-amber-400">
-                  mist {formatHours(mist)}
-                </Badge>
-              )}
-              {opgeslagen.includes(m.userId) && (
-                <span className="text-xs text-muted-foreground ml-auto">opgeslagen</span>
-              )}
-            </div>
-
-            <div className="text-sm">
-              {m.entries.length === 0 ? (
-                // Een afwezigheid is de uitzonderlijkere mededeling en wint
-                // daarom van het rooster: wie op zijn vaste vrije dag ook nog
-                // vakantie opnam, ziet die badge al naast zijn naam staan.
-                <p className="text-muted-foreground">
-                  {m.scheduledHours === 0 && !m.absence
-                    ? `werkt niet op ${weekdag(data.previousWorkingDay)}`
-                    : "geen uren geboekt"}
-                </p>
-              ) : (
-                <EntryList entries={m.entries} />
-              )}
-            </div>
-
-            {m.entries.length === 0 && m.lastWorked && (
-              <div className="text-sm text-muted-foreground">
-                <p className="text-xs">laatst gewerkt: {kortNl(m.lastWorked.date)}</p>
-                <EntryList entries={m.lastWorked.entries} />
-              </div>
-            )}
-
-            {m.previousNote && (
-              <p className="text-sm text-muted-foreground border-l-2 pl-3">
-                {data.previousStandupDate && (
-                  <span className="block text-xs">{nl(data.previousStandupDate)}</span>
+        const geboekt = m.entries.reduce((som, e) => som + e.hours, 0);
+        const mist = missingHours(m.scheduledHours, geboekt, !!m.absence);
+        return (
+          <Card key={m.userId}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{m.userName}</span>
+                {m.absence && <Badge variant="secondary">afwezig — {m.absence}</Badge>}
+                {mist > 0 && (
+                  <Badge variant="outline" className="border-amber-500/60 text-amber-700 dark:text-amber-400">
+                    mist {formatHours(mist)}
+                  </Badge>
                 )}
-                {m.previousNote}
-              </p>
-            )}
+                {opgeslagen.includes(m.userId) && (
+                  <span className="text-xs text-muted-foreground ml-auto">opgeslagen</span>
+                )}
+              </div>
 
-            <Textarea
-              rows={2}
-              placeholder="Notitie…"
-              value={concept[m.userId] ?? ""}
-              onChange={(e) => setConcept((prev) => ({ ...prev, [m.userId]: e.target.value }))}
-              onBlur={() => save(m.userId)}
-            />
-          </CardContent>
-        </Card>
-          );
-        })}
+              <div className="text-sm">
+                {m.entries.length === 0 ? (
+                  // Een afwezigheid is de uitzonderlijkere mededeling en wint
+                  // daarom van het rooster: wie op zijn vaste vrije dag ook nog
+                  // vakantie opnam, ziet die badge al naast zijn naam staan.
+                  <p className="text-muted-foreground">
+                    {m.scheduledHours === 0 && !m.absence
+                      ? `werkt niet op ${weekdag(data.previousWorkingDay)}`
+                      : "geen uren geboekt"}
+                  </p>
+                ) : (
+                  <EntryList entries={m.entries} />
+                )}
+              </div>
+
+              {/* De server vult dit veld alleen voor wie geen échte uren boekte;
+                  het scherm hoeft dat niet nog eens te raden. Wie verlof had ziet
+                  dus zowel zijn verlofregel als waar hij het laatst aan werkte. */}
+              {m.lastWorked && (
+                <div className="text-sm text-muted-foreground">
+                  <p className="text-xs">laatst gewerkt: {kortNl(m.lastWorked.date)}</p>
+                  <EntryList entries={m.lastWorked.entries} />
+                </div>
+              )}
+
+              {m.previousNote && (
+                <p className="text-sm text-muted-foreground border-l-2 pl-3">
+                  {data.previousStandupDate && (
+                    <span className="block text-xs">{nl(data.previousStandupDate)}</span>
+                  )}
+                  {m.previousNote}
+                </p>
+              )}
+
+              <Textarea
+                rows={2}
+                placeholder="Notitie…"
+                value={concept[m.userId] ?? ""}
+                onChange={(e) => setConcept((prev) => ({ ...prev, [m.userId]: e.target.value }))}
+                onBlur={() => save(m.userId)}
+              />
+            </CardContent>
+          </Card>
+        );
+      })}
 
       <Dialog open={kiezerOpen} onOpenChange={setKiezerOpen}>
         <DialogContent className="max-w-sm">
