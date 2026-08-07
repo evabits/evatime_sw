@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 import { serialize } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
+import { canLeadStandup } from "@/lib/roles";
+import { previousWorkingDay } from "@/lib/working-days";
+import { countMissingHours } from "@/lib/missing-hours";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -16,7 +19,12 @@ export default async function DashboardPage() {
   const userId = session?.user?.id ?? "";
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
   const isAdmin = role === "ADMIN";
+  // Niet isAdmin: de teamleider leidt de standup en moet deze waarschuwing
+  // juist zien.
+  const magStandup = canLeadStandup(role);
   const now = new Date();
+  // Dezelfde dag als de standup meet: de vorige werkdag ten opzichte van nu.
+  const standupDag = previousWorkingDay(format(now, "yyyy-MM-dd"));
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
@@ -26,7 +34,7 @@ export default async function DashboardPage() {
   // Employees see only their own totals; admins see company-wide.
   const ownerFilter = isAdmin ? {} : { userId };
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects] = await Promise.all([
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -86,6 +94,7 @@ export default async function DashboardPage() {
     isAdmin
       ? prisma.project.count({ where: { customerId: null, archivedAt: null } })
       : Promise.resolve(0),
+    magStandup ? countMissingHours(standupDag) : Promise.resolve(0),
   ]);
 
   const pendingReview = userId
@@ -159,6 +168,32 @@ export default async function DashboardPage() {
                   {customerlessProjects} {customerlessProjects === 1 ? "project" : "projecten"} zonder klant
                 </p>
                 <p className="text-sm text-muted-foreground">Koppel een klant zodat ze gefactureerd kunnen worden.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
+      {magStandup && missendeUren > 0 && (
+        <Link href="/standup" className="block">
+          <Card className="border-amber-500/40 bg-amber-500/5 dark:border-amber-900 dark:bg-amber-950/30">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="font-medium">
+                  {missendeUren === 1
+                    ? "1 medewerker miste uren"
+                    : `${missendeUren} medewerkers misten uren`}{" "}
+                  op {new Date(`${standupDag}T00:00:00Z`).toLocaleDateString("nl-NL", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    timeZone: "UTC",
+                  })}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Laat ze bijboeken vóór de standup begint.
+                </p>
               </div>
             </CardContent>
           </Card>
