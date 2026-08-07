@@ -79,3 +79,27 @@ export function toWeekSchedule(row: ScheduleRow | null | undefined): WeekSchedul
     friday: Number(row.friday),
   };
 }
+
+/**
+ * Hoeveel uur er op een dag ontbreekt ten opzichte van het weekrooster.
+ *
+ * Nul betekent "niets aan de hand", en dat is bewust ook de uitkomst in de
+ * gevallen waarin de vraag niet te beantwoorden is. Zo hoeft geen enkele
+ * aanroeper de randgevallen zelf nog uit elkaar te houden:
+ *
+ * - afwezig: verlof of ziekte is geen vergeten boeking;
+ * - `scheduled` nul: vaste vrije dag, die hoort leeg te zijn;
+ * - `scheduled` null: geen weekrooster, er is niets om tegen af te zetten;
+ * - genoeg of meer geboekt: klaar.
+ *
+ * Onvolledig telt als ontbrekend: wie vier van zijn acht uur boekte mist er
+ * vier. Alleen op nul kijken zou de halve dag stil laten passeren.
+ */
+export function missingHours(
+  scheduled: number | null,
+  booked: number,
+  absent: boolean,
+): number {
+  if (absent || scheduled === null || scheduled <= 0) return 0;
+  return Math.max(0, rond(scheduled - booked));
+}
