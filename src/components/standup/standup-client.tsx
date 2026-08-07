@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatHours } from "@/lib/utils";
+import { readHiddenIds, hiddenStorageKey } from "@/lib/standup-visibility";
 
 interface Entry {
   hours: number;
@@ -43,13 +46,38 @@ function weekdag(d: string) {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString("nl-NL", { weekday: "long", timeZone: "UTC" });
 }
 
-export function StandupClient() {
+export function StandupClient({ userId }: { userId: string }) {
   const [date, setDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [data, setData] = useState<Data | null>(null);
   const [laden, setLaden] = useState(true);
   const [fout, setFout] = useState("");
   const [concept, setConcept] = useState<Record<string, string>>({});
   const [opgeslagen, setOpgeslagen] = useState<string[]>([]);
+  // Wie de leider uit beeld heeft geklikt. Leeg betekent iedereen zichtbaar,
+  // dus het scherm gedraagt zich als voorheen tot hij zelf iets wegklikt.
+  const [verborgen, setVerborgen] = useState<string[]>([]);
+  const [kiezerOpen, setKiezerOpen] = useState(false);
+  const opslagSleutel = hiddenStorageKey(userId);
+
+  // Pas na het hydrateren lezen: op de server bestaat localStorage niet. De
+  // try/catch is niet decoratief — die property gooit een SecurityError in een
+  // browser die site-data blokkeert, en dan zou dit scherm omvallen.
+  useEffect(() => {
+    try {
+      setVerborgen(readHiddenIds(localStorage.getItem(opslagSleutel)));
+    } catch {
+      /* geen opslag beschikbaar: iedereen blijft in beeld */
+    }
+  }, [opslagSleutel]);
+
+  function bewaarVerborgen(ids: string[]) {
+    setVerborgen(ids);
+    try {
+      localStorage.setItem(opslagSleutel, JSON.stringify(ids));
+    } catch {
+      /* schrijven mag mislukken; de keuze geldt dan voor deze sessie */
+    }
+  }
   // Houdt de datum die nu op het scherm staat bij, ook tijdens een lopend
   // save()-verzoek: zo kan een antwoord van een verlaten dag herkend worden.
   const huidigeDatum = useRef(date);
@@ -131,6 +159,9 @@ export function StandupClient() {
     setOpgeslagen((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
   }
 
+  const alleLeden = data?.members ?? [];
+  const zichtbareLeden = alleLeden.filter((m) => !verborgen.includes(m.userId));
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4">
@@ -142,20 +173,33 @@ export function StandupClient() {
               : "Uren van de vorige werkdag"}
           </p>
         </div>
-        <div className="space-y-1">
-          <Label>Datum standup</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+        <div className="flex items-end gap-2">
+          {alleLeden.length > 0 && (
+            <Button variant="outline" className="h-10" onClick={() => setKiezerOpen(true)}>
+              In beeld: {zichtbareLeden.length} van {alleLeden.length}
+            </Button>
+          )}
+          <div className="space-y-1">
+            <Label>Datum standup</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          </div>
         </div>
       </div>
 
       {fout && <p className="text-sm text-destructive">{fout}</p>}
       {laden && <p className="text-sm text-muted-foreground">Laden…</p>}
 
-      {data && data.members.length === 0 && (
+      {data && alleLeden.length === 0 && (
         <p className="text-sm text-muted-foreground">Geen actieve medewerkers gevonden.</p>
       )}
 
-      {data?.members.map((m) => (
+      {data && alleLeden.length > 0 && zichtbareLeden.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Iedereen staat uit beeld. Kies wie u wilt zien via &quot;In beeld&quot;.
+        </p>
+      )}
+
+      {data && zichtbareLeden.map((m) => (
         <Card key={m.userId}>
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center gap-2">
@@ -208,6 +252,40 @@ export function StandupClient() {
           </CardContent>
         </Card>
       ))}
+
+      <Dialog open={kiezerOpen} onOpenChange={setKiezerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Wie in beeld</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 max-h-80 overflow-y-auto">
+            {alleLeden.map((m) => {
+              const zichtbaar = !verborgen.includes(m.userId);
+              return (
+                <label key={m.userId} className="flex items-center gap-2 text-sm cursor-pointer py-1">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    checked={zichtbaar}
+                    onChange={() =>
+                      bewaarVerborgen(
+                        zichtbaar
+                          ? [...verborgen, m.userId]
+                          : verborgen.filter((id) => id !== m.userId),
+                      )
+                    }
+                  />
+                  {m.userName}
+                </label>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => bewaarVerborgen([])}>Toon iedereen</Button>
+            <Button onClick={() => setKiezerOpen(false)}>Klaar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
