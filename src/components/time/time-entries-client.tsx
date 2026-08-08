@@ -21,7 +21,7 @@ import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
-import { isQuarter, NOT_A_QUARTER, hoursBetween } from "@/lib/quarter-hours";
+import { hoursBetween, toQuarter } from "@/lib/quarter-hours";
 import { perDayTotals } from "@/lib/per-day-totals";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
@@ -29,7 +29,12 @@ const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
   date: z.string().min(1, "Verplicht"),
-  hours: z.coerce.number().positive("Moet positief zijn").refine(isQuarter, NOT_A_QUARTER),
+  // Afronden hoort bij het valideren en niet alleen bij het verlaten van het
+  // veld: met Enter opslaan slaat die onBlur over, en dan zou er alsnog een
+  // kwartiermelding komen voor iets wat het scherm zelf oplost. Eerst afronden,
+  // dan pas op positief controleren — 0,1 wordt 0 en hoort een melding te geven
+  // in plaats van als nul weggeschreven te worden.
+  hours: z.coerce.number().transform(toQuarter).refine((h) => h > 0, "Moet positief zijn"),
   description: z.string().optional(),
   rateOverride: z.coerce.number().positive().optional().or(z.literal("")),
   userId: z.string().optional(),
@@ -170,17 +175,18 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const tijdvak = hoursBetween(vanTijd, totTijd, pauzeMinuten);
   const tijdvakFout = vanTijd !== "" && totTijd !== "" && bruto === null;
   const pauzeTeLang = bruto !== null && tijdvak === null;
-  // Dezelfde kwartierregel als op het uren-veld, maar hier gemeld: de fout zit
-  // in de pauze en daar moet hij gecorrigeerd worden. step={15} en min={0}
-  // vangen dit in de browser al grotendeels af, maar die worden pas bij het
-  // versturen afgedwongen — en dit veld wordt niet verstuurd, dus een getypte
-  // -30 komt er gewoon doorheen.
-  const pauzeOngeldig =
-    pauzeMinuten < 0 || (pauzeMinuten > 0 && !isQuarter(pauzeMinuten / 60));
+  // Een pauze hoeft geen kwartier te zijn: het uitgerekende aantal uren wordt
+  // toch afgerond. Negatief blijft wél fout — dat zou uren bíjtellen. min={0}
+  // vangt dat in de browser pas bij het versturen af, en dit veld wordt niet
+  // verstuurd, dus een getypte -30 komt er gewoon doorheen.
+  const pauzeNegatief = pauzeMinuten < 0;
 
   useEffect(() => {
     if (tijdvak === null) return;
-    form.setValue("hours", tijdvak, { shouldValidate: true });
+    // Afronden op het scherm en niet op de server: het uren-veld toont meteen
+    // wat er opgeslagen wordt. Van 9:00 tot 17:07 staat er dus 8, terwijl de
+    // eindtijd 17:07 blijft — die tijd is wat er werkelijk gewerkt is.
+    form.setValue("hours", toQuarter(tijdvak), { shouldValidate: true });
   }, [tijdvak, form]);
 
   const selectedProjectId = form.watch("projectId");
@@ -508,18 +514,34 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
               </div>
               {tijdvakFout ? (
                 <p className="text-xs text-destructive">De eindtijd moet ná de begintijd liggen</p>
-              ) : pauzeOngeldig ? (
-                <p className="text-xs text-destructive">Vul de pauze in als een positief aantal minuten, in stappen van 15</p>
+              ) : pauzeNegatief ? (
+                <p className="text-xs text-destructive">De pauze kan niet negatief zijn</p>
               ) : pauzeTeLang ? (
                 <p className="text-xs text-destructive">De pauze is even lang als of langer dan het tijdvak</p>
               ) : (
-                <p className="text-xs text-muted-foreground">Optioneel — vult het aantal uren voor u in, pauze eraf</p>
+                <p className="text-xs text-muted-foreground">Optioneel — vult het aantal uren voor u in, pauze eraf, afgerond op kwartieren</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label>Uren *</Label>
-              <Input type="number" step="0.25" min="0.25" placeholder="1.5" {...form.register("hours")} />
+              {/* Afronden bij het verlaten van het veld en niet bij het opslaan:
+                  zo staat er wat er opgeslagen wordt. Zou het pas bij versturen
+                  gebeuren, dan verstuur je een getal en krijg je een ander
+                  terug. */}
+              <Input
+                type="number"
+                step="0.25"
+                min="0.25"
+                placeholder="1.5"
+                {...form.register("hours", {
+                  onBlur: (e) => {
+                    const waarde = Number(e.target.value);
+                    if (e.target.value === "" || Number.isNaN(waarde)) return;
+                    form.setValue("hours", toQuarter(waarde), { shouldValidate: true });
+                  },
+                })}
+              />
               {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
             </div>
 

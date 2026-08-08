@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
-import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+import { toQuarter } from "@/lib/quarter-hours";
 
 const TITLE: Record<BulkKind, string> = { time: "Uren aanpassen", km: "Rit aanpassen", expense: "Uitgave aanpassen" };
 
@@ -61,8 +61,10 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
     } else {
       if (!form.projectId) return "Project is verplicht";
       if (!form.date) return "Datum is verplicht";
-      if (kind === "time" && !(Number(form.hours) > 0)) return "Uren moet groter dan 0 zijn";
-      if (kind === "time" && !isQuarter(Number(form.hours))) return NOT_A_QUARTER;
+      // Op de afgeronde waarde controleren, want dat is wat er verstuurd wordt.
+      // Een niet-kwartier bestaat hier niet meer: het veld rondt af bij het
+      // verlaten en save() rondt nog eens af voor wie met Enter opslaat.
+      if (kind === "time" && !(toQuarter(Number(form.hours)) > 0)) return "Uren moet groter dan 0 zijn";
       if (kind === "km" && !(Number(form.km) > 0)) return "Kilometers moet groter dan 0 zijn";
     }
     if (form.rateOverride !== "" && !(Number(form.rateOverride) > 0)) return "Tarief moet positief zijn";
@@ -79,7 +81,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
     setError(null);
     const body =
       kind === "time"
-        ? { projectId: form.projectId, date: form.date, hours: Number(form.hours), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
+        ? { projectId: form.projectId, date: form.date, hours: toQuarter(Number(form.hours)), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
         : kind === "km"
         ? { projectId: form.projectId, date: form.date, km: Number(form.km), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
         : { categoryId: form.categoryId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), reimbursable: form.reimbursable, userId: form.userId };
@@ -148,7 +150,20 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
           {kind === "time" && (
             <div className="space-y-2">
               <Label>Uren</Label>
-              <Input type="number" step="0.25" min="0.25" value={form.hours} onChange={(e) => set("hours", e.target.value)} />
+              {/* Afronden bij het verlaten van het veld, zoals op het
+                  urenscherm: je ziet wat er opgeslagen wordt vóór je opslaat. */}
+              <Input
+                type="number"
+                step="0.25"
+                min="0.25"
+                value={form.hours}
+                onChange={(e) => set("hours", e.target.value)}
+                onBlur={(e) => {
+                  const waarde = Number(e.target.value);
+                  if (e.target.value === "" || Number.isNaN(waarde)) return;
+                  set("hours", toQuarter(waarde));
+                }}
+              />
             </div>
           )}
           {kind === "km" && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isQuarter, hoursBetween } from "./quarter-hours";
+import { isQuarter, hoursBetween, toQuarter } from "./quarter-hours";
 
 describe("isQuarter", () => {
   it("accepts whole hours", () => {
@@ -40,6 +40,46 @@ describe("isQuarter", () => {
     // maar een som van kwartieren die net naast de waarde landt niet.
     expect(isQuarter(0.1 + 0.2)).toBe(false);
     expect(isQuarter(2.75 + 2.75 + 2.5)).toBe(true);
+  });
+});
+
+describe("toQuarter", () => {
+  it("laat een waarde die al een kwartier is met rust", () => {
+    expect(toQuarter(7.75)).toBe(7.75);
+    expect(toQuarter(8)).toBe(8);
+    expect(toQuarter(0.25)).toBe(0.25);
+  });
+
+  it("rondt naar boven wanneer dat het dichtstbij is", () => {
+    // Negen tot zeven over vijf min twintig minuten pauze: 7,67 uur.
+    expect(toQuarter(7.67)).toBe(7.75);
+  });
+
+  it("rondt naar beneden wanneer dát het dichtstbij is", () => {
+    expect(toQuarter(7.6)).toBe(7.5);
+  });
+
+  it("rondt precies op de helft naar boven", () => {
+    expect(toQuarter(7.625)).toBe(7.75);
+  });
+
+  it("laat nul nul", () => {
+    expect(toQuarter(0)).toBe(0);
+  });
+
+  it("rondt een te kleine waarde naar nul, zodat de aanroeper hem weigert", () => {
+    // Geen minimum van een kwartier: er een kwartier van maken zou tijd
+    // verzinnen die niet gewerkt is. De eis "moet positief zijn" vangt dit.
+    expect(toQuarter(0.1)).toBe(0);
+  });
+
+  it("levert altijd zelf een kwartier op", () => {
+    // De twee regels mogen niet uiteenlopen: wat hieruit komt moet door
+    // isQuarter heen, anders zou het scherm alsnog een weigering krijgen na
+    // zijn eigen afronding.
+    for (const uren of [0, 0.1, 1.01, 2.49, 3.13, 7.6, 7.67, 7.625, 12.99, 23.99]) {
+      expect(isQuarter(toQuarter(uren))).toBe(true);
+    }
   });
 });
 
@@ -113,10 +153,11 @@ describe("hoursBetween met pauze", () => {
 
   it("laat een pauze die geen kwartier is gewoon doorrekenen", () => {
     // Deze functie oordeelt niet over de stap, net zomin als over het tijdvak.
-    // De aanroeper weigert dit met isQuarter en zet de melding bij het
-    // pauze-veld, waar de fout zit.
+    // De aanroeper haalt het resultaat door toQuarter, dus 20 minuten pauze
+    // levert uiteindelijk 7,75 op zonder dat de gebruiker iets hoeft te doen.
     const uren = hoursBetween("09:00", "17:00", 20);
     expect(uren).toBe(7.67);
     expect(isQuarter(uren!)).toBe(false);
+    expect(toQuarter(uren!)).toBe(7.75);
   });
 });
