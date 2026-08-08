@@ -79,3 +79,44 @@ describe("hoursBetween", () => {
     expect(hoursBetween("09:10", "12:00")).toBe(2.83);
   });
 });
+
+describe("hoursBetween met pauze", () => {
+  it("trekt de pauze van het tijdvak af", () => {
+    // Het geval waarvoor dit gebouwd is: negen tot vijf met een half uur pauze.
+    expect(hoursBetween("09:00", "17:00", 30)).toBe(7.5);
+  });
+
+  it("rekent zonder pauze hetzelfde als voorheen", () => {
+    expect(hoursBetween("09:00", "17:00", 0)).toBe(8);
+    expect(hoursBetween("09:00", "17:00")).toBe(hoursBetween("09:00", "17:00", 0));
+  });
+
+  it("weigert een pauze die het tijdvak precies opeet", () => {
+    // Nul uur boeken heeft geen betekenis, dus dit is een typefout en geen
+    // lege dag.
+    expect(hoursBetween("09:00", "09:30", 30)).toBe(null);
+  });
+
+  it("weigert een pauze die langer is dan het tijdvak", () => {
+    expect(hoursBetween("09:00", "09:30", 60)).toBe(null);
+  });
+
+  it("weigert een negatieve pauze, want die zou uren bijtellen", () => {
+    expect(hoursBetween("09:00", "17:00", -30)).toBe(null);
+  });
+
+  it("weigert een pauze die geen getal is", () => {
+    // Een leeg of onleesbaar invoerveld levert NaN op via Number().
+    expect(hoursBetween("09:00", "17:00", NaN)).toBe(null);
+    expect(hoursBetween("09:00", "17:00", Infinity)).toBe(null);
+  });
+
+  it("laat een pauze die geen kwartier is gewoon doorrekenen", () => {
+    // Deze functie oordeelt niet over de stap, net zomin als over het tijdvak.
+    // De aanroeper weigert dit met isQuarter en zet de melding bij het
+    // pauze-veld, waar de fout zit.
+    const uren = hoursBetween("09:00", "17:00", 20);
+    expect(uren).toBe(7.67);
+    expect(isQuarter(uren!)).toBe(false);
+  });
+});
