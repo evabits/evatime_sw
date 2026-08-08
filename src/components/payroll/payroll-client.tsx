@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { MemberPicker } from "@/components/shared/member-picker";
 import { formatHours } from "@/lib/utils";
+import { readHiddenIds, hiddenStorageKey } from "@/lib/hidden-members";
 
 type ContractType = "PERMANENT" | "FIXED_TERM" | "ZERO_HOURS";
 
@@ -26,10 +29,35 @@ const contractLabel: Record<ContractType, string> = {
   ZERO_HOURS: "0-uren",
 };
 
-export function PayrollClient() {
+export function PayrollClient({ userId }: { userId: string }) {
   const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [data, setData] = useState<PayrollRow[]>([]);
   const [loading, setLoading] = useState(false);
+  // Wie er weggeklikt is. Leeg betekent iedereen in beeld, dus het scherm
+  // gedraagt zich als voorheen tot er zelf iets uit gaat.
+  const [verborgen, setVerborgen] = useState<string[]>([]);
+  const [kiezerOpen, setKiezerOpen] = useState(false);
+  const opslagSleutel = hiddenStorageKey("payroll", userId);
+
+  // Pas na het hydrateren lezen: op de server bestaat localStorage niet. De
+  // try/catch is niet decoratief — die property gooit een SecurityError in een
+  // browser die site-data blokkeert, en dan zou dit scherm omvallen.
+  useEffect(() => {
+    try {
+      setVerborgen(readHiddenIds(localStorage.getItem(opslagSleutel)));
+    } catch {
+      /* geen opslag beschikbaar: iedereen blijft in beeld */
+    }
+  }, [opslagSleutel]);
+
+  function bewaarVerborgen(ids: string[]) {
+    setVerborgen(ids);
+    try {
+      localStorage.setItem(opslagSleutel, JSON.stringify(ids));
+    } catch {
+      /* schrijven mag mislukken; de keuze geldt dan voor deze sessie */
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +75,8 @@ export function PayrollClient() {
     };
   }, [month]);
 
+  const zichtbaar = data.filter((r) => !verborgen.includes(r.userId));
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,6 +89,11 @@ export function PayrollClient() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle>Overzicht</CardTitle>
             <div className="flex items-center gap-2">
+              {data.length > 0 && (
+                <Button variant="outline" onClick={() => setKiezerOpen(true)}>
+                  In beeld: {zichtbaar.length} van {data.length}
+                </Button>
+              )}
               <Label htmlFor="month" className="text-sm text-muted-foreground">Maand</Label>
               <Input
                 id="month"
@@ -93,7 +128,14 @@ export function PayrollClient() {
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Geen medewerkers gevonden</TableCell>
                 </TableRow>
               )}
-              {!loading && data.map((row) => (
+              {!loading && data.length > 0 && zichtbaar.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    Iedereen staat uit beeld. Kies wie u wilt zien via &quot;In beeld&quot;.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loading && zichtbaar.map((row) => (
                 <TableRow key={row.userId}>
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>
@@ -114,6 +156,14 @@ export function PayrollClient() {
           </Table>
         </CardContent>
       </Card>
+
+      <MemberPicker
+        open={kiezerOpen}
+        onOpenChange={setKiezerOpen}
+        members={data.map((r) => ({ id: r.userId, name: r.name }))}
+        hidden={verborgen}
+        onChange={bewaarVerborgen}
+      />
     </div>
   );
 }

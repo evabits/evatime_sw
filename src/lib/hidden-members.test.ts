@@ -1,10 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { readHiddenIds, hiddenStorageKey } from "./standup-visibility";
+import { readHiddenIds, hiddenStorageKey } from "./hidden-members";
 
 describe("hiddenStorageKey", () => {
   it("carries the user id, so two leaders on one browser do not share a selection", () => {
-    expect(hiddenStorageKey("u1")).toBe("standup-hidden:u1");
-    expect(hiddenStorageKey("u2")).not.toBe(hiddenStorageKey("u1"));
+    expect(hiddenStorageKey("standup", "u1")).toBe("standup-hidden:u1");
+    expect(hiddenStorageKey("standup", "u2")).not.toBe(hiddenStorageKey("standup", "u1"));
+  });
+
+  it("keeps the standup key it had before the payroll screen existed", () => {
+    // Deze sleutel staat al bij gebruikers in de browser. Zou hij veranderen,
+    // dan raakt iedereen stilzwijgend zijn standup-selectie kwijt bij de deploy.
+    expect(hiddenStorageKey("standup", "u1")).toBe("standup-hidden:u1");
+  });
+
+  it("keeps the two screens apart", () => {
+    // Mensen wegklikken op de standup zegt niets over de loonlijst.
+    expect(hiddenStorageKey("payroll", "u1")).toBe("payroll-hidden:u1");
+    expect(hiddenStorageKey("payroll", "u1")).not.toBe(hiddenStorageKey("standup", "u1"));
   });
 });
 
