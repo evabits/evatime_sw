@@ -37,6 +37,30 @@ export function isQuarter(hours: number): boolean {
 }
 
 /**
+ * Rondt uren af op het dichtstbijzijnde kwartier, precies op de helft naar
+ * boven.
+ *
+ * Hiermee hoeft niemand meer zelf uit te rekenen wat 9:00 tot 17:07 in
+ * kwartieren is. Het afronden hoort in het scherm en niet op de server: een
+ * API-verzoek met 7,67 moet geweigerd blijven worden, want daar zou het een
+ * gegeven veranderen dat niemand heeft aangepast. `isQuarter` blijft daarom
+ * gewoon bestaan naast deze functie.
+ *
+ * Naar nul afronden mag: wie 0,1 invult krijgt 0 terug en loopt daarmee tegen
+ * de bestaande eis dat uren positief zijn. Er wordt bewust geen minimum van een
+ * kwartier opgelegd — daar een kwartier van maken is tijd verzinnen die niet
+ * gewerkt is, en dat is erger dan een melding.
+ *
+ * De uitkomst gaat door dezelfde afronding op twee decimalen als
+ * `hoursBetween`, want hij belandt in dezelfde `Decimal(5,2)`-kolom. Een
+ * veelvoud van een kwartier heeft hooguit twee decimalen, dus die stap kan het
+ * resultaat niet meer van een kwartier af halen.
+ */
+export function toQuarter(hours: number): number {
+  return Math.round((Math.round(hours / QUARTER) * QUARTER) * 100) / 100;
+}
+
+/**
  * Het aantal uren tussen twee tijdstippen op dezelfde dag, beide als `HH:MM`,
  * minus een eventuele pauze in minuten.
  *
