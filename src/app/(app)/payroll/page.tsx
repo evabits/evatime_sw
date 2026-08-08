@@ -7,5 +7,8 @@ export default async function PayrollPage() {
   const isAdmin = (session?.user as any)?.role === "ADMIN";
   if (!isAdmin) redirect("/");
 
-  return <PayrollClient />;
+  // Het id gaat mee omdat de selectie "wie in beeld" per admin bewaard wordt:
+  // vier mensen zijn admin en er kan er meer dan één op dezelfde computer
+  // inloggen.
+  return <PayrollClient userId={session!.user!.id!} />;
 }

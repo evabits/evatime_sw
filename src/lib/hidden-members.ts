@@ -1,27 +1,34 @@
 /**
- * Wie de leider van de standup uit beeld heeft geklikt.
+ * Wie een gebruiker op een lijstscherm uit beeld heeft geklikt.
  *
- * Het scherm toont één kaart per actieve medewerker, en wie de standup leidt
- * wil daar zijn eigen mensen in zien. Dat is een schermvoorkeur en geen
- * organisatiestructuur: er is bewust geen team in het datamodel, want vijf
- * mensen mogen de standup leiden en soms neemt een ander het over.
+ * Twee schermen tonen één regel per medewerker en zijn allebei te lang voor
+ * waar ze voor gebruikt worden: de standup, waar de leider zijn eigen mensen
+ * wil zien, en de loonverwerking, waar de systeemaccounts elke maand
+ * meescrollen. Dat is in beide gevallen een schermvoorkeur en geen
+ * organisatiestructuur — er is bewust geen team in het datamodel.
  *
  * Opgeslagen wordt wie is WEGGEKLIKT, niet wie zichtbaar is. Dat verschil telt
  * bij een nieuwe collega: die staat er dan vanzelf bij, in plaats van
  * onzichtbaar te blijven tot iemand eraan denkt hem toe te voegen. In een
- * dagelijks ritueel valt zo iemand lang niet op, en iemand zien die je niet
- * nodig had is de goedkopere fout.
+ * dagelijks ritueel valt zo iemand lang niet op, en in een maandelijkse
+ * loonronde helemaal niet; iemand zien die je niet nodig had is de goedkopere
+ * fout.
  */
 
 /**
- * De sleutel in localStorage, met het gebruikers-id erin.
+ * De sleutel in localStorage, met het scherm én het gebruikers-id erin.
  *
- * Vijf mensen mogen de standup leiden en er kan er meer dan één op dezelfde
- * computer inloggen; zonder het id zou de een de selectie van de ander erven.
+ * De scope scheidt de twee schermen: wie op de standup mensen wegklikt bedoelt
+ * daar niet mee dat ze ook van de loonlijst af moeten. `"standup"` levert
+ * bewust exact de sleutel op die er vóór de loonverwerking al was — anders
+ * zouden bestaande gebruikers hun selectie kwijtraken bij een deploy.
+ *
+ * Het gebruikers-id staat erin omdat er meer dan één persoon op dezelfde
+ * computer kan inloggen; zonder id zou de een de selectie van de ander erven.
  * Zelfde opzet als `time-filters:<userId>` in het urenscherm.
  */
-export function hiddenStorageKey(userId: string): string {
-  return `standup-hidden:${userId}`;
+export function hiddenStorageKey(scope: "standup" | "payroll", userId: string): string {
+  return `${scope}-hidden:${userId}`;
 }
 
 /**

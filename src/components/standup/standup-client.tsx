@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { MemberPicker } from "@/components/shared/member-picker";
 import { formatHours } from "@/lib/utils";
-import { readHiddenIds, hiddenStorageKey } from "@/lib/standup-visibility";
+import { readHiddenIds, hiddenStorageKey } from "@/lib/hidden-members";
 import { missingHours } from "@/lib/work-schedule";
 
 interface Entry {
@@ -84,7 +84,7 @@ export function StandupClient({ userId }: { userId: string }) {
   // dus het scherm gedraagt zich als voorheen tot hij zelf iets wegklikt.
   const [verborgen, setVerborgen] = useState<string[]>([]);
   const [kiezerOpen, setKiezerOpen] = useState(false);
-  const opslagSleutel = hiddenStorageKey(userId);
+  const opslagSleutel = hiddenStorageKey("standup", userId);
 
   // Pas na het hydrateren lezen: op de server bestaat localStorage niet. De
   // try/catch is niet decoratief — die property gooit een SecurityError in een
@@ -291,39 +291,13 @@ export function StandupClient({ userId }: { userId: string }) {
         );
       })}
 
-      <Dialog open={kiezerOpen} onOpenChange={setKiezerOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Wie in beeld</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-1 max-h-80 overflow-y-auto">
-            {alleLeden.map((m) => {
-              const zichtbaar = !verborgen.includes(m.userId);
-              return (
-                <label key={m.userId} className="flex items-center gap-2 text-sm cursor-pointer py-1">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-input accent-primary"
-                    checked={zichtbaar}
-                    onChange={() =>
-                      bewaarVerborgen(
-                        zichtbaar
-                          ? [...verborgen, m.userId]
-                          : verborgen.filter((id) => id !== m.userId),
-                      )
-                    }
-                  />
-                  {m.userName}
-                </label>
-              );
-            })}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => bewaarVerborgen([])}>Toon iedereen</Button>
-            <Button onClick={() => setKiezerOpen(false)}>Klaar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MemberPicker
+        open={kiezerOpen}
+        onOpenChange={setKiezerOpen}
+        members={alleLeden.map((m) => ({ id: m.userId, name: m.userName }))}
+        hidden={verborgen}
+        onChange={bewaarVerborgen}
+      />
     </div>
   );
 }
