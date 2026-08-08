@@ -37,22 +37,37 @@ export function isQuarter(hours: number): boolean {
 }
 
 /**
- * Het aantal uren tussen twee tijdstippen op dezelfde dag, beide als `HH:MM`.
+ * Het aantal uren tussen twee tijdstippen op dezelfde dag, beide als `HH:MM`,
+ * minus een eventuele pauze in minuten.
  *
- * Geeft `null` wanneer een van beide ontbreekt, onleesbaar is, of de eindtijd
- * niet ná de begintijd ligt. Een dienst over middernacht bestaat hier niet, dus
- * een omgekeerd paar is altijd een typefout en nooit een nachtdienst.
+ * Geeft `null` wanneer een van beide tijdstippen ontbreekt, onleesbaar is, of de
+ * eindtijd niet ná de begintijd ligt. Een dienst over middernacht bestaat hier
+ * niet, dus een omgekeerd paar is altijd een typefout en nooit een nachtdienst.
+ *
+ * De pauze zit in deze functie en niet in een tweede ernaast, zodat er één plek
+ * blijft waar een tijdvak uren wordt; een volgend scherm kan dan niet de
+ * verkeerde kiezen. Weglaten is hetzelfde als nul.
+ *
+ * Ook `null` wanneer de pauze het tijdvak opeet of overtreft — van 9:00 tot 9:30
+ * met een uur pauze is geen negatieve dag maar een typefout — en wanneer de
+ * pauze negatief of geen getal is, want dat zou uren bíjtellen.
+ *
+ * Over de stap van een kwartier oordeelt deze functie niet, net zomin als hij
+ * dat over het tijdvak doet: een pauze van 20 minuten levert gewoon 7,67 op. De
+ * aanroeper weigert dat met `isQuarter`, en kan de melding dan bij het veld
+ * zetten waar de fout zit.
  *
  * Het resultaat wordt afgerond op twee decimalen omdat het in een
- * `Decimal(5,2)`-kolom belandt. Een tijdvak dat op een kwartier uitkomt is
- * daarmee exact; een tijdvak dat dat niet doet levert een getal op dat verderop
- * door `isQuarter` geweigerd wordt, en dat is de bedoeling.
+ * `Decimal(5,2)`-kolom belandt.
  */
-export function hoursBetween(from: string, to: string): number | null {
+export function hoursBetween(from: string, to: string, pauseMinutes = 0): number | null {
   const begin = minutenOpDeDag(from);
   const eind = minutenOpDeDag(to);
   if (begin === null || eind === null || eind <= begin) return null;
-  return Math.round(((eind - begin) / 60) * 100) / 100;
+  if (!Number.isFinite(pauseMinutes) || pauseMinutes < 0) return null;
+  const netto = eind - begin - pauseMinutes;
+  if (netto <= 0) return null;
+  return Math.round((netto / 60) * 100) / 100;
 }
 
 function minutenOpDeDag(waarde: string): number | null {

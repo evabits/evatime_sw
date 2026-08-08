@@ -151,8 +151,32 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   // zod-schema.
   const [vanTijd, setVanTijd] = useState("");
   const [totTijd, setTotTijd] = useState("");
-  const tijdvak = hoursBetween(vanTijd, totTijd);
-  const tijdvakFout = vanTijd !== "" && totTijd !== "" && tijdvak === null;
+  const [pauze, setPauze] = useState("");
+
+  // Eén plek om alle drie leeg te maken. Er zijn vijf plaatsen die het
+  // formulier resetten, en een pauze die daar vergeten wordt gaat er bij de
+  // volgende regel een tweede keer af zonder dat iets klaagt.
+  function leegTijdvak() {
+    setVanTijd("");
+    setTotTijd("");
+    setPauze("");
+  }
+
+  const pauzeMinuten = pauze === "" ? 0 : Number(pauze);
+  // Bruto ernaast, zodat een te lange pauze te onderscheiden is van een
+  // omgekeerd tijdvak: anders zou de gebruiker bij een fout in de pauze een
+  // melding over zijn eindtijd krijgen.
+  const bruto = hoursBetween(vanTijd, totTijd);
+  const tijdvak = hoursBetween(vanTijd, totTijd, pauzeMinuten);
+  const tijdvakFout = vanTijd !== "" && totTijd !== "" && bruto === null;
+  const pauzeTeLang = bruto !== null && tijdvak === null;
+  // Dezelfde kwartierregel als op het uren-veld, maar hier gemeld: de fout zit
+  // in de pauze en daar moet hij gecorrigeerd worden. step={15} en min={0}
+  // vangen dit in de browser al grotendeels af, maar die worden pas bij het
+  // versturen afgedwongen — en dit veld wordt niet verstuurd, dus een getypte
+  // -30 komt er gewoon doorheen.
+  const pauzeOngeldig =
+    pauzeMinuten < 0 || (pauzeMinuten > 0 && !isQuarter(pauzeMinuten / 60));
 
   useEffect(() => {
     if (tijdvak === null) return;
@@ -306,8 +330,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
         if (res.ok) {
           setEditing(null);
           form.reset({ date: selectedDay ?? today, userId });
-          setVanTijd("");
-          setTotTijd("");
+          leegTijdvak();
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
             const updated = await res.json();
@@ -328,8 +351,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
           form.reset({ date: data.date, userId: data.userId ?? userId });
-          setVanTijd("");
-          setTotTijd("");
+          leegTijdvak();
           if (switchedFilter) {
             await handleUserChange(targetUser);
           } else if (viewMode === "week") {
@@ -363,8 +385,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     setSubmitError(null);
     // De tijden zijn niet opgeslagen, dus bij het bewerken van een bestaande
     // regel is er niets om te tonen. Leeg laten is eerlijker dan gokken.
-    setVanTijd("");
-    setTotTijd("");
+    leegTijdvak();
     setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
@@ -475,11 +496,24 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   onChange={(e) => setTotTijd(e.target.value)}
                   className="w-32"
                 />
+                <Input
+                  type="number"
+                  step={15}
+                  min={0}
+                  placeholder="Pauze (min)"
+                  value={pauze}
+                  onChange={(e) => setPauze(e.target.value)}
+                  className="w-32"
+                />
               </div>
               {tijdvakFout ? (
                 <p className="text-xs text-destructive">De eindtijd moet ná de begintijd liggen</p>
+              ) : pauzeOngeldig ? (
+                <p className="text-xs text-destructive">Vul de pauze in als een positief aantal minuten, in stappen van 15</p>
+              ) : pauzeTeLang ? (
+                <p className="text-xs text-destructive">De pauze is even lang als of langer dan het tijdvak</p>
               ) : (
-                <p className="text-xs text-muted-foreground">Optioneel — vult het aantal uren voor u in</p>
+                <p className="text-xs text-muted-foreground">Optioneel — vult het aantal uren voor u in, pauze eraf</p>
               )}
             </div>
 
@@ -519,8 +553,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   setEditing(null);
                   setSelectedCustomerId("");
                   form.reset({ date: selectedDay ?? today, userId });
-                  setVanTijd("");
-                  setTotTijd("");
+                  leegTijdvak();
                   setSubmitError(null);
                 }}>Annuleren</Button>
               )}
