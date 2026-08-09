@@ -78,6 +78,20 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const [fetching, setFetching] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
+  // Verhoogd na elke geslaagde opslag, en gebruikt als key op de velden die
+  // leeg moeten worden.
+  //
+  // De keuzelijsten lezen hun waarde bij elke render uit de formulierstatus en
+  // lopen dus vanzelf leeg. Uren, Omschrijving en Tarief zijn losse
+  // invoervelden: daar moet react-hook-form de DOM-waarde actief overschrijven,
+  // en dat is het stuk dat hier niet betrouwbaar bleek. Met een nieuwe key
+  // bouwt React ze opnieuw op en zijn ze leeg omdat er niets anders in kán
+  // staan — legen vraagt dan geen actie meer, alleen bewáren zou dat vragen.
+  //
+  // Bewust niet op het <form> zelf: dan zou het datumveld ook opnieuw opgebouwd
+  // worden, en juist dat veld moet zijn waarde houden.
+  const [formulierNr, setFormulierNr] = useState(0);
+
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectSaving, setNewProjectSaving] = useState(false);
@@ -349,11 +363,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
         });
         if (res.ok) {
           setEditing(null);
-          form.reset({ date: selectedDay ?? today, userId });
           // Net als bij Annuleren en bij het toevoegen: het formulier is hierna
-          // weer een leeg toevoegformulier, dus de klant hoort ook leeg.
+          // weer een leeg toevoegformulier, dus alles hoort leeg.
+          form.reset({ date: selectedDay ?? today, userId });
           setSelectedCustomerId("");
           leegTijdvak();
+          setFormulierNr((n) => n + 1);
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
             const updated = await res.json();
@@ -374,12 +389,11 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
           // Datum en medewerker blijven staan: je boekt meestal meerdere
-          // regels op dezelfde dag voor dezelfde persoon. De rest gaat leeg —
-          // form.reset wist alles wat hier niet genoemd wordt, en de klant
-          // staat naast het formulier en moet dus apart.
+          // regels op dezelfde dag voor dezelfde persoon. De rest gaat leeg.
           form.reset({ date: data.date, userId: data.userId ?? userId });
           setSelectedCustomerId("");
           leegTijdvak();
+          setFormulierNr((n) => n + 1);
           if (switchedFilter) {
             await handleUserChange(targetUser);
           } else if (viewMode === "week") {
@@ -575,6 +589,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   gebeuren, dan verstuur je een getal en krijg je een ander
                   terug. */}
               <Input
+                key={`uren-${formulierNr}`}
                 type="number"
                 step="0.25"
                 min="0.25"
@@ -602,13 +617,13 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                     ? <span className="text-muted-foreground font-normal"> · geen tarief voor dit niveau</span>
                     : <span className="text-muted-foreground font-normal"> · standaard: €{effectiveRate.toFixed(2)}</span>)}
                 </Label>
-                <Input type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
+                <Input key={`tarief-${formulierNr}`} type="number" step="0.01" min="0" placeholder="Optioneel" {...form.register("rateOverride")} />
               </div>
             )}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
-              <Textarea placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
+              <Textarea key={`omschrijving-${formulierNr}`} placeholder="Wat heeft u gedaan?" {...form.register("description")} rows={2} />
             </div>
 
             {submitError && (
