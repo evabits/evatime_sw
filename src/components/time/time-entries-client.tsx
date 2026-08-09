@@ -350,6 +350,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
         if (res.ok) {
           setEditing(null);
           form.reset({ date: selectedDay ?? today, userId });
+          // Net als bij Annuleren en bij het toevoegen: het formulier is hierna
+          // weer een leeg toevoegformulier, dus de klant hoort ook leeg.
+          setSelectedCustomerId("");
           leegTijdvak();
           if (viewMode === "week") await fetchWeekEntries(weekOffset);
           else {
@@ -370,7 +373,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           const targetUser = data.userId ?? userId;
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
+          // Datum en medewerker blijven staan: je boekt meestal meerdere
+          // regels op dezelfde dag voor dezelfde persoon. De rest gaat leeg —
+          // form.reset wist alles wat hier niet genoemd wordt, en de klant
+          // staat naast het formulier en moet dus apart.
           form.reset({ date: data.date, userId: data.userId ?? userId });
+          setSelectedCustomerId("");
           leegTijdvak();
           if (switchedFilter) {
             await handleUserChange(targetUser);
