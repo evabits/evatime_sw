@@ -54,6 +54,28 @@ export function partitionProjectsByCustomer<T extends ProjectLike>(
   return { matched, customerless };
 }
 
+/**
+ * Of een gekozen project nog in de keuzelijst staat bij deze klant.
+ *
+ * Het invoerformulier moet een project loslaten zodra het niet meer gekozen kán
+ * worden — anders blijft er een project van een andere klant geselecteerd. De
+ * verleiding is om dat aan "de klant is veranderd" op te hangen, maar dat is te
+ * grof: bij het bewerken van een bestaande regel worden de klant en het project
+ * samen ingevuld, en dan wist die regel het project meteen weer.
+ *
+ * Zonder gekozen klant wordt er niet gefilterd en staat dus alles in de lijst;
+ * dan is er ook nooit iets om los te laten.
+ */
+export function isProjectOffered<T extends ProjectLike & { id: string }>(
+  projects: T[],
+  selectedCustomerId: string,
+  projectId: string,
+): boolean {
+  if (!projectId) return false;
+  const { matched, customerless } = partitionProjectsByCustomer(projects, selectedCustomerId);
+  return matched.some((p) => p.id === projectId) || customerless.some((p) => p.id === projectId);
+}
+
 export type MergeProject = { id: string; status: string; archivedAt: Date | null };
 
 export type InvoicedCounts = { timeEntries: number; kmEntries: number; expenses: number };

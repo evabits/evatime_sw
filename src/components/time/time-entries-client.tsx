@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeekGrid } from "@/components/shared/week-grid";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
-import { partitionProjectsByCustomer } from "@/lib/projects";
+import { partitionProjectsByCustomer, isProjectOffered } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
@@ -209,8 +209,17 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const { matched: matchedProjects, customerless: customerlessProjects } =
     partitionProjectsByCustomer(bookableProjects, selectedCustomerId);
 
+  // Een project loslaten zodra het niet meer in de keuzelijst staat, en alleen
+  // dán. Hier stond "de klant is veranderd", en dat is te grof: startEdit vult
+  // de klant en het project van de te bewerken regel samen in, waarna dit
+  // effect het project meteen weer wiste. Je moest het dus elke keer opnieuw
+  // kiezen — behalve als je toevallig twee regels van dezelfde klant achter
+  // elkaar bewerkte, want dan veranderde de klant niet.
   useEffect(() => {
-    form.setValue("projectId", "");
+    const huidig = form.getValues("projectId");
+    if (huidig && !isProjectOffered(bookableProjects, selectedCustomerId, huidig)) {
+      form.setValue("projectId", "");
+    }
   }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When a day is selected in week view, pre-fill the form date
