@@ -336,7 +336,10 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             {!editing && templates.length > 0 && (
               <div className="space-y-2 sm:col-span-2">
                 <Label>Sjabloon</Label>
-                <Select value={appliedTemplate || undefined} onValueChange={applyTemplate}>
+                {/* Lege string en niet undefined: Radix ziet undefined als
+                    onbestuurd en houdt zijn eigen laatste keuze vast, waardoor
+                    het leegmaken hieronder niets deed. */}
+                <Select value={appliedTemplate} onValueChange={applyTemplate}>
                   <SelectTrigger><SelectValue placeholder="Kies een opgeslagen rit om in te vullen" /></SelectTrigger>
                   <SelectContent>
                     {templates.map((t) => (
@@ -349,7 +352,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
             <div className="space-y-2">
               <Label>Klant</Label>
-              <Select value={selectedCustomerId || undefined} onValueChange={changeCustomer}>
+              <Select value={selectedCustomerId} onValueChange={changeCustomer}>
                 <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
