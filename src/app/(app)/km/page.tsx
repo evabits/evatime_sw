@@ -21,6 +21,9 @@ export default async function KmPage() {
       select: {
         id: true,
         name: true,
+        // Voor de tooltip op de projectkeuze: medewerkers zagen de omschrijving
+        // nergens, terwijl die vaak precies zegt wat er op het project hoort.
+        description: true,
         defaultKmRate: true,
         customer: { select: { id: true, name: true } },
       },

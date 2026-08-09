@@ -364,8 +364,9 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
               <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
                 <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                 <SelectContent>
+                  {/* title toont de projectomschrijving bij het over-hoveren. */}
                   {filteredProjects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id} title={p.description || undefined}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -205,7 +205,8 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
                   <SelectTrigger><SelectValue placeholder="Geen project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">Geen project</SelectItem>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
+                    {/* title toont de projectomschrijving bij het over-hoveren. */}
+                    {projects.map((p) => <SelectItem key={p.id} value={p.id} title={p.description || undefined}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

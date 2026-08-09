@@ -23,7 +23,8 @@ export default async function ExpensesPage() {
         ...(admin ? {} : { members: { some: { userId } } }),
       },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, customer: { select: { name: true } } },
+      // description is voor de tooltip op de projectkeuze.
+      select: { id: true, name: true, description: true, customer: { select: { name: true } } },
     }),
     prisma.expense.findMany({
       where: {

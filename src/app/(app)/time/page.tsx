@@ -23,10 +23,13 @@ export default async function TimePage() {
       // for admins — see the `{isAdmin && ...}` guard in TimeEntriesClient.
       // Non-admins don't need the per-level rate card, so don't ship it to
       // them in the page payload; same class of leak as the /api/time fix.
+      // description gaat naar iedereen: die voedt de tooltip op de
+      // projectkeuze, en juist medewerkers zagen hem tot nu toe nergens.
       select: admin
         ? {
             id: true,
             name: true,
+            description: true,
             status: true,
             levelRates: true,
             members: { select: { userId: true } },
@@ -35,6 +38,7 @@ export default async function TimePage() {
         : {
             id: true,
             name: true,
+            description: true,
             status: true,
             customer: { select: { id: true, name: true } },
           },

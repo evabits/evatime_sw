@@ -323,7 +323,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
       const created = await res.json();
       setProjects((prev) => [
         ...prev,
-        { id: created.id, name: created.name, status: "CONCEPT", levelRates: [], customer: null, members: created.members },
+        { id: created.id, name: created.name, description: created.description ?? null, status: "CONCEPT", levelRates: [], customer: null, members: created.members },
       ]);
       form.setValue("projectId", created.id);
       setNewProjectOpen(false);
@@ -474,8 +474,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
                   <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                   <SelectContent>
+                    {/* title is de omschrijving van het project: een native
+                        tooltip bij het over-hoveren. Geen tooltipcomponent
+                        nodig, en hij werkt ook binnen de portal waar Radix
+                        deze lijst in rendert. */}
                     {matchedProjects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
+                      <SelectItem key={p.id} value={p.id} title={p.description || undefined}>
                         {p.customer ? `${p.customer.name} — ` : ""}{p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
                       </SelectItem>
                     ))}
@@ -483,7 +487,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                       <SelectGroup>
                         <SelectLabel>Zonder klant</SelectLabel>
                         {customerlessProjects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
+                          <SelectItem key={p.id} value={p.id} title={p.description || undefined}>
                             {p.name}{p.status === "CONCEPT" ? " (concept)" : ""}
                           </SelectItem>
                         ))}
