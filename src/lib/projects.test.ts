@@ -3,6 +3,7 @@ import {
   projectCreateDenialReason,
   partitionProjectsByCustomer,
   projectMergeDenialReason,
+  isProjectOffered,
 } from "./projects";
 
 describe("projects", () => {
@@ -82,6 +83,45 @@ describe("partitionProjectsByCustomer", () => {
     const projects = [p("a", "c1"), p("c", "c2")];
     const { customerless } = partitionProjectsByCustomer(projects, "c1");
     expect(customerless).toEqual([]);
+  });
+});
+
+describe("isProjectOffered", () => {
+  const p = (id: string, customerId: string | null) => ({
+    id,
+    customer: customerId ? { id: customerId } : null,
+  });
+  const projects = [p("a", "c1"), p("b", null), p("c", "c2")];
+
+  it("houdt een project van de gekozen klant", () => {
+    // Het geval waarvoor dit bestaat: bij het bewerken worden de klant en het
+    // project samen ingevuld, en dan mag het project niet gewist worden.
+    expect(isProjectOffered(projects, "c1", "a")).toBe(true);
+  });
+
+  it("laat een project van een andere klant los", () => {
+    expect(isProjectOffered(projects, "c2", "a")).toBe(false);
+  });
+
+  it("houdt een project zonder klant, ongeacht de gekozen klant", () => {
+    // Projecten zonder klant staan altijd in de lijst, onder "Zonder klant".
+    expect(isProjectOffered(projects, "c1", "b")).toBe(true);
+    expect(isProjectOffered(projects, "", "b")).toBe(true);
+  });
+
+  it("houdt alles wanneer er geen klant gekozen is", () => {
+    // Zonder klant wordt er niet gefilterd, dus valt er niets af.
+    expect(isProjectOffered(projects, "", "a")).toBe(true);
+    expect(isProjectOffered(projects, "", "c")).toBe(true);
+  });
+
+  it("laat een project los dat helemaal niet in de lijst staat", () => {
+    // Bijvoorbeeld een gearchiveerd project: dat komt niet meer mee.
+    expect(isProjectOffered(projects, "", "onbekend")).toBe(false);
+  });
+
+  it("geeft false zonder gekozen project", () => {
+    expect(isProjectOffered(projects, "c1", "")).toBe(false);
   });
 });
 
