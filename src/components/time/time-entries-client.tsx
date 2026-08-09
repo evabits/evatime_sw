@@ -21,7 +21,7 @@ import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
-import { hoursBetween, toQuarter } from "@/lib/quarter-hours";
+import { hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES } from "@/lib/quarter-hours";
 import { perDayTotals } from "@/lib/per-day-totals";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
@@ -173,7 +173,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   // melding over zijn eindtijd krijgen.
   const bruto = hoursBetween(vanTijd, totTijd);
   const tijdvak = hoursBetween(vanTijd, totTijd, pauzeMinuten);
-  const tijdvakFout = vanTijd !== "" && totTijd !== "" && bruto === null;
+  // Tijdens het typen niet klagen. Een tekstveld ziet halve invoer — na de "9"
+  // van "9:00" is er nog geen geldig tijdstip — en bij type="time" kon dat niet
+  // gebeuren, want dat veld gaf een halve waarde als leeg door. Zonder deze
+  // vlag knippert de melding bij elke aanslag.
+  const [tijdBezig, setTijdBezig] = useState(false);
+  const tijdvakFout = !tijdBezig && vanTijd !== "" && totTijd !== "" && bruto === null;
   const pauzeTeLang = bruto !== null && tijdvak === null;
   // Een pauze hoeft geen kwartier te zijn: het uitgerekende aantal uren wordt
   // toch afgerond. Negatief blijft wél fout — dat zou uren bíjtellen. min={0}
@@ -484,24 +489,43 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
             <div className="space-y-2">
               <Label>Van — tot</Label>
               <div className="flex items-center gap-2">
-                {/* step={900} is de native kwartierstap: de browser levert de
-                    keuze-UI en de validatie, dus hier komt geen tijdbibliotheek
-                    aan te pas. */}
+                {/* Geen type="time": dat rendert volgens de taal van de browser
+                    en toont dan AM/PM, ongeacht wat de pagina zegt. Een
+                    tekstveld met een datalist staat altijd op HH:MM en levert
+                    de keuzelijst meteen op. normalizeTime maakt van een getypte
+                    9:00 een 09:00, want typen is hier de gewone weg. */}
                 <Input
-                  type="time"
-                  step={900}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="09:00"
+                  list="tijdstippen"
                   value={vanTijd}
                   onChange={(e) => setVanTijd(e.target.value)}
+                  onFocus={() => setTijdBezig(true)}
+                  onBlur={(e) => {
+                    setVanTijd(normalizeTime(e.target.value));
+                    setTijdBezig(false);
+                  }}
                   className="w-32"
                 />
                 <span className="text-muted-foreground">—</span>
                 <Input
-                  type="time"
-                  step={900}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="17:00"
+                  list="tijdstippen"
                   value={totTijd}
                   onChange={(e) => setTotTijd(e.target.value)}
+                  onFocus={() => setTijdBezig(true)}
+                  onBlur={(e) => {
+                    setTotTijd(normalizeTime(e.target.value));
+                    setTijdBezig(false);
+                  }}
                   className="w-32"
                 />
+                <datalist id="tijdstippen">
+                  {TIME_CHOICES.map((t) => <option key={t} value={t} />)}
+                </datalist>
                 <Input
                   type="number"
                   step={15}
@@ -534,6 +558,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 step="0.25"
                 min="0.25"
                 placeholder="1.5"
+                list="urenkeuzes"
                 {...form.register("hours", {
                   onBlur: (e) => {
                     const waarde = Number(e.target.value);
@@ -542,6 +567,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                   },
                 })}
               />
+              <datalist id="urenkeuzes">
+                {HOUR_CHOICES.map((u) => <option key={u} value={u} />)}
+              </datalist>
               {form.formState.errors.hours && <p className="text-xs text-destructive">{form.formState.errors.hours.message}</p>}
             </div>
 

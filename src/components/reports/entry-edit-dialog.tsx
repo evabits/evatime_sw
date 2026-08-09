@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
-import { toQuarter } from "@/lib/quarter-hours";
+import { toQuarter, HOUR_CHOICES } from "@/lib/quarter-hours";
 
 const TITLE: Record<BulkKind, string> = { time: "Uren aanpassen", km: "Rit aanpassen", expense: "Uitgave aanpassen" };
 
@@ -157,6 +157,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
                 step="0.25"
                 min="0.25"
                 value={form.hours}
+                list="urenkeuzes-bewerken"
                 onChange={(e) => set("hours", e.target.value)}
                 onBlur={(e) => {
                   const waarde = Number(e.target.value);
@@ -164,6 +165,12 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
                   set("hours", toQuarter(waarde));
                 }}
               />
+              {/* Eigen id: twee datalists met dezelfde id op één pagina is
+                  ongeldige HTML, en dat wil je niet laten afhangen van welke
+                  route toevallig gemount is. */}
+              <datalist id="urenkeuzes-bewerken">
+                {HOUR_CHOICES.map((u) => <option key={u} value={u} />)}
+              </datalist>
             </div>
           )}
           {kind === "km" && (
