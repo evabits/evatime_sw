@@ -94,6 +94,45 @@ export function hoursBetween(from: string, to: string, pauseMinutes = 0): number
   return Math.round((netto / 60) * 100) / 100;
 }
 
+/**
+ * Vult een getypt tijdstip aan tot `HH:MM`.
+ *
+ * De tijdvelden zijn tekstvelden en geen `type="time"` — dat laatste rendert
+ * volgens de taal van de browser en toont dan AM/PM, wat hier niet gewenst is.
+ * Daarmee wordt typen de gewone weg, en `9:00` intikken is dan volstrekt
+ * normaal. Zonder deze stap zou dat de melding "de eindtijd moet ná de
+ * begintijd liggen" opleveren: een leugen over wat er misging.
+ *
+ * Bewust geen parser. `930` of `9u30` wordt niet omgezet — de keuzelijst is er
+ * voor wie niet wil typen, en iets wat soms iets anders begrijpt dan je bedoelde
+ * is erger dan niets.
+ *
+ * Hij oordeelt niet over het bereik: `25:00` komt er onveranderd uit en wordt
+ * verderop door `hoursBetween` geweigerd. Eén plek die over geldigheid gaat.
+ */
+export function normalizeTime(raw: string): string {
+  const m = /^(\d{1,2}):(\d{1,2})$/.exec(raw.trim());
+  if (!m) return raw;
+  return `${m[1].padStart(2, "0")}:${m[2].padStart(2, "0")}`;
+}
+
+/**
+ * Alle kwartieren van een etmaal als `HH:MM`, voor de keuzelijst bij van-tot.
+ *
+ * Berekend uit `QUARTER` en niet met de hand uitgeschreven: een lijst die een
+ * waarde aanbiedt die het formulier daarna afrondt, is erger dan geen lijst.
+ */
+export const TIME_CHOICES: string[] = Array.from({ length: 24 / QUARTER }, (_, i) => {
+  const minuten = i * QUARTER * 60;
+  return `${String(Math.floor(minuten / 60)).padStart(2, "0")}:${String(minuten % 60).padStart(2, "0")}`;
+});
+
+/**
+ * Kwartieren van een kwartier tot twaalf uur, voor de keuzelijst bij het
+ * uren-veld. Twaalf is ruim boven een lange werkdag; wie meer boekt typt het.
+ */
+export const HOUR_CHOICES: number[] = Array.from({ length: 12 / QUARTER }, (_, i) => (i + 1) * QUARTER);
+
 function minutenOpDeDag(waarde: string): number | null {
   const m = /^(\d{2}):(\d{2})$/.exec(waarde);
   if (!m) return null;

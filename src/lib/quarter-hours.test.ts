@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isQuarter, hoursBetween, toQuarter } from "./quarter-hours";
+import { isQuarter, hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES } from "./quarter-hours";
 
 describe("isQuarter", () => {
   it("accepts whole hours", () => {
@@ -79,6 +79,74 @@ describe("toQuarter", () => {
     // zijn eigen afronding.
     for (const uren of [0, 0.1, 1.01, 2.49, 3.13, 7.6, 7.67, 7.625, 12.99, 23.99]) {
       expect(isQuarter(toQuarter(uren))).toBe(true);
+    }
+  });
+});
+
+describe("normalizeTime", () => {
+  it("vult een eencijferig uur aan", () => {
+    expect(normalizeTime("9:00")).toBe("09:00");
+  });
+
+  it("vult een eencijferige minuut aan", () => {
+    expect(normalizeTime("09:5")).toBe("09:05");
+  });
+
+  it("vult beide aan", () => {
+    expect(normalizeTime("9:5")).toBe("09:05");
+  });
+
+  it("laat een waarde die al goed staat met rust", () => {
+    expect(normalizeTime("09:00")).toBe("09:00");
+    expect(normalizeTime("23:45")).toBe("23:45");
+  });
+
+  it("laat leeg leeg", () => {
+    expect(normalizeTime("")).toBe("");
+  });
+
+  it("geeft iets wat er niet op lijkt onveranderd terug", () => {
+    // Dan doet de bestaande melding zijn werk in plaats van dat hier stilletjes
+    // iets anders van gemaakt wordt.
+    expect(normalizeTime("930")).toBe("930");
+    expect(normalizeTime("9u30")).toBe("9u30");
+    expect(normalizeTime("kwart over negen")).toBe("kwart over negen");
+  });
+
+  it("oordeelt niet over het bereik", () => {
+    // hoursBetween is de enige plek die dat doet.
+    expect(normalizeTime("25:00")).toBe("25:00");
+    expect(hoursBetween(normalizeTime("25:00"), "26:00")).toBe(null);
+  });
+});
+
+describe("TIME_CHOICES", () => {
+  it("dekt het hele etmaal in kwartieren", () => {
+    expect(TIME_CHOICES.length).toBe(96);
+    expect(TIME_CHOICES[0]).toBe("00:00");
+    expect(TIME_CHOICES[TIME_CHOICES.length - 1]).toBe("23:45");
+  });
+
+  it("biedt uitsluitend tijdstippen die op een kwartier vallen", () => {
+    // Anders zou de keuzelijst een waarde aanbieden die het formulier daarna
+    // afrondt naar iets anders dan je aanklikte.
+    for (const tijd of TIME_CHOICES.slice(1)) {
+      expect(isQuarter(hoursBetween("00:00", tijd)!)).toBe(true);
+    }
+  });
+});
+
+describe("HOUR_CHOICES", () => {
+  it("loopt van een kwartier tot twaalf uur", () => {
+    expect(HOUR_CHOICES.length).toBe(48);
+    expect(HOUR_CHOICES[0]).toBe(0.25);
+    expect(HOUR_CHOICES[HOUR_CHOICES.length - 1]).toBe(12);
+  });
+
+  it("biedt uitsluitend kwartieren aan", () => {
+    for (const uren of HOUR_CHOICES) {
+      expect(isQuarter(uren)).toBe(true);
+      expect(toQuarter(uren)).toBe(uren);
     }
   });
 });
