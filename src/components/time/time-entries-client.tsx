@@ -458,7 +458,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Klant</Label>
-              <Select value={selectedCustomerId || undefined} onValueChange={(v) => setSelectedCustomerId(v)}>
+              {/* De lege string rechtstreeks doorgeven, niet undefined. Radix
+                  ziet undefined als "onbestuurd" en houdt dan zijn eigen
+                  laatste keuze vast, waardoor leegmaken niets deed. Een lege
+                  string is een geldige bestuurde waarde en toont de
+                  placeholder — zie shouldShowPlaceholder in @radix-ui/react-select. */}
+              <Select value={selectedCustomerId} onValueChange={(v) => setSelectedCustomerId(v)}>
                 <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
