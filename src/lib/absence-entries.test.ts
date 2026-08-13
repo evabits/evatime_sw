@@ -256,4 +256,122 @@ describe("absenceLines", () => {
     const som = uitkomst.entries.reduce((s, e) => s + Math.round(e.hours * 100), 0);
     expect(som).toBe(1000);
   });
+
+  // Merlijn Kunst werkt maandags niet.
+  const roosterZonderMaandag = { monday: 0, tuesday: 8, wednesday: 8, thursday: 8, friday: 8 };
+  // Paul van Gelderen werkt maandag, woensdag en vrijdag.
+  const roosterOmDeDag = { monday: 8, tuesday: 0, wednesday: 8, thursday: 0, friday: 8 };
+
+  it("skips the day the schedule leaves free", () => {
+    const uitkomst = absenceLines(32, null, "2026-08-03", "2026-08-07", roosterZonderMaandag);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
+  });
+
+  it("keeps only the three days a part-time schedule works", () => {
+    const uitkomst = absenceLines(24, null, "2026-08-03", "2026-08-07", roosterOmDeDag);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-03", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
+  });
+
+  it("leaves a half day on the scheduled day it was asked for", () => {
+    const uitkomst = absenceLines(4, null, "2026-08-04", "2026-08-04", roosterZonderMaandag);
+    expect(uitkomst).toEqual({ ok: true, entries: [{ date: "2026-08-04", hours: 4 }] });
+  });
+
+  it("changes nothing without a schedule", () => {
+    // Expliciete null als rooster: elke werkdag is dan gewoon een werkdag,
+    // net als vóór dit argument bestond. Dit pint het concrete resultaat in
+    // plaats van alleen het defaultgedrag van het vijfde argument te testen —
+    // dat laatste zou ook slagen als de hele roosterfunctionaliteit verdween.
+    expect(absenceLines(40, null, "2026-08-03", "2026-08-07", null)).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-03", hours: 8 },
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
+  });
+
+  it("falls back to every working day when the schedule leaves none", () => {
+    // Verlof op precies een vaste vrije dag. Het scherm stelt hier nul uur voor
+    // en houdt dat tegen; wie tóch uren opgeeft bedoelt die dag, dus de uren
+    // horen daar te landen in plaats van te verdwijnen.
+    const uitkomst = absenceLines(8, null, "2026-08-03", "2026-08-03", roosterZonderMaandag);
+    expect(uitkomst).toEqual({ ok: true, entries: [{ date: "2026-08-03", hours: 8 }] });
+  });
+
+  // Rooster met een korte vrijdag: 0, 8, 8, 8, 4 uur.
+  const roosterOngelijk = { monday: 0, tuesday: 8, wednesday: 8, thursday: 8, friday: 4 };
+
+  it("takes the hours straight from an uneven schedule when the total matches", () => {
+    // 28 is het roostertotaal van roosterOngelijk over deze week — precies wat
+    // patternSummary het dialoog zou voorstellen. Plat verdelen zou 7,00 uur
+    // per dag geven; hier hoort de vrijdag zijn eigen vier uur te houden.
+    const uitkomst = absenceLines(28, null, "2026-08-03", "2026-08-07", roosterOngelijk);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 4 },
+      ],
+    });
+  });
+
+  it("falls back to a flat split over an uneven schedule when the total was overridden", () => {
+    // 14 is niet het roostertotaal (28): de aanvrager heeft het voorgestelde
+    // getal aangepast, dus geldt weer de platte verdeling over dezelfde vier
+    // werkdagen — 14 uur (56 kwartier) door vier is keurig 3,5 per dag.
+    const uitkomst = absenceLines(14, null, "2026-08-03", "2026-08-07", roosterOngelijk);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 3.5 },
+        { date: "2026-08-05", hours: 3.5 },
+        { date: "2026-08-06", hours: 3.5 },
+        { date: "2026-08-07", hours: 3.5 },
+      ],
+    });
+  });
+
+  it("keeps splitting a matching total flat when the schedule is even", () => {
+    // Pint dat een gelijk rooster (vier keer 8) niet van gedrag verandert: de
+    // uitkomst is hier identiek aan wat de platte verdeling ook al gaf.
+    const uitkomst = absenceLines(32, null, "2026-08-03", "2026-08-07", roosterZonderMaandag);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
+  });
+
+  it("lets the pattern win over the schedule", () => {
+    // Woensdagpatroon over een week, met een rooster dat woensdag juist vrij
+    // geeft: het patroon is een uitdrukkelijke keuze en gaat voor.
+    const roosterZonderWoensdag = { monday: 8, tuesday: 8, wednesday: 0, thursday: 8, friday: 8 };
+    const uitkomst = absenceLines(999, patroon, "2026-08-03", "2026-08-07", roosterZonderWoensdag);
+    expect(uitkomst).toEqual({ ok: true, entries: [{ date: "2026-08-05", hours: 8 }] });
+  });
 });

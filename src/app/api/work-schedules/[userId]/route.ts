@@ -5,8 +5,12 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { weekTotal } from "@/lib/work-schedule";
+import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
 
-const dag = z.number().min(0).max(24);
+// Het rooster voedt voortaan het urenveld van het verlofdialoog (via
+// patternSummary), dat zelf alleen kwartieren toelaat; een rooster met 7,6 uur
+// zou dus een getal voorstellen dat de invoercontrole meteen weer weigert.
+const dag = z.number().min(0).max(24).refine(isQuarter, NOT_A_QUARTER);
 
 const schema = z.object({
   monday: dag,
