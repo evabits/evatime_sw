@@ -21,7 +21,8 @@ import { getEffectiveContract, rangeOverlaps } from "@/lib/contracts";
 interface Contract {
   id: string; userId: string;
   contractType: "PERMANENT" | "FIXED_TERM" | "ZERO_HOURS";
-  contractHours: number | null; startDate: string | null; endDate: string | null;
+  contractHours: number | null; vacationHours: number | null;
+  startDate: string | null; endDate: string | null;
   salaryMonthly: number | null; salaryHourly: number | null;
   jobTitle: string | null; ftePercentage: number | null; notes: string | null;
   attachments: { id: string; filename: string; url: string; size: number; createdAt: string }[];
@@ -36,6 +37,7 @@ const CONTRACT_LABELS: Record<string, string> = {
 const schema = z.object({
   contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]),
   contractHours: z.coerce.number().positive().optional(),
+  vacationHours: z.coerce.number().positive().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   salaryMonthly: z.coerce.number().positive().optional(),
@@ -90,6 +92,7 @@ export function ContractsClient({
     form.reset({
       contractType: c.contractType,
       contractHours: c.contractHours ?? undefined,
+      vacationHours: c.vacationHours ?? undefined,
       startDate: c.startDate ?? undefined,
       endDate: c.endDate ?? undefined,
       salaryMonthly: c.salaryMonthly ?? undefined,
@@ -167,6 +170,7 @@ export function ContractsClient({
                   <TableHead>Functie</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Uren</TableHead>
+                  <TableHead>Vakantie-uren</TableHead>
                   <TableHead>Maandsalaris</TableHead>
                   <TableHead>Uursalaris</TableHead>
                   <TableHead>FTE</TableHead>
@@ -188,6 +192,7 @@ export function ContractsClient({
                         <Badge variant="outline">{CONTRACT_LABELS[c.contractType]}</Badge>
                       </TableCell>
                       <TableCell>{c.contractHours != null ? `${c.contractHours}u` : <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>{c.vacationHours != null ? `${c.vacationHours}u` : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="font-mono">{c.salaryMonthly != null ? formatCurrency(c.salaryMonthly) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="font-mono">{c.salaryHourly != null ? formatCurrency(c.salaryHourly) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>{c.ftePercentage != null ? `${c.ftePercentage}%` : <span className="text-muted-foreground">—</span>}</TableCell>
@@ -287,6 +292,10 @@ export function ContractsClient({
             <div className="space-y-1">
               <Label>Contracturen per week</Label>
               <Input type="number" step="0.5" min="0" placeholder="bijv. 40" {...form.register("contractHours", numberField)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Vakantie-uren per jaar</Label>
+              <Input type="number" step="0.5" min="0" placeholder="bijv. 160" {...form.register("vacationHours", numberField)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">

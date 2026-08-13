@@ -4,6 +4,7 @@ import { serialize } from "@/lib/utils";
 import { isAdmin } from "@/lib/roles";
 import { AbsenceClient } from "@/components/vacation/absence-client";
 import { toWeekSchedule } from "@/lib/work-schedule";
+import { fillBudgets, toContractVacation } from "@/lib/vacation-budget";
 
 export default async function AbsencePage() {
   const session = await auth();
@@ -14,7 +15,7 @@ export default async function AbsencePage() {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31);
 
-  const [requests, budgets, users, currentUser, scheduleRows] = await Promise.all([
+  const [requests, budgets, users, currentUser, scheduleRows, contractRows] = await Promise.all([
     prisma.absenceRequest.findMany({
       where: {
         ...(admin ? {} : { userId }),
@@ -42,10 +43,16 @@ export default async function AbsencePage() {
           orderBy: { name: "asc" },
         })
       : Promise.resolve([]),
-    prisma.user.findUnique({ where: { id: userId }, select: { weeklyHours: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { weeklyHours: true, name: true } }),
     // Een medewerker heeft alleen zijn eigen rooster nodig; een admin kan voor
     // iedereen aanvragen, dus die krijgt ze allemaal. Het zijn enkele rijen.
     prisma.workSchedule.findMany({ where: admin ? {} : { userId } }),
+    // Alleen de velden die het budget bepalen: de rest van een contract is
+    // salaris en heeft op dit scherm niets te zoeken.
+    prisma.contract.findMany({
+      where: admin ? {} : { userId },
+      select: { userId: true, startDate: true, endDate: true, vacationHours: true },
+    }),
   ]);
 
   const calendarToken = process.env.VACATION_CALENDAR_TOKEN ?? "";
@@ -55,6 +62,15 @@ export default async function AbsencePage() {
   // hij nooit null geven, want elke rij bestaat.
   const schedules = Object.fromEntries(
     scheduleRows.map((r) => [r.userId, toWeekSchedule(r)!]),
+  );
+
+  // De budgetlijst aangevuld met wat de contracten opleveren. Dit gebeurt hier
+  // en niet in de client, zodat de contracten de browser niet halen.
+  const budgetRegels = fillBudgets(
+    serialize(budgets).map((b: any) => ({ ...b, hours: Number(b.hours) })),
+    admin ? users : [{ id: userId, name: currentUser?.name ?? "" }],
+    toContractVacation(contractRows),
+    year,
   );
 
   return (
@@ -68,7 +84,7 @@ export default async function AbsencePage() {
         hours: Number(r.hours),
         pattern: toWeekSchedule(r.pattern),
       }))}
-      initialBudgets={serialize(budgets).map((b: any) => ({ ...b, hours: Number(b.hours) }))}
+      initialBudgets={budgetRegels}
       users={users}
       currentUserId={userId}
       isAdmin={admin}

@@ -6,7 +6,7 @@ import { handleError } from "@/lib/api";
 import { fillSalary } from "@/lib/contracts";
 
 export const contractSelect = {
-  id: true, userId: true, contractType: true, contractHours: true,
+  id: true, userId: true, contractType: true, contractHours: true, vacationHours: true,
   startDate: true, endDate: true, salaryMonthly: true, salaryHourly: true,
   jobTitle: true, ftePercentage: true, notes: true, expiryReminderSentAt: true,
   createdAt: true,
@@ -18,6 +18,7 @@ export function serializeContract(c: any) {
   return {
     ...c,
     contractHours: c.contractHours != null ? Number(c.contractHours) : null,
+    vacationHours: c.vacationHours != null ? Number(c.vacationHours) : null,
     salaryMonthly: c.salaryMonthly != null ? Number(c.salaryMonthly) : null,
     salaryHourly: c.salaryHourly != null ? Number(c.salaryHourly) : null,
     ftePercentage: c.ftePercentage != null ? Number(c.ftePercentage) : null,
@@ -34,6 +35,7 @@ const dateStr = z.string().optional().or(z.literal(""));
 export const contractBodySchema = z.object({
   contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]).default("PERMANENT"),
   contractHours: num,
+  vacationHours: num,
   startDate: dateStr,
   endDate: dateStr,
   salaryMonthly: num,
@@ -55,6 +57,7 @@ export function toContractData(b: z.infer<typeof contractBodySchema>) {
   return {
     contractType: b.contractType,
     contractHours,
+    vacationHours: b.vacationHours ?? null,
     startDate: b.startDate ? new Date(b.startDate) : null,
     endDate: b.endDate ? new Date(b.endDate) : null,
     salaryMonthly,

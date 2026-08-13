@@ -479,6 +479,10 @@ model Contract {
   user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   contractType         ContractType         @default(PERMANENT)
   contractHours        Decimal?             @db.Decimal(5, 2)
+  // Vakantie-uren per jaar. Voedt het vakantiesaldo op /absence en het
+  // dashboard; leeg betekent "geen afspraak vastgelegd", en dan blijft het
+  // saldo leeg zoals het altijd was.
+  vacationHours        Decimal?             @db.Decimal(5, 2)
   startDate            DateTime?            @db.Date
   endDate              DateTime?            @db.Date
   salaryMonthly        Decimal?             @db.Decimal(10, 2)

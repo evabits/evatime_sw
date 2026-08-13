@@ -57,7 +57,11 @@ interface AbsenceRequest {
 }
 
 interface VacationBudget {
-  id: string;
+  // null betekent: afgeleid uit het contract, er staat geen rij in de
+  // database. Daaraan hangt de tekst "uit contract", het ontbreken van de
+  // verwijderknop, en dat opslaan een nieuwe rij maakt in plaats van een
+  // bestaande te wijzigen.
+  id: string | null;
   userId: string;
   year: number;
   hours: number;
@@ -283,8 +287,13 @@ export function AbsenceClient({
 
   function openBudgetDialog(budget?: VacationBudget) {
     setServerError("");
-    if (budget) {
+    if (budget?.id) {
       setEditingBudget(budget);
+      budgetForm.reset({ userId: budget.userId, year: budget.year, hours: budget.hours });
+    } else if (budget) {
+      // Afgeleid uit het contract: er valt niets te wijzigen, dit wordt een
+      // nieuwe rij. De waarden staan al klaar zodat alleen het getal nog hoeft.
+      setEditingBudget(null);
       budgetForm.reset({ userId: budget.userId, year: budget.year, hours: budget.hours });
     } else {
       setEditingBudget(null);
@@ -385,9 +394,12 @@ export function AbsenceClient({
       }
       const saved: VacationBudget = await res.json();
       setBudgets((prev) => {
-        const existing = prev.findIndex((b) => b.id === saved.id);
-        return existing >= 0
-          ? prev.map((b) => (b.id === saved.id ? saved : b))
+        // Op medewerker en jaar samenvoegen, niet op id: de regel die hier
+        // vervangen wordt is vaak de afgeleide, en die heeft geen id. Op id
+        // zoeken zou de afgeleide regel naast de nieuwe echte laten staan.
+        const bestaand = prev.findIndex((b) => b.userId === saved.userId && b.year === saved.year);
+        return bestaand >= 0
+          ? prev.map((b, i) => (i === bestaand ? saved : b))
           : [...prev, saved].sort((a, b) => a.user.name.localeCompare(b.user.name));
       });
     }
@@ -547,10 +559,15 @@ export function AbsenceClient({
                         .reduce((s, r) => s + r.hours, 0);
                       const remaining = b.hours - used;
                       return (
-                        <tr key={b.id} className="border-t hover:bg-muted/30">
+                        <tr key={b.id ?? `${b.userId}-${b.year}`} className="border-t hover:bg-muted/30">
                           <td className="px-4 py-3">{b.user.name}</td>
                           <td className="px-4 py-3">{b.year}</td>
-                          <td className="px-4 py-3 text-right">{b.hours}</td>
+                          <td className="px-4 py-3 text-right">
+                            {b.hours}
+                            {b.id === null && (
+                              <span className="ml-1.5 text-xs text-muted-foreground">uit contract</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-right">{used}</td>
                           <td className={`px-4 py-3 text-right font-medium ${remaining < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                             {remaining}
@@ -560,9 +577,11 @@ export function AbsenceClient({
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openBudgetDialog(b)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteBudget(b.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              {b.id !== null && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteBudget(b.id!)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -12,6 +12,7 @@ import { isBillable } from "@/lib/billable";
 import { canLeadStandup } from "@/lib/roles";
 import { previousWorkingDay } from "@/lib/working-days";
 import { countMissingHours } from "@/lib/missing-hours";
+import { contractVacationHours, toContractVacation } from "@/lib/vacation-budget";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
   // Employees see only their own totals; admins see company-wide.
   const ownerFilter = isAdmin ? {} : { userId };
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren] = await Promise.all([
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -95,6 +96,12 @@ export default async function DashboardPage() {
       ? prisma.project.count({ where: { customerId: null, archivedAt: null } })
       : Promise.resolve(0),
     magStandup ? countMissingHours(standupDag) : Promise.resolve(0),
+    // Alleen de velden die het vakantiebudget bepalen; de rest van een
+    // contract is salaris en hoort hier niet.
+    prisma.contract.findMany({
+      where: { userId },
+      select: { userId: true, startDate: true, endDate: true, vacationHours: true },
+    }),
   ]);
 
   const pendingReview = userId
@@ -107,7 +114,11 @@ export default async function DashboardPage() {
 
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
-  const vacBudgetHours = Number(vacationBudget?.hours ?? 0);
+  // Een budgetrij voor dit jaar wint; anders zegt het contract het. Zonder
+  // allebei blijft het nul, zoals het altijd was.
+  const vacBudgetHours = vacationBudget
+    ? Number(vacationBudget.hours)
+    : (contractVacationHours(toContractVacation(eigenContracten), currentYear) ?? 0);
   const vacUsedHours = Number(vacationApproved._sum.hours ?? 0);
   const vacRemainingHours = vacBudgetHours - vacUsedHours;
 
