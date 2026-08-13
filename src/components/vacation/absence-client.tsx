@@ -78,6 +78,8 @@ interface Props {
   year: number;
   calendarToken: string;
   weeklyHours: number;
+  // Het weekrooster per gebruikers-id. Wie er geen heeft staat er niet in.
+  schedules: Record<string, WeekSchedule>;
 }
 
 function countWorkingHours(startStr: string, endStr: string, weeklyHours: number): number {
@@ -145,6 +147,7 @@ export function AbsenceClient({
   year,
   calendarToken,
   weeklyHours,
+  schedules,
 }: Props) {
   const [requests, setRequests] = useState<AbsenceRequest[]>(initialRequests);
   const [budgets, setBudgets] = useState<VacationBudget[]>(initialBudgets);
@@ -220,6 +223,20 @@ export function AbsenceClient({
     herhaald && watchedStart && watchedEnd ? patternSummary(patroon, watchedStart, watchedEnd) : null;
   const patroonTotaal = patroonInfo?.total ?? 0;
 
+  // Het rooster van de medewerker waar de dialoog over gaat — dezelfde keuze
+  // die het saldo hierboven al maakt. Wie geen rooster heeft krijgt null en
+  // valt terug op weeklyHours, precies zoals het altijd ging.
+  const doelRooster = schedules[doelMedewerkerId] ?? null;
+
+  // Wat dat rooster over de gekozen periode oplevert. Niet berekend zodra het
+  // patroonvinkje aanstaat: dat patroon wint en zou anders met deze regel om
+  // het urenveld vechten.
+  const roosterInfo =
+    !herhaald && doelRooster && watchedStart && watchedEnd
+      ? patternSummary(doelRooster, watchedStart, watchedEnd)
+      : null;
+  const roosterTotaal = roosterInfo?.total ?? null;
+
   useEffect(() => {
     // Met een patroon is het urenveld alleen-lezen en toont het het afgeleide
     // totaal. De werkdagentelling zou dat overschrijven zodra je een datum
@@ -230,9 +247,16 @@ export function AbsenceClient({
       return;
     }
     if (!watchedStart || !watchedEnd) return;
+    // Mét rooster telt het rooster, ook als het nul oplevert: verlof op een
+    // vaste vrije dag hóórt nul te zijn, en de bestaande "Moet positief zijn"
+    // houdt dat tegen. Een oude waarde laten staan zou juist verwarren.
+    if (roosterTotaal !== null) {
+      requestForm.setValue("hours", roosterTotaal, { shouldValidate: false });
+      return;
+    }
     const calculated = countWorkingHours(watchedStart, watchedEnd, weeklyHours);
     if (calculated > 0) requestForm.setValue("hours", calculated, { shouldValidate: false });
-  }, [herhaald, patroonTotaal, watchedStart, watchedEnd, weeklyHours, requestForm]);
+  }, [herhaald, patroonTotaal, roosterTotaal, watchedStart, watchedEnd, weeklyHours, requestForm]);
 
   function openRequestDialog(req?: AbsenceRequest) {
     setServerError("");
@@ -678,6 +702,11 @@ export function AbsenceClient({
               />
               {requestForm.formState.errors.hours && (
                 <p className="text-xs text-destructive">{requestForm.formState.errors.hours.message}</p>
+              )}
+              {roosterInfo && (
+                <p className="text-xs text-muted-foreground">
+                  Rooster: {roosterInfo.entries.length} dagen, {roosterInfo.total.toFixed(2)} uur in totaal
+                </p>
               )}
               {balanceAfterRequest !== null && doelBudget !== undefined && dialogRequestedHours > 0 && (
                 <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
