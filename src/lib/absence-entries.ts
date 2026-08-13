@@ -107,6 +107,25 @@ export function patternSummary(
 }
 
 /**
+ * De dagen uit `dagen` waarop het weekrooster werk kent.
+ *
+ * Zonder rooster verandert er niets: dan is elke werkdag een werkdag, precies
+ * zoals het altijd ging. Mét rooster vallen de vaste vrije dagen weg, zodat een
+ * week verlof van iemand die maandags niet werkt vier regels oplevert en niet
+ * vijf met een uitgesmeerde maandag erbij.
+ *
+ * Laat het rooster geen enkele dag over, dan geeft hij alle dagen terug. Dat
+ * gebeurt wanneer iemand uitdrukkelijk verlof opgeeft op een vaste vrije dag;
+ * het formulier stelt daar nul uur voor, dus wie er toch een getal intypt
+ * bedoelt die dag. Uren stil laten verdwijnen is dan het slechtere antwoord.
+ */
+function roosterDagen(schedule: WeekSchedule | null, dagen: string[]): string[] {
+  if (!schedule) return dagen;
+  const werkdagen = dagen.filter((d) => scheduledHoursOn(schedule, d) > 0);
+  return werkdagen.length > 0 ? werkdagen : dagen;
+}
+
+/**
  * Wat een verlofaanvraag oplevert: de urenregels, of de reden dat het er geen
  * zijn.
  *
@@ -117,6 +136,11 @@ export function patternSummary(
  *
  * Hij geeft de weigering terug als waarde en niet als HTTP-antwoord, zodat hij
  * los van een route te testen is. De aanroeper maakt er een 400 van.
+ *
+ * Het weekrooster van de medewerker gaat als laatste argument mee en bepaalt
+ * op welke dagen een aanvraag zónder patroon mag landen. Een aanvraag mét
+ * patroon raakt het niet: dat patroon is een uitdrukkelijke keuze van de
+ * aanvrager en gaat vóór het rooster.
  */
 export type AbsenceLinesResult =
   | { ok: true; entries: Array<{ date: string; hours: number }> }
@@ -127,6 +151,7 @@ export function absenceLines(
   pattern: WeekSchedule | null,
   from: string,
   to: string,
+  schedule: WeekSchedule | null = null,
 ): AbsenceLinesResult {
   const dagen = workingDaysBetween(from, to);
   if (dagen.length === 0) {
@@ -135,10 +160,10 @@ export function absenceLines(
 
   // Met patroon: alleen de dagen die erop passen, met de uren van die dag; het
   // opgegeven totaal doet dan niet mee. Zonder patroon: het totaal gelijk over
-  // alle werkdagen.
+  // de dagen die het rooster als werkdag kent.
   const entries = pattern
     ? patternedEntries(pattern, dagen)
-    : splitHoursOverDays(hours, dagen);
+    : splitHoursOverDays(hours, roosterDagen(schedule, dagen));
 
   // Alleen bereikbaar mét patroon: een woensdagpatroon over maandag en dinsdag.
   // Zonder patroon kan dit niet, want de invoercontrole eist een positief
