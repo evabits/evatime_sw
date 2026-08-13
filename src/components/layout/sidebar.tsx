@@ -133,7 +133,7 @@ export function Sidebar({ user, role }: SidebarProps) {
           alt="EvaTime"
           width={100}
           height={34}
-          className="object-contain dark:bg-white dark:rounded dark:p-1"
+          className="object-contain dark:brightness-0 dark:invert"
           priority
         />
       </header>
@@ -159,7 +159,7 @@ export function Sidebar({ user, role }: SidebarProps) {
             alt="EvaTime"
             width={110}
             height={37}
-            className="object-contain dark:bg-white dark:rounded dark:p-1"
+            className="object-contain dark:brightness-0 dark:invert"
             priority
           />
           <button
