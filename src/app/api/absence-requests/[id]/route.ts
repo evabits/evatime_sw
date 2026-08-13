@@ -112,11 +112,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
         projectId = project.projectId;
 
+        // Het rooster van de aanvrager, niet van de admin die goedkeurt.
+        const rooster = toWeekSchedule(
+          await prisma.workSchedule.findUnique({ where: { userId: existing.userId } }),
+        );
+
         const uitkomst = absenceLines(
           Number(existing.hours),
           toWeekSchedule(existing.pattern),
           existing.startDate.toISOString().slice(0, 10),
           existing.endDate.toISOString().slice(0, 10),
+          rooster,
         );
         if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
         regels = uitkomst.entries;
@@ -207,7 +213,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
       projectId = project.projectId;
 
-      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
+      // Het rooster van de eigenaar van de aanvraag; een admin mag die van een
+      // ander bewerken.
+      const rooster = toWeekSchedule(
+        await prisma.workSchedule.findUnique({ where: { userId: existing.userId } }),
+      );
+
+      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate, rooster);
       if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
       regels = uitkomst.entries;
     }

@@ -131,7 +131,13 @@ export async function POST(req: Request) {
       if (!project.ok) return NextResponse.json({ error: project.error }, { status: 400 });
       projectId = project.projectId;
 
-      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate);
+      // Het rooster van de eigenaar, niet van de admin die aanmaakt: de uren
+      // horen op de dagen die déze medewerker werkt.
+      const rooster = toWeekSchedule(
+        await prisma.workSchedule.findUnique({ where: { userId: ownerId } }),
+      );
+
+      const uitkomst = absenceLines(hours, data.pattern ?? null, data.startDate, data.endDate, rooster);
       if (!uitkomst.ok) return NextResponse.json({ error: uitkomst.error }, { status: 400 });
       regels = uitkomst.entries;
     }
