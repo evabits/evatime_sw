@@ -159,11 +159,25 @@ export function absenceLines(
   }
 
   // Met patroon: alleen de dagen die erop passen, met de uren van die dag; het
-  // opgegeven totaal doet dan niet mee. Zonder patroon: het totaal gelijk over
-  // de dagen die het rooster als werkdag kent.
-  const entries = pattern
-    ? patternedEntries(pattern, dagen)
-    : splitHoursOverDays(hours, roosterDagen(schedule, dagen));
+  // opgegeven totaal doet dan niet mee. Zonder patroon, mét rooster: eerst
+  // kijken of het opgegeven totaal het roostertotaal is — dat is precies het
+  // getal dat het dialoog voorstelde via patternSummary. Is dat zo, dan komen
+  // de uren dag voor dag van het rooster zelf, niet plat verdeeld: bij een
+  // ongelijk rooster (0/8/8/8/4) zou plat verdelen 7,00 uur op de vrijdag van
+  // vier boeken. Week de aanvrager af — een halve dag, bijvoorbeeld — dan is er
+  // niets om uit het rooster te lezen en geldt de platte verdeling, zoals altijd.
+  let entries: Array<{ date: string; hours: number }>;
+  if (pattern) {
+    entries = patternedEntries(pattern, dagen);
+  } else if (schedule) {
+    const roosterUitkomst = patternSummary(schedule, from, to);
+    entries =
+      roosterUitkomst.total === hours
+        ? roosterUitkomst.entries
+        : splitHoursOverDays(hours, roosterDagen(schedule, dagen));
+  } else {
+    entries = splitHoursOverDays(hours, dagen);
+  }
 
   // Alleen bereikbaar mét patroon: een woensdagpatroon over maandag en dinsdag.
   // Zonder patroon kan dit niet, want de invoercontrole eist een positief

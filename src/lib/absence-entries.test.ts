@@ -293,10 +293,20 @@ describe("absenceLines", () => {
   });
 
   it("changes nothing without a schedule", () => {
-    // Zelfde aanroep als de eerste test van dit blok, nu met een expliciete null
-    // als rooster: dat moet exact hetzelfde opleveren.
-    expect(absenceLines(40, null, "2026-08-03", "2026-08-07", null))
-      .toEqual(absenceLines(40, null, "2026-08-03", "2026-08-07"));
+    // Expliciete null als rooster: elke werkdag is dan gewoon een werkdag,
+    // net als vóór dit argument bestond. Dit pint het concrete resultaat in
+    // plaats van alleen het defaultgedrag van het vijfde argument te testen —
+    // dat laatste zou ook slagen als de hele roosterfunctionaliteit verdween.
+    expect(absenceLines(40, null, "2026-08-03", "2026-08-07", null)).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-03", hours: 8 },
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
   });
 
   it("falls back to every working day when the schedule leaves none", () => {
@@ -305,6 +315,56 @@ describe("absenceLines", () => {
     // horen daar te landen in plaats van te verdwijnen.
     const uitkomst = absenceLines(8, null, "2026-08-03", "2026-08-03", roosterZonderMaandag);
     expect(uitkomst).toEqual({ ok: true, entries: [{ date: "2026-08-03", hours: 8 }] });
+  });
+
+  // Rooster met een korte vrijdag: 0, 8, 8, 8, 4 uur.
+  const roosterOngelijk = { monday: 0, tuesday: 8, wednesday: 8, thursday: 8, friday: 4 };
+
+  it("takes the hours straight from an uneven schedule when the total matches", () => {
+    // 28 is het roostertotaal van roosterOngelijk over deze week — precies wat
+    // patternSummary het dialoog zou voorstellen. Plat verdelen zou 7,00 uur
+    // per dag geven; hier hoort de vrijdag zijn eigen vier uur te houden.
+    const uitkomst = absenceLines(28, null, "2026-08-03", "2026-08-07", roosterOngelijk);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 4 },
+      ],
+    });
+  });
+
+  it("falls back to a flat split over an uneven schedule when the total was overridden", () => {
+    // 14 is niet het roostertotaal (28): de aanvrager heeft het voorgestelde
+    // getal aangepast, dus geldt weer de platte verdeling over dezelfde vier
+    // werkdagen — 14 uur (56 kwartier) door vier is keurig 3,5 per dag.
+    const uitkomst = absenceLines(14, null, "2026-08-03", "2026-08-07", roosterOngelijk);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 3.5 },
+        { date: "2026-08-05", hours: 3.5 },
+        { date: "2026-08-06", hours: 3.5 },
+        { date: "2026-08-07", hours: 3.5 },
+      ],
+    });
+  });
+
+  it("keeps splitting a matching total flat when the schedule is even", () => {
+    // Pint dat een gelijk rooster (vier keer 8) niet van gedrag verandert: de
+    // uitkomst is hier identiek aan wat de platte verdeling ook al gaf.
+    const uitkomst = absenceLines(32, null, "2026-08-03", "2026-08-07", roosterZonderMaandag);
+    expect(uitkomst).toEqual({
+      ok: true,
+      entries: [
+        { date: "2026-08-04", hours: 8 },
+        { date: "2026-08-05", hours: 8 },
+        { date: "2026-08-06", hours: 8 },
+        { date: "2026-08-07", hours: 8 },
+      ],
+    });
   });
 
   it("lets the pattern win over the schedule", () => {
