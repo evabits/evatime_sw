@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getEffectiveContract, fillSalary, rangeOverlaps, WEEKS_PER_MONTH } from "./contracts";
+import { getEffectiveContract, fillSalary, rangeOverlaps, nextDay, WEEKS_PER_MONTH } from "./contracts";
 
 const a = { id: "a", startDate: "2024-01-01", endDate: "2024-12-31" };
 const b = { id: "b", startDate: "2025-01-01", endDate: null };
@@ -61,6 +61,40 @@ describe("contracts", () => {
     });
     it("adjacent no overlap", () => {
       expect(rangeOverlaps("2024-01-01", "2024-12-31", "2025-01-01", null)).toBe(false);
+    });
+  });
+
+  describe("nextDay", () => {
+    it("goes to the next day in the middle of a month", () => {
+      expect(nextDay("2026-08-14")).toBe("2026-08-15");
+    });
+
+    it("crosses a month boundary", () => {
+      expect(nextDay("2026-08-31")).toBe("2026-09-01");
+    });
+
+    it("crosses a year boundary", () => {
+      expect(nextDay("2026-12-31")).toBe("2027-01-01");
+    });
+
+    it("finds the leap day in a leap year", () => {
+      expect(nextDay("2028-02-28")).toBe("2028-02-29");
+    });
+
+    it("steps off the leap day into March", () => {
+      expect(nextDay("2028-02-29")).toBe("2028-03-01");
+    });
+
+    it("skips straight to March in a common year", () => {
+      expect(nextDay("2026-02-28")).toBe("2026-03-01");
+    });
+
+    it("crosses the spring DST boundary (zomertijdgrens)", () => {
+      // Op 29 maart 2026 gaat Amsterdam van UTC+1 naar UTC+2 (zomertijdgrens).
+      // Een lokale setDate zou hier op dezelfde dag blijven staan; UTC-gerekend
+      // gaat naar de volgende dag. Deze test bewaakt de UTC-regel die het
+      // commentaar bij de functie belooft.
+      expect(nextDay("2026-03-29")).toBe("2026-03-30");
     });
   });
 });
