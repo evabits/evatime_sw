@@ -4,13 +4,14 @@ import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { startImpersonation, stopImpersonation, type SessieToken } from "@/lib/impersonation";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
@@ -52,7 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
       if (user) {
         if (account?.provider === "google") {
           const dbUser = await prisma.user.upsert({
@@ -72,11 +73,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.role = (user as any).role;
         }
       }
+
+      // Meekijken aan- of uitzetten. De rolcontrole hoort hier: het token is
+      // servergetekend, dus dit is de enige plek waar niet te sjoemelen valt.
+      if (trigger === "update") {
+        const wens = session as { impersonate?: string | null } | undefined;
+
+        if (wens?.impersonate === null) {
+          return stopImpersonation(token as unknown as SessieToken) as any;
+        }
+
+        if (typeof wens?.impersonate === "string") {
+          const doel = await prisma.user.findFirst({
+            where: { id: wens.impersonate, archivedAt: null },
+            select: { id: true, role: true, name: true, email: true },
+          });
+          if (!doel) return token;
+          const nieuw = startImpersonation(token as unknown as SessieToken, doel);
+          return (nieuw ?? token) as any;
+        }
+      }
+
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id as string;
       (session.user as any).role = token.role;
+      // De balk moet weten dát je meekijkt en als wie je werkelijk bent. De
+      // aanwezigheid van realId is het teken; realName staat in de balk.
+      (session as any).impersonating = token.realId
+        ? { realName: (token.realName as string) ?? "" }
+        : null;
       return session;
     },
   },
