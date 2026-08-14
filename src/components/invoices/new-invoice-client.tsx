@@ -14,6 +14,8 @@ import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
 import { groupHourEntriesForInvoice } from "@/lib/invoice-lines";
+import { resolvePeriod } from "@/lib/periods";
+import { splitInvoicePeriod } from "@/lib/invoice-period";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -30,11 +32,63 @@ interface InvoiceLine {
   kmEntryIds?: string[];
 }
 
+/**
+ * Het vinkje in de kolomkop dat een hele lijst aan- of uitzet.
+ *
+ * `ids` zijn de regels waar het over gaat: bij uren alleen de selecteerbare
+ * (een regel zonder tarief heeft een uitgeschakeld vinkje), anders zou de kop
+ * nooit op "alles aan" komen te staan.
+ *
+ * De halve stand is `indeterminate`, en dat is geen attribuut maar een
+ * eigenschap van het element — hij moet dus via een ref gezet worden. De ref
+ * geeft bewust niets terug: React 19 leest een teruggegeven waarde als
+ * opruimfunctie.
+ */
+function AllesVinkje({
+  ids,
+  geselecteerd,
+  onChange,
+}: {
+  ids: string[];
+  geselecteerd: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
+  const aantalAan = ids.filter((id) => geselecteerd.has(id)).length;
+  const allesAan = ids.length > 0 && aantalAan === ids.length;
+
+  return (
+    <input
+      type="checkbox"
+      className="h-4 w-4"
+      title={allesAan ? "Alles uitvinken" : "Alles aanvinken"}
+      checked={allesAan}
+      disabled={ids.length === 0}
+      ref={(el) => {
+        if (el) el.indeterminate = aantalAan > 0 && !allesAan;
+      }}
+      onChange={() => {
+        const next = new Set(geselecteerd);
+        for (const id of ids) {
+          if (allesAan) next.delete(id);
+          else next.add(id);
+        }
+        onChange(next);
+      }}
+    />
+  );
+}
+
 export function NewInvoiceClient({ customers }: Props) {
   const router = useRouter();
   const [customerId, setCustomerId] = useState("");
   const [issueDate, setIssueDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [dueDate, setDueDate] = useState(format(addDays(new Date(), 30), "yyyy-MM-dd"));
+  // Er wordt vrijwel altijd één kalendermaand gefactureerd, en bij het
+  // aanmaken is dat de maand die net voorbij is. resolvePeriod is dezelfde
+  // functie die de rapportagefilters gebruiken; hij geeft alleen null voor de
+  // preset "custom".
+  const [periodeVan, setPeriodeVan] = useState(() => resolvePeriod("last-month", new Date())!.from);
+  const [periodeTot, setPeriodeTot] = useState(() => resolvePeriod("last-month", new Date())!.to);
   const [vatRate, setVatRate] = useState(21);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<InvoiceLine[]>([]);
@@ -55,6 +109,41 @@ export function NewInvoiceClient({ customers }: Props) {
     });
   }, [customerId]);
 
+  // unbilledTime en unbilledKm blijven ongefilterd — daar zit de achterstand
+  // in. Alles wat het scherm toont en gebruikt gaat door de zichtbare lijsten,
+  // zodat er niets op de factuur kan belanden wat je niet in beeld hebt.
+  const tijdSplitsing = splitInvoicePeriod(unbilledTime, periodeVan, periodeTot);
+  const kmSplitsing = splitInvoicePeriod(unbilledKm, periodeVan, periodeTot);
+  const zichtbaarTijd = tijdSplitsing.binnen;
+  const zichtbaarKm = kmSplitsing.binnen;
+
+  const achterstandAantal = tijdSplitsing.ervoorAantal + kmSplitsing.ervoorAantal;
+  // De oudste van de twee lijsten. Sorteren mag op de string, want YYYY-MM-DD
+  // loopt lexicografisch gelijk met de kalender.
+  const achterstandOudste =
+    [tijdSplitsing.ervoorOudste, kmSplitsing.ervoorOudste]
+      .filter((d): d is string => d !== null)
+      .sort()[0] ?? null;
+
+  // Een aangevinkte regel die buiten de nieuwe periode valt zou onzichtbaar
+  // meeliften naar de factuur. Teruggeven van dezelfde Set wanneer er niets
+  // afvalt is nodig: een nieuwe Set zou elke render opnieuw state zetten.
+  useEffect(() => {
+    const zichtbaar = new Set(zichtbaarTijd.map((e) => e.id));
+    setSelectedTimeIds((prev) => {
+      const next = new Set([...prev].filter((id) => zichtbaar.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+    const zichtbaarK = new Set(zichtbaarKm.map((e) => e.id));
+    setSelectedKmIds((prev) => {
+      const next = new Set([...prev].filter((id) => zichtbaarK.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+    // zichtbaarTijd en zichtbaarKm zijn elke render nieuwe arrays en kunnen
+    // dus geen dependency zijn; de waarden waaruit ze volgen wel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodeVan, periodeTot, unbilledTime, unbilledKm]);
+
   function toggleTimeEntry(id: string) {
     setSelectedTimeIds((prev) => {
       const next = new Set(prev);
@@ -74,7 +163,7 @@ export function NewInvoiceClient({ customers }: Props) {
   function addLinesFromSelection() {
     const newLines: InvoiceLine[] = [];
 
-    const selectedTime = unbilledTime.filter((e) => selectedTimeIds.has(e.id));
+    const selectedTime = zichtbaarTijd.filter((e) => selectedTimeIds.has(e.id));
     // Groepeert de geselecteerde urenregels tot factuurregels: één regel per
     // project + tarief + werkniveau. Zie invoice-lines.ts voor waarom de
     // sleutel op project-id (niet -naam) en niveau steunt.
@@ -82,7 +171,7 @@ export function NewInvoiceClient({ customers }: Props) {
       newLines.push({ ...line, lineType: "HOURS" });
     }
 
-    const selectedKm = unbilledKm.filter((e) => selectedKmIds.has(e.id));
+    const selectedKm = zichtbaarKm.filter((e) => selectedKmIds.has(e.id));
     if (selectedKm.length > 0) {
       const totalKm = selectedKm.reduce((s, e) => s + Number(e.km), 0);
       const rate = Number(selectedKm[0].rateOverride ?? selectedKm[0].project?.defaultKmRate ?? 0);
@@ -179,10 +268,20 @@ export function NewInvoiceClient({ customers }: Props) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {unbilledTime.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+              <div className="space-y-1">
+                <Label>Van</Label>
+                <Input type="date" value={periodeVan} onChange={(e) => setPeriodeVan(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Tot en met</Label>
+                <Input type="date" value={periodeTot} onChange={(e) => setPeriodeTot(e.target.value)} />
+              </div>
+            </div>
+            {zichtbaarTijd.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Uren</p>
-                {unbilledTime.some((e) => resolveHourRate(e) == null) && (
+                {zichtbaarTijd.some((e) => resolveHourRate(e) == null) && (
                   <p className="text-sm text-muted-foreground px-4 py-2">
                     Sommige uren hebben geen tarief. Stel een tarief in bij de klant of het project, of zet een handmatig tarief op de regel.
                   </p>
@@ -190,7 +289,13 @@ export function NewInvoiceClient({ customers }: Props) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="w-8">
+                        <AllesVinkje
+                          ids={zichtbaarTijd.filter((e) => resolveHourRate(e) != null).map((e) => e.id)}
+                          geselecteerd={selectedTimeIds}
+                          onChange={setSelectedTimeIds}
+                        />
+                      </TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Project</TableHead>
                       <TableHead>Omschrijving</TableHead>
@@ -199,7 +304,7 @@ export function NewInvoiceClient({ customers }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unbilledTime.map((e) => {
+                    {zichtbaarTijd.map((e) => {
                       const rate = resolveHourRate(e);
                       return (
                       <TableRow key={e.id} className={selectedTimeIds.has(e.id) ? "bg-primary/5" : ""}>
@@ -228,13 +333,19 @@ export function NewInvoiceClient({ customers }: Props) {
                 </Table>
               </div>
             )}
-            {unbilledKm.length > 0 && (
+            {zichtbaarKm.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Kilometers</p>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="w-8">
+                        <AllesVinkje
+                          ids={zichtbaarKm.map((e) => e.id)}
+                          geselecteerd={selectedKmIds}
+                          onChange={setSelectedKmIds}
+                        />
+                      </TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Project</TableHead>
                       <TableHead>Omschrijving</TableHead>
@@ -242,7 +353,7 @@ export function NewInvoiceClient({ customers }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unbilledKm.map((e) => (
+                    {zichtbaarKm.map((e) => (
                       <TableRow key={e.id} className={selectedKmIds.has(e.id) ? "bg-primary/5" : ""}>
                         <TableCell>
                           <input type="checkbox" checked={selectedKmIds.has(e.id)} onChange={() => toggleKmEntry(e.id)} className="h-4 w-4" />
@@ -255,6 +366,22 @@ export function NewInvoiceClient({ customers }: Props) {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+            {zichtbaarTijd.length === 0 && zichtbaarKm.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Geen registraties in deze periode.
+              </p>
+            )}
+            {achterstandAantal > 0 && achterstandOudste !== null && (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+                <span>
+                  Nog {achterstandAantal} {achterstandAantal === 1 ? "regel" : "regels"} open van
+                  vóór deze periode, oudste {formatDate(achterstandOudste)}.
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setPeriodeVan(achterstandOudste)}>
+                  Periode oprekken
+                </Button>
               </div>
             )}
           </CardContent>
