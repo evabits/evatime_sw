@@ -86,24 +86,29 @@ export async function POST(req: Request) {
         subtotal,
         total,
         notes: data.notes,
-        lines: {
-          create: data.lines.map((l) => ({
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            total: l.quantity * l.unitPrice,
-            lineType: l.lineType,
-          })),
-        },
       },
-      include: { lines: true },
     });
 
+    // Regel voor regel aanmaken en de registraties meteen aan het id koppelen
+    // dat we terugkrijgen. Ze in één keer aanmaken en daarna terugzoeken op
+    // omschrijving en type ging mis zodra twee regels daarin gelijk waren —
+    // en dat gebeurt gewoon: twee keer "Reiskosten" toevoegen levert twee
+    // identieke omschrijvingen op. Alle registraties belandden dan onder de
+    // eerste regel, waarna het verwijderen van de tweede zijn bedrag van de
+    // factuur haalde terwijl die uren op "gefactureerd" bleven staan. Ze waren
+    // daarmee uit elke volgende factuurlijst verdwenen zonder ooit in rekening
+    // te zijn gebracht.
     for (const line of data.lines) {
-      const createdLine = inv.lines.find(
-        (l) => l.description === line.description && l.lineType === line.lineType
-      );
-      if (!createdLine) continue;
+      const createdLine = await tx.invoiceLine.create({
+        data: {
+          invoiceId: inv.id,
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          total: line.quantity * line.unitPrice,
+          lineType: line.lineType,
+        },
+      });
 
       if (line.timeEntryIds?.length) {
         await tx.timeEntry.updateMany({
@@ -125,7 +130,14 @@ export async function POST(req: Request) {
       }
     }
 
-    return inv;
+    // Opnieuw ophalen zodat het antwoord de regels bevat, zoals voorheen.
+    // Zonder vaste volgorde, net als hiervoor: createdAt krijgt in Postgres de
+    // starttijd van de transactie, dus alle regels van één factuur delen die
+    // waarde en sorteren erop zegt niets.
+    return tx.invoice.findUniqueOrThrow({
+      where: { id: inv.id },
+      include: { lines: true },
+    });
   });
 
   return NextResponse.json(invoice, { status: 201 });
