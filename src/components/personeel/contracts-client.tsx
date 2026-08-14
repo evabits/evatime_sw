@@ -81,10 +81,11 @@ export function ContractsClient({
   const watchedEnd = form.watch("endDate");
   const hasOverlap = initialContracts.some((c) => {
     if (c.id === editingId) return false;
-    // Het bron-contract van een duplicaat krijgt in dezelfde handeling zijn
-    // einddatum, dus overlapt het straks niet meer. Zonder deze regel gaat de
-    // waarschuwing af op een overlap die je net aan het opheffen bent.
-    if (c.id === duplicerenVan?.id) return false;
+    // Het bron-contract krijgt in dezelfde handeling zijn einddatum, dus het
+    // moet worden getoetst aan de periode die het straks heeft — niet
+    // overgeslagen, want dan blijft een echte overlap onopgemerkt.
+    if (c.id === duplicerenVan?.id)
+      return rangeOverlaps(watchedStart || null, watchedEnd || null, c.startDate, bronEinddatum || c.endDate);
     return rangeOverlaps(
       watchedStart || null, watchedEnd || null,
       c.startDate, c.endDate,
@@ -162,58 +163,74 @@ export function ContractsClient({
     setLoading(true);
     setServerError("");
 
-    // Dupliceren van een contract dat nog doorloopt: dat krijgt eerst zijn
-    // einddatum. Anders sluiten de twee niet op elkaar aan en overlappen ze.
-    // De overige velden gaan onveranderd mee, want PUT vervangt de hele body.
-    // jobTitle, notes en de datums moeten "" zijn en niet null: het zod-schema
-    // van de route staat daar geen null toe.
-    if (duplicerenVan && !duplicerenVan.endDate) {
-      const bron = await fetch(`/api/contracts/${duplicerenVan.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contractType: duplicerenVan.contractType,
-          contractHours: duplicerenVan.contractHours,
-          vacationHours: duplicerenVan.vacationHours,
-          startDate: duplicerenVan.startDate ?? "",
-          endDate: bronEinddatum,
-          salaryMonthly: duplicerenVan.salaryMonthly,
-          salaryHourly: duplicerenVan.salaryHourly,
-          jobTitle: duplicerenVan.jobTitle ?? "",
-          ftePercentage: duplicerenVan.ftePercentage,
-          notes: duplicerenVan.notes ?? "",
-        }),
-      });
-      if (!bron.ok) {
-        setLoading(false);
-        const err = await bron.json();
-        setServerError(err.error ?? "Fout bij het bijwerken van het bestaande contract");
-        return;
-      }
-    }
+    // Onthoudt of de bron al zijn nieuwe einddatum kreeg, want zowel een
+    // afgewezen tweede schrijfactie als een netwerkfout daarna moet dat
+    // aan de gebruiker melden — de bron is dan al gewijzigd op de server.
+    let bronOpgeslagen = false;
 
-    const url = editingId ? `/api/contracts/${editingId}` : "/api/contracts";
-    const method = editingId ? "PUT" : "POST";
-    const body = editingId ? data : { userId: user.id, ...data };
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setLoading(false);
-    if (res.ok) {
-      close();
+    try {
+      // Dupliceren van een contract dat nog doorloopt: dat krijgt eerst zijn
+      // einddatum. Anders sluiten de twee niet op elkaar aan en overlappen ze.
+      // De overige velden gaan onveranderd mee, want PUT vervangt de hele body.
+      // jobTitle, notes en de datums moeten "" zijn en niet null: het zod-schema
+      // van de route staat daar geen null toe.
+      if (duplicerenVan && !duplicerenVan.endDate) {
+        const bron = await fetch(`/api/contracts/${duplicerenVan.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractType: duplicerenVan.contractType,
+            contractHours: duplicerenVan.contractHours,
+            vacationHours: duplicerenVan.vacationHours,
+            startDate: duplicerenVan.startDate ?? "",
+            endDate: bronEinddatum,
+            salaryMonthly: duplicerenVan.salaryMonthly,
+            salaryHourly: duplicerenVan.salaryHourly,
+            jobTitle: duplicerenVan.jobTitle ?? "",
+            ftePercentage: duplicerenVan.ftePercentage,
+            notes: duplicerenVan.notes ?? "",
+          }),
+        });
+        if (!bron.ok) {
+          const err = await bron.json();
+          setServerError(err.error ?? "Fout bij het bijwerken van het bestaande contract");
+          return;
+        }
+        bronOpgeslagen = true;
+      }
+
+      const url = editingId ? `/api/contracts/${editingId}` : "/api/contracts";
+      const method = editingId ? "PUT" : "POST";
+      const body = editingId ? data : { userId: user.id, ...data };
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        close();
+        router.refresh();
+      } else {
+        const err = await res.json();
+        // Bij het dupliceren staat de einddatum van het bestaande contract er op
+        // dit punt al op. Dat is geen schade, maar je moet het weten voordat je
+        // het opnieuw probeert.
+        const staart = bronOpgeslagen ? " De einddatum van het bestaande contract is wel opgeslagen." : "";
+        setServerError((err.error ?? "Fout bij opslaan") + staart);
+        // De tabel achter de dialoog toont anders nog de oude rij van vóór de
+        // geslaagde eerste schrijfactie; zonder refresh kan een volgende actie
+        // op die verouderde data die zojuist opgeslagen wijziging overschrijven.
+        router.refresh();
+      }
+    } catch {
+      // Een netwerkfout (bijv. verbinding weggevallen na de eerste schrijfactie)
+      // verdient dezelfde melding als een afgewezen response, anders blijft de
+      // knop op "Opslaan..." staan zonder dat de gebruiker weet wat er gebeurde.
+      const staart = bronOpgeslagen ? " De einddatum van het bestaande contract is wel opgeslagen." : "";
+      setServerError("Netwerkfout bij opslaan" + staart);
       router.refresh();
-    } else {
-      const err = await res.json();
-      // Bij het dupliceren staat de einddatum van het bestaande contract er op
-      // dit punt al op. Dat is geen schade, maar je moet het weten voordat je
-      // het opnieuw probeert.
-      const staart =
-        duplicerenVan && !duplicerenVan.endDate
-          ? " De einddatum van het bestaande contract is wel opgeslagen."
-          : "";
-      setServerError((err.error ?? "Fout bij opslaan") + staart);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -360,6 +377,7 @@ export function ContractsClient({
                 <Input
                   type="date"
                   value={bronEinddatum}
+                  min={duplicerenVan.startDate ?? undefined}
                   onChange={(e) => {
                     setBronEinddatum(e.target.value);
                     // De begindatum van het nieuwe contract volgt hieruit, dus
