@@ -60,6 +60,9 @@ export async function POST(req: Request) {
   // in new-invoice-client.tsx is de enige andere plek die dit tegenhoudt, dus
   // dezelfde alles-of-niets-controle als de bulkactie (entries/bulk/route.ts).
   const timeEntryIds = data.lines.flatMap((l) => l.timeEntryIds ?? []);
+  const kmEntryIds = data.lines.flatMap((l) => l.kmEntryIds ?? []);
+  const expenseIds = data.lines.flatMap((l) => l.expenseIds ?? []);
+
   if (timeEntryIds.length > 0) {
     const verlof = await prisma.timeEntry.count({
       where: { id: { in: timeEntryIds }, absenceRequestId: { not: null } },
@@ -67,6 +70,41 @@ export async function POST(req: Request) {
     if (verlof > 0) {
       return NextResponse.json({ error: "Verlofregels kun je niet factureren" }, { status: 400 });
     }
+  }
+
+  // Registraties van een ándere klant mogen hier niet op belanden. Het scherm
+  // laat je van klant wisselen met de al toegevoegde regels nog in beeld, en
+  // dan zou een factuur voor klant B de uren van klant A bevatten — en die uren
+  // ook nog als gefactureerd wegschrijven, waarmee ze bij hun eigen klant uit
+  // beeld verdwijnen. Het scherm waarschuwt inmiddels, maar dit is de grendel
+  // die er niet omheen kan.
+  //
+  // Alleen aantoonbare tegenspraak weigert hij. Een registratie op een project
+  // zonder klant — Project.customerId mag null zijn — hoort bij niemand en valt
+  // er dus buiten, net als een uitgave zonder project. Dat is geen gat maar de
+  // bedoeling: die zet een beheerder er bewust op.
+  const [vreemdeUren, vreemdeKm, vreemdeUitgaven] = await Promise.all([
+    timeEntryIds.length > 0
+      ? prisma.timeEntry.count({
+          where: { id: { in: timeEntryIds }, project: { customerId: { not: data.customerId } } },
+        })
+      : Promise.resolve(0),
+    kmEntryIds.length > 0
+      ? prisma.kmEntry.count({
+          where: { id: { in: kmEntryIds }, project: { customerId: { not: data.customerId } } },
+        })
+      : Promise.resolve(0),
+    expenseIds.length > 0
+      ? prisma.expense.count({
+          where: { id: { in: expenseIds }, project: { customerId: { not: data.customerId } } },
+        })
+      : Promise.resolve(0),
+  ]);
+  if (vreemdeUren + vreemdeKm + vreemdeUitgaven > 0) {
+    return NextResponse.json(
+      { error: "Sommige registraties horen bij een andere klant" },
+      { status: 400 },
+    );
   }
 
   const subtotal = data.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);

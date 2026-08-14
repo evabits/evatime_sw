@@ -161,6 +161,24 @@ export function NewInvoiceClient({ customers }: Props) {
     });
   }
 
+  function wisselKlant(nieuw: string) {
+    // Al toegevoegde regels horen bij de vórige klant en mogen niet meeverhuizen:
+    // dat zou een factuur voor deze klant opleveren met de uren van de vorige,
+    // die daarbij ook nog als gefactureerd worden weggeschreven. De factuurroute
+    // weigert dat inmiddels, maar dan sta je er pas bij het opslaan voor —
+    // hier kun je nog kiezen.
+    if (
+      lines.length > 0 &&
+      !confirm("Je hebt al factuurregels toegevoegd. Die vervallen als je van klant wisselt.")
+    ) {
+      return;
+    }
+    setLines([]);
+    setSelectedTimeIds(new Set());
+    setSelectedKmIds(new Set());
+    setCustomerId(nieuw);
+  }
+
   function addLinesFromSelection() {
     const newLines: InvoiceLine[] = [];
 
@@ -229,7 +247,7 @@ export function NewInvoiceClient({ customers }: Props) {
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1 lg:col-span-2">
             <Label>Klant *</Label>
-            <Select value={customerId} onValueChange={setCustomerId}>
+            <Select value={customerId} onValueChange={wisselKlant}>
               <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
               <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
