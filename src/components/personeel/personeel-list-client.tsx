@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface Row {
@@ -22,6 +22,22 @@ const CONTRACT_LABELS: Record<string, string> = {
 
 export function PersoneelListClient({ rows }: { rows: Row[] }) {
   const todayPlus30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+
+  async function bekijkAls(userId: string) {
+    const res = await fetch("/api/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Meekijken is niet gelukt");
+      return;
+    }
+    // Naar het dashboard, en volledig herladen: de servercomponenten moeten
+    // hun data opnieuw ophalen, nu als deze medewerker.
+    window.location.href = "/";
+  }
 
   return (
     <div className="space-y-6">
@@ -67,11 +83,22 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="icon">
-                        <Link href={`/personeel/${row.id}`} aria-label="Bewerken">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Bekijk als"
+                          aria-label="Bekijk als"
+                          onClick={() => bekijkAls(row.id)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button asChild variant="ghost" size="icon">
+                          <Link href={`/personeel/${row.id}`} aria-label="Bewerken">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
