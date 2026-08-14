@@ -88,5 +88,13 @@ describe("contracts", () => {
     it("skips straight to March in a common year", () => {
       expect(nextDay("2026-02-28")).toBe("2026-03-01");
     });
+
+    it("crosses the spring DST boundary (zomertijdgrens)", () => {
+      // Op 29 maart 2026 gaat Amsterdam van UTC+1 naar UTC+2 (zomertijdgrens).
+      // Een lokale setDate zou hier op dezelfde dag blijven staan; UTC-gerekend
+      // gaat naar de volgende dag. Deze test bewaakt de UTC-regel die het
+      // commentaar bij de functie belooft.
+      expect(nextDay("2026-03-29")).toBe("2026-03-30");
+    });
   });
 });
