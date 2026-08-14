@@ -67,3 +67,76 @@ describe("groupHourEntriesForInvoice", () => {
     expect(lines).toEqual([]);
   });
 });
+
+import { groupKmEntriesForInvoice, type KmEntryForInvoice } from "./invoice-lines";
+
+function kmEntry(over: Partial<KmEntryForInvoice> & { id: string }): KmEntryForInvoice {
+  return {
+    km: 10,
+    rateOverride: null,
+    project: { defaultKmRate: 0.23 },
+    ...over,
+  } as KmEntryForInvoice;
+}
+
+describe("groupKmEntriesForInvoice", () => {
+  it("keeps one line when every entry shares a rate", () => {
+    const lines = groupKmEntriesForInvoice([kmEntry({ id: "k1" }), kmEntry({ id: "k2", km: 15 })]);
+    expect(lines).toEqual([
+      { description: "Reiskosten", quantity: 25, unitPrice: 0.23, kmEntryIds: ["k1", "k2"] },
+    ]);
+  });
+
+  it("splits two rates into two lines instead of billing both at the first", () => {
+    // De fout die dit voorkomt: alles ging tegen het tarief van de eerste
+    // regel, dus 20 km à 0,40 werd stilzwijgend 20 km à 0,23.
+    const lines = groupKmEntriesForInvoice([
+      kmEntry({ id: "k1", km: 10 }),
+      kmEntry({ id: "k2", km: 20, project: { defaultKmRate: 0.4 } }),
+    ]);
+    expect(lines).toEqual([
+      { description: "Reiskosten", quantity: 10, unitPrice: 0.23, kmEntryIds: ["k1"] },
+      { description: "Reiskosten", quantity: 20, unitPrice: 0.4, kmEntryIds: ["k2"] },
+    ]);
+  });
+
+  it("lets a rate override beat the project rate", () => {
+    const lines = groupKmEntriesForInvoice([
+      kmEntry({ id: "k1", rateOverride: 0.5 }),
+      kmEntry({ id: "k2" }),
+    ]);
+    expect(lines.map((l) => [l.unitPrice, l.kmEntryIds])).toEqual([
+      [0.5, ["k1"]],
+      [0.23, ["k2"]],
+    ]);
+  });
+
+  it("drops an entry without any rate rather than billing it at nought", () => {
+    const lines = groupKmEntriesForInvoice([
+      kmEntry({ id: "k1" }),
+      kmEntry({ id: "geen", project: { defaultKmRate: null } }),
+    ]);
+    expect(lines).toEqual([
+      { description: "Reiskosten", quantity: 10, unitPrice: 0.23, kmEntryIds: ["k1"] },
+    ]);
+  });
+
+  it("drops an entry whose rate is nought", () => {
+    // Nul per kilometer is geen factureerbaar tarief, en een regel van nul
+    // euro laat de invoerkeuring van de factuurroute struikelen.
+    expect(groupKmEntriesForInvoice([kmEntry({ id: "k1", rateOverride: 0 })])).toEqual([]);
+  });
+
+  it("returns nothing for an empty selection", () => {
+    expect(groupKmEntriesForInvoice([])).toEqual([]);
+  });
+
+  it("reads the Decimal strings Prisma hands back", () => {
+    const lines = groupKmEntriesForInvoice([
+      kmEntry({ id: "k1", km: "12.5", project: { defaultKmRate: "0.23" } }),
+    ]);
+    expect(lines).toEqual([
+      { description: "Reiskosten", quantity: 12.5, unitPrice: 0.23, kmEntryIds: ["k1"] },
+    ]);
+  });
+});
