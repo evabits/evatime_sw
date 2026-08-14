@@ -83,9 +83,13 @@ export function ContractsClient({
     if (c.id === editingId) return false;
     // Het bron-contract krijgt in dezelfde handeling zijn einddatum, dus het
     // moet worden getoetst aan de periode die het straks heeft — niet
-    // overgeslagen, want dan blijft een echte overlap onopgemerkt.
+    // overgeslagen, want dan blijft een echte overlap onopgemerkt. Zolang die
+    // einddatum nog niet is ingevuld valt er niets te toetsen (en laat het
+    // formulier toch niet opslaan), dus dan geen waarschuwing.
     if (c.id === duplicerenVan?.id)
-      return rangeOverlaps(watchedStart || null, watchedEnd || null, c.startDate, bronEinddatum || c.endDate);
+      return bronEinddatum
+        ? rangeOverlaps(watchedStart || null, watchedEnd || null, c.startDate, bronEinddatum)
+        : false;
     return rangeOverlaps(
       watchedStart || null, watchedEnd || null,
       c.startDate, c.endDate,
