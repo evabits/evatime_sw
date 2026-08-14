@@ -44,3 +44,20 @@ export function rangeOverlaps(
   const bS = bStart ?? "0000-01-01", bE = bEnd ?? "9999-12-31";
   return aS <= bE && bS <= aE;
 }
+
+/**
+ * De volgende kalenderdag, in UTC gerekend.
+ *
+ * Uitdrukkelijk een kalenderdag en geen werkdag: een contract mag op elke dag
+ * ingaan, ook op een zaterdag. Wie hier `previousWorkingDay` uit
+ * working-days.ts als voorbeeld neemt, slaat per ongeluk het weekend over.
+ *
+ * UTC omdat de productieserver op UTC draait en de gebruikers in Amsterdam
+ * zitten; `setDate()` rekent lokaal en verschuift dan een dag zonder dat er
+ * iets klaagt.
+ */
+export function nextDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
