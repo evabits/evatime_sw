@@ -34,23 +34,42 @@ const CONTRACT_LABELS: Record<string, string> = {
   ZERO_HOURS: "0-uren",
 };
 
+/**
+ * Een optioneel getalveld: leeg mag, en anders moet het positief zijn.
+ *
+ * Een leeg `type="number"`-veld levert "" op, en `z.coerce.number()` maakt daar
+ * 0 van — waarna `.positive()` klaagt over een veld dat je juist leeg wilde
+ * laten. Die omzetting gebeurde hiervoor in `setValueAs` bij het registreren
+ * van het veld, maar daarmee waren deze velden niet meer te overtypen: de
+ * pijltjes werkten wel, een cijfer intypen deed niets. Nergens anders in deze
+ * app krijgt een getalveld een `setValueAs` mee, en daar typt alles gewoon.
+ * Dus staat de omzetting nu hier, in het schema, en zijn de velden weer kaal
+ * geregistreerd.
+ */
+const optioneelGetal = z
+  .union([z.literal(""), z.coerce.number().positive()])
+  .optional()
+  .transform((v) => (v === "" ? undefined : v));
+
 const schema = z.object({
   contractType: z.enum(["PERMANENT", "FIXED_TERM", "ZERO_HOURS"]),
-  contractHours: z.coerce.number().positive().optional(),
-  vacationHours: z.coerce.number().positive().optional(),
+  contractHours: optioneelGetal,
+  vacationHours: optioneelGetal,
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  salaryMonthly: z.coerce.number().positive().optional(),
-  salaryHourly: z.coerce.number().positive().optional(),
+  salaryMonthly: optioneelGetal,
+  salaryHourly: optioneelGetal,
   jobTitle: z.string().optional(),
-  ftePercentage: z.coerce.number().positive().optional(),
+  ftePercentage: optioneelGetal,
   notes: z.string().optional(),
 });
 
-// Empty number inputs arrive as "" and coerce to 0 (failing .positive()); map blank → undefined
-const numberField = { setValueAs: (v: string) => (v === "" ? undefined : Number(v)) };
-
-type FormData = z.infer<typeof schema>;
+// Invoer en uitvoer lopen uiteen doordat een leeg getalveld ("") naar
+// undefined wordt omgezet. Het formulier werkt met de invoerkant, de
+// submit-handler krijgt de omgezette uitvoer — vandaar de derde generic op
+// useForm.
+type FormInput = z.input<typeof schema>;
+type FormData = z.output<typeof schema>;
 
 export function ContractsClient({
   user, initialContracts,
@@ -68,7 +87,7 @@ export function ContractsClient({
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const form = useForm<FormData>({
+  const form = useForm<FormInput, any, FormData>({
     resolver: zodResolver(schema),
     defaultValues: { contractType: "PERMANENT" },
   });
@@ -421,26 +440,26 @@ export function ContractsClient({
             </div>
             <div className="space-y-1">
               <Label>Contracturen per week</Label>
-              <Input type="number" step="0.5" min="0" placeholder="bijv. 40" {...form.register("contractHours", numberField)} />
+              <Input type="number" step="0.5" min="0" placeholder="bijv. 40" {...form.register("contractHours")} />
             </div>
             <div className="space-y-1">
               <Label>Vakantie-uren per jaar</Label>
-              <Input type="number" step="0.5" min="0" placeholder="bijv. 160" {...form.register("vacationHours", numberField)} />
+              <Input type="number" step="0.5" min="0" placeholder="bijv. 160" {...form.register("vacationHours")} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Maandsalaris</Label>
-                <Input type="number" step="0.01" min="0" placeholder="bijv. 3500" {...form.register("salaryMonthly", numberField)} />
+                <Input type="number" step="0.01" min="0" placeholder="bijv. 3500" {...form.register("salaryMonthly")} />
               </div>
               <div className="space-y-1">
                 <Label>Uursalaris</Label>
-                <Input type="number" step="0.01" min="0" placeholder="bijv. 20.00" {...form.register("salaryHourly", numberField)} />
+                <Input type="number" step="0.01" min="0" placeholder="bijv. 20.00" {...form.register("salaryHourly")} />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Leeg = automatisch berekend uit het andere veld (vereist contracturen)</p>
             <div className="space-y-1">
               <Label>FTE percentage</Label>
-              <Input type="number" step="0.01" min="0" max="100" placeholder="bijv. 100" {...form.register("ftePercentage", numberField)} />
+              <Input type="number" step="0.01" min="0" max="100" placeholder="bijv. 100" {...form.register("ftePercentage")} />
             </div>
             <div className="space-y-1">
               <Label>Notities</Label>
