@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
-import { groupHourEntriesForInvoice } from "@/lib/invoice-lines";
+import { groupHourEntriesForInvoice, groupKmEntriesForInvoice } from "@/lib/invoice-lines";
+import { kmRate } from "@/lib/report-totals";
 import { resolvePeriod } from "@/lib/periods";
 import { splitInvoicePeriod } from "@/lib/invoice-period";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
@@ -172,16 +173,11 @@ export function NewInvoiceClient({ customers }: Props) {
     }
 
     const selectedKm = zichtbaarKm.filter((e) => selectedKmIds.has(e.id));
-    if (selectedKm.length > 0) {
-      const totalKm = selectedKm.reduce((s, e) => s + Number(e.km), 0);
-      const rate = Number(selectedKm[0].rateOverride ?? selectedKm[0].project?.defaultKmRate ?? 0);
-      newLines.push({
-        description: "Reiskosten",
-        quantity: totalKm,
-        unitPrice: rate,
-        lineType: "KM",
-        kmEntryIds: selectedKm.map((e) => e.id),
-      });
+    // Eén regel per tarief. Alles onder het tarief van de eerste selectie
+    // scharen factureerde bij twee projecten met verschillende kilometer-
+    // tarieven stilzwijgend te weinig.
+    for (const line of groupKmEntriesForInvoice(selectedKm)) {
+      newLines.push({ ...line, lineType: "KM" });
     }
 
     setLines((prev) => [...prev, ...newLines]);
@@ -336,12 +332,17 @@ export function NewInvoiceClient({ customers }: Props) {
             {zichtbaarKm.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Kilometers</p>
+                {zichtbaarKm.some((e) => kmRate(e) <= 0) && (
+                  <p className="text-sm text-muted-foreground px-4 py-2">
+                    Sommige ritten hebben geen kilometertarief. Stel er een in bij het project, of zet een handmatig tarief op de rit.
+                  </p>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-8">
                         <AllesVinkje
-                          ids={zichtbaarKm.map((e) => e.id)}
+                          ids={zichtbaarKm.filter((e) => kmRate(e) > 0).map((e) => e.id)}
                           geselecteerd={selectedKmIds}
                           onChange={setSelectedKmIds}
                         />
@@ -350,20 +351,38 @@ export function NewInvoiceClient({ customers }: Props) {
                       <TableHead>Project</TableHead>
                       <TableHead>Omschrijving</TableHead>
                       <TableHead className="text-right">Km</TableHead>
+                      <TableHead className="text-right">Tarief</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {zichtbaarKm.map((e) => (
+                    {zichtbaarKm.map((e) => {
+                      // Zonder tarief valt de rit weg bij het groeperen, dus hij
+                      // mag hier ook niet aan te vinken zijn — anders verdwijnt
+                      // een aangevinkte rit zonder uitleg van de factuur.
+                      const tarief = kmRate(e);
+                      return (
                       <TableRow key={e.id} className={selectedKmIds.has(e.id) ? "bg-primary/5" : ""}>
                         <TableCell>
-                          <input type="checkbox" checked={selectedKmIds.has(e.id)} onChange={() => toggleKmEntry(e.id)} className="h-4 w-4" />
+                          <input
+                            type="checkbox"
+                            checked={selectedKmIds.has(e.id)}
+                            onChange={() => toggleKmEntry(e.id)}
+                            disabled={tarief <= 0}
+                            className="h-4 w-4"
+                          />
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
                         <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right">{Number(e.km).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">
+                          {tarief <= 0
+                            ? <Badge variant="secondary" className="text-xs">Geen tarief</Badge>
+                            : formatCurrency(tarief)}
+                        </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

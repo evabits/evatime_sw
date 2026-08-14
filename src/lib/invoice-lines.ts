@@ -1,5 +1,6 @@
 import { resolveHourRate, effectiveWorkLevel, type RateEntry } from "./rates";
 import { WORK_LEVEL_LABELS } from "./work-levels";
+import { kmRate } from "./report-totals";
 
 export type HourEntryForInvoice = RateEntry & {
   id: string;
@@ -64,4 +65,56 @@ export function groupHourEntriesForInvoice(entries: HourEntryForInvoice[]): Hour
       timeEntryIds: groupEntries.map((e) => e.id),
     };
   });
+}
+
+export type KmEntryForInvoice = {
+  id: string;
+  km: number | string;
+  rateOverride?: number | string | null;
+  project?: { defaultKmRate?: number | string | null } | null;
+};
+
+export type KmInvoiceLine = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  kmEntryIds: string[];
+};
+
+/**
+ * Groepeert kilometerregels tot factuurregels, één per tarief.
+ *
+ * Hiervoor werd er één regel gemaakt voor de hele selectie, met het tarief van
+ * de eerste regel erin. Bij een klant met twee projecten à 0,23 en 0,40 per
+ * kilometer werd daarmee alles tegen het laagste van de twee gefactureerd,
+ * zonder dat iets erover klaagde. De urenkant groepeert al per tarief; dit is
+ * dezelfde gedachte.
+ *
+ * Er wordt op het tarief gegroepeerd en niet op project: bij één tarief — het
+ * gewone geval — blijft het precies één regel "Reiskosten", zoals altijd.
+ * Vallen de tarieven uiteen, dan staan er twee regels met dezelfde
+ * omschrijving maar een eigen prijs en aantal, en dat is op een factuur
+ * gewoon te lezen.
+ *
+ * Een regel zonder tarief valt weg in plaats van tegen nul euro mee te gaan:
+ * nul per kilometer is geen factureerbaar tarief, en `unitPrice` moet van de
+ * factuurroute positief zijn. Het scherm laat zo'n regel daarom niet
+ * aanvinken, net als bij uren zonder tarief.
+ */
+export function groupKmEntriesForInvoice(entries: KmEntryForInvoice[]): KmInvoiceLine[] {
+  const grouped = new Map<number, KmEntryForInvoice[]>();
+
+  for (const e of entries) {
+    const tarief = kmRate(e);
+    if (tarief <= 0) continue;
+    if (!grouped.has(tarief)) grouped.set(tarief, []);
+    grouped.get(tarief)!.push(e);
+  }
+
+  return Array.from(grouped.entries()).map(([tarief, groep]) => ({
+    description: "Reiskosten",
+    quantity: groep.reduce((s, e) => s + Number(e.km), 0),
+    unitPrice: tarief,
+    kmEntryIds: groep.map((e) => e.id),
+  }));
 }
