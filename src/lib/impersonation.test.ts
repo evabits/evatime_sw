@@ -3,6 +3,9 @@ import {
   mayWrite,
   startImpersonation,
   stopImpersonation,
+  impersonationInfo,
+  impersonationFromSession,
+  isImpersonating,
   IMPERSONATION_PAD,
   type SessieToken,
 } from "./impersonation";
@@ -91,5 +94,48 @@ describe("stopImpersonation", () => {
 
   it("changes nothing when you were not looking on", () => {
     expect(stopImpersonation(beheerder)).toEqual(beheerder);
+  });
+});
+
+describe("impersonationInfo", () => {
+  it("returns the real name when realId is set", () => {
+    const token: SessieToken = { id: "u2", role: "EMPLOYEE", realId: "admin1", realName: "Arjen" };
+    expect(impersonationInfo(token)).toEqual({ realName: "Arjen" });
+  });
+
+  it("falls back to an empty string when realName is missing", () => {
+    const token: SessieToken = { id: "u2", role: "EMPLOYEE", realId: "admin1" };
+    expect(impersonationInfo(token)).toEqual({ realName: "" });
+  });
+
+  it("returns null when realId is absent, so you are not looking on", () => {
+    expect(impersonationInfo(beheerder)).toBeNull();
+  });
+});
+
+describe("impersonationFromSession and isImpersonating", () => {
+  it("reads the balkgegevens when impersonating is set", () => {
+    const session = { impersonating: { realName: "Arjen" } };
+    expect(impersonationFromSession(session)).toEqual({ realName: "Arjen" });
+    expect(isImpersonating(session)).toBe(true);
+  });
+
+  it("returns null/false when impersonating is explicitly null", () => {
+    const session = { impersonating: null };
+    expect(impersonationFromSession(session)).toBeNull();
+    expect(isImpersonating(session)).toBe(false);
+  });
+
+  it("returns null/false when impersonating is absent entirely", () => {
+    const session = { user: { id: "u1" } };
+    expect(impersonationFromSession(session)).toBeNull();
+    expect(isImpersonating(session)).toBe(false);
+  });
+
+  it("returns null/false for a null or undefined session", () => {
+    expect(impersonationFromSession(null)).toBeNull();
+    expect(isImpersonating(null)).toBe(false);
+    expect(impersonationFromSession(undefined)).toBeNull();
+    expect(isImpersonating(undefined)).toBe(false);
   });
 });

@@ -29,7 +29,7 @@ export function ImpersonationBanner({ naam, realName }: { naam: string; realName
   }
 
   return (
-    <div className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-sm text-amber-950">
+    <div className="sticky top-14 z-50 flex flex-wrap items-center justify-between gap-2 bg-amber-500 px-4 py-2 text-sm text-amber-950 md:top-0">
       <span className="flex items-center gap-2">
         <Eye className="h-4 w-4" />
         Je kijkt mee als <strong>{naam}</strong> — alleen-lezen. Je bent ingelogd als {realName}.

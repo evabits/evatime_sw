@@ -2,12 +2,13 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
+import { impersonationFromSession } from "@/lib/impersonation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const impersonating = (session as any).impersonating as { realName: string } | null;
+  const impersonating = impersonationFromSession(session);
 
   return (
     <div className="flex h-full">

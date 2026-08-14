@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { mayWrite } from "@/lib/impersonation";
+import { mayWrite, isImpersonating } from "@/lib/impersonation";
 
 /**
  * Elke aanvraag komt hier langs, ook die naar de API. Zolang een beheerder
@@ -12,7 +12,7 @@ import { mayWrite } from "@/lib/impersonation";
  * /login gebeurt in de app-layout, niet hier.
  */
 export const proxy = auth((req) => {
-  const meekijkend = Boolean((req.auth as any)?.impersonating);
+  const meekijkend = isImpersonating(req.auth);
   if (!mayWrite(req.method, req.nextUrl.pathname, meekijkend)) {
     return NextResponse.json({ error: "Meekijken is alleen-lezen" }, { status: 403 });
   }

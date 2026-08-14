@@ -64,6 +64,16 @@ autorisatielaag is. Dat klopt, en daarom hangt de beveiliging er ook niet aan:
 wie je bent staat in een getekend token en wordt in de `jwt`-callback bepaald.
 De proxy is de grendel op het schrijven, niet op het wie.
 
+De grendel is "geen GET", niet "leest alleen". Drie cron-routes zijn zelf een
+GET en versturen daarbinnen mail en schrijven naar de database:
+`src/app/api/cron/hours-reminder/route.ts`,
+`src/app/api/cron/review-reminder/route.ts` en
+`src/app/api/cron/contract-expiry/route.ts` (die ook `expiryReminderSentAt`
+stempelt). Die zijn uitgezonderd van de grendel omdat ze een GET zijn, niet
+omdat ze met opzet zijn vrijgesteld — de bewering hierboven dat er tijdens het
+meekijken geen enkele schrijfactie kan plaatsvinden is dus niet helemaal
+waar.
+
 ### 3. Het scherm
 
 Zolang het aanstaat, staat er bovenaan elke pagina een balk: *"Je kijkt mee als

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
+import { isImpersonating } from "@/lib/impersonation";
 
 const schema = z.object({
   userId: z.string().min(1).optional(),
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     // van de medewerker in de sessie staan, dus daar valt niets uit af te
     // leiden — die zit hier per definitie al in en gaat door de jwt-callback,
     // die dezelfde controle op realRole nog eens doet.
-    if ((session.user as any)?.role !== "ADMIN" && !(session as any).impersonating) {
+    if ((session.user as any)?.role !== "ADMIN" && !isImpersonating(session)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

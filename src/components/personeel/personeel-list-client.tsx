@@ -88,6 +88,7 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                           variant="ghost"
                           size="icon"
                           title="Bekijk als"
+                          aria-label="Bekijk als"
                           onClick={() => bekijkAls(row.id)}
                         >
                           <Eye className="h-3.5 w-3.5" />

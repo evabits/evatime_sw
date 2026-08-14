@@ -78,3 +78,41 @@ export function stopImpersonation(token: SessieToken): SessieToken {
     email: realEmail ?? token.email,
   };
 }
+
+/**
+ * De balkgegevens die de session-callback in `session.impersonating` zet:
+ * null als je niet meekijkt, anders de naam van wie je werkelijk bent.
+ *
+ * Dit is puur token -> waarde, geen sessie-toegang, dus geen cast nodig.
+ * `src/lib/auth.ts` gebruikt dit in plaats van het rechtstreeks inline te
+ * bouwen, zodat de vorm van `impersonating` op één plek vastligt.
+ */
+export function impersonationInfo(token: SessieToken): { realName: string } | null {
+  return token.realId ? { realName: token.realName ?? "" } : null;
+}
+
+/**
+ * De balkgegevens uit een sessie-object, voor de layout die de balk rendert.
+ * Null als er geen sessie is of niet wordt meegekeken.
+ *
+ * next-auth's `Session`-type breidt deze app bewust niet uit (zie AGENTS.md),
+ * dus `session.impersonating` bestaat alleen op de waarde die de
+ * session-callback er hierboven op zet — niet in de types. Dit is de enige
+ * plek die de sessie daarom ongetypeerd aanspreekt op het veld
+ * `impersonating`; alle drie de aanroepers hieronder gaan hierdoorheen zodat
+ * die veldnaam nergens anders hoeft te staan.
+ */
+export function impersonationFromSession(session: unknown): { realName: string } | null {
+  return (
+    (session as { impersonating?: { realName: string } | null } | null | undefined)
+      ?.impersonating ?? null
+  );
+}
+
+/**
+ * Kijkt deze sessie mee? Voor `src/proxy.ts` en
+ * `src/app/api/impersonate/route.ts`, die alleen het ja/nee nodig hebben.
+ */
+export function isImpersonating(session: unknown): boolean {
+  return impersonationFromSession(session) !== null;
+}

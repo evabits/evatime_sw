@@ -4,7 +4,12 @@ import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { startImpersonation, stopImpersonation, type SessieToken } from "@/lib/impersonation";
+import {
+  startImpersonation,
+  stopImpersonation,
+  impersonationInfo,
+  type SessieToken,
+} from "@/lib/impersonation";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -100,10 +105,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       session.user.id = token.id as string;
       (session.user as any).role = token.role;
       // De balk moet weten dát je meekijkt en als wie je werkelijk bent. De
-      // aanwezigheid van realId is het teken; realName staat in de balk.
-      (session as any).impersonating = token.realId
-        ? { realName: (token.realName as string) ?? "" }
-        : null;
+      // vorm van dit veld staat vast in impersonation.ts, niet hier — anders
+      // kan een hernoeming daar dit stukje stilletjes laten desynchroniseren.
+      (session as any).impersonating = impersonationInfo(token as unknown as SessieToken);
       return session;
     },
   },
