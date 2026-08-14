@@ -124,6 +124,13 @@ export function ContractsClient({
     setEditingId(null);
     setDuplicerenVan(c);
     setBronEinddatum(c.endDate ?? "");
+    // De dialoog unmount bij sluiten (geen forceMount op DialogContent, dus
+    // Radix' Presence-component breekt hem af), dus elk veld hieronder start
+    // straks vers op — er is geen stale DOM-waarde om tegen te beschermen. De
+    // `?? undefined`-velden nemen daarom gewoon over van het bron-contract,
+    // dat is het hele punt van dupliceren. Alleen endDate moet je actief
+    // leegmaken (niet gewoon weglaten): een duplicaat mag nooit de einddatum
+    // van zijn bron erven.
     form.reset({
       contractType: c.contractType,
       contractHours: c.contractHours ?? undefined,
@@ -132,9 +139,6 @@ export function ContractsClient({
       // origineel valt er nog niets te berekenen; het veld in de dialoog vult
       // dit alsnog zodra je die datum opgeeft.
       startDate: c.endDate ? nextDay(c.endDate) : "",
-      // Uitdrukkelijk een lege string en geen undefined: react-hook-form
-      // schrijft undefined niet naar een invoerveld, waardoor de einddatum van
-      // een eerder geopend contract zou blijven staan.
       endDate: "",
       salaryMonthly: c.salaryMonthly ?? undefined,
       salaryHourly: c.salaryHourly ?? undefined,
