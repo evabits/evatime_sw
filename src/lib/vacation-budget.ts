@@ -108,6 +108,20 @@ export function vacationCountFrom(opening: VacationOpening | null, year: number)
   return opening ? opening.date : `${year}-01-01`;
 }
 
+/**
+ * De beginsaldovelden van een Prisma-gebruiker naar de vorm die `vacationBalance`
+ * verwacht. Zonder peildatum is er geen beginsaldo, ook al staat er een getal.
+ */
+export function toVacationOpening(
+  user: { vacationOpeningDate: Date | null; vacationOpeningHours: unknown } | null,
+): VacationOpening | null {
+  if (!user?.vacationOpeningDate) return null;
+  return {
+    date: user.vacationOpeningDate.toISOString().slice(0, 10),
+    hours: Number(user.vacationOpeningHours ?? 0),
+  };
+}
+
 export type VacationBalance = { entitled: number; used: number; remaining: number };
 
 /**
