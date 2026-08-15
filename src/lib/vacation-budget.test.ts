@@ -98,23 +98,35 @@ describe("accruedVacationHours", () => {
   const peildatum = { date: "2026-07-01", used: 0 };
 
   it("gives only this year's entitlement when there is no reference date", () => {
-    expect(accruedVacationHours(contract, [], null, 2026)).toBe(200);
+    expect(accruedVacationHours(contract, [], null, "2026-08-15")).toBe(200);
   });
 
   it("gives nought when neither a budget row nor a contract says anything", () => {
-    expect(accruedVacationHours([], [], null, 2026)).toBe(0);
+    expect(accruedVacationHours([], [], null, "2026-08-15")).toBe(0);
   });
 
   it("stacks every year from the first contract onwards", () => {
     const vanaf2024 = [{ startDate: "2024-01-01", endDate: null, vacationHours: 200 }];
-    expect(accruedVacationHours(vanaf2024, [], peildatum, 2026)).toBe(600);
+    expect(accruedVacationHours(vanaf2024, [], peildatum, "2026-08-15")).toBe(600);
   });
 
   it("counts the running contract year only as far as it has come", () => {
     // Twee volle contractjaren vanaf 1 juli 2024, plus 184 van de 365 dagen
     // van het derde: 200 + 200 + 100,82.
     const halverwege = [{ startDate: "2024-07-01", endDate: null, vacationHours: 200 }];
-    expect(accruedVacationHours(halverwege, [], peildatum, 2026)).toBe(500.82);
+    expect(accruedVacationHours(halverwege, [], peildatum, "2026-08-15")).toBe(500.82);
+  });
+
+  it("gives a contract that runs on into next year its full hours", () => {
+    // Een contract van 1 februari t/m 31 januari belooft 208 uur over zijn
+    // eigen looptijd. De opbouw eindigt bij die 31e januari, niet op oudjaar —
+    // anders viel de laatste maand eraf en bleef er 190,33 over.
+    const overDeJaargrens = [
+      { startDate: "2025-02-01", endDate: "2026-01-31", vacationHours: 208 },
+      { startDate: "2026-02-01", endDate: "2027-01-31", vacationHours: 208 },
+    ];
+    const peil = { date: "2026-02-01", used: 0 };
+    expect(accruedVacationHours(overDeJaargrens, [], peil, "2026-08-15")).toBe(416);
   });
 
   it("gives a career of neat one-year contracts exactly their hours", () => {
@@ -123,13 +135,13 @@ describe("accruedVacationHours", () => {
       { startDate: "2024-09-01", endDate: "2025-08-31", vacationHours: 168 },
       { startDate: "2025-09-01", endDate: "2026-08-31", vacationHours: 200 },
     ];
-    expect(accruedVacationHours(perJaar, [], peildatum, 2026)).toBe(536);
+    expect(accruedVacationHours(perJaar, [], peildatum, "2026-08-15")).toBe(536);
   });
 
   it("stops accruing once the contract has run out", () => {
     // Tot en met 30 juni 2026 is 181 van de 365 dagen.
     const aflopend = [{ startDate: "2025-01-01", endDate: "2026-06-30", vacationHours: 200 }];
-    expect(accruedVacationHours(aflopend, [], peildatum, 2026)).toBe(299.18);
+    expect(accruedVacationHours(aflopend, [], peildatum, "2026-08-15")).toBe(299.18);
   });
 
   it("adds up the years of a career spanning three contracts", () => {
@@ -140,7 +152,7 @@ describe("accruedVacationHours", () => {
     ];
     // Het eerste contract duurde ruim 16 maanden en levert daarom meer dan zijn
     // jaarbedrag: 234,10. Het tweede 210,34, het derde precies zijn 200.
-    expect(accruedVacationHours(loopbaan, [], peildatum, 2026)).toBe(644.44);
+    expect(accruedVacationHours(loopbaan, [], peildatum, "2026-08-15")).toBe(644.44);
   });
 });
 
@@ -152,7 +164,7 @@ describe("vacationBalance", () => {
   ];
 
   it("counts only this year without an opening balance", () => {
-    expect(vacationBalance(contract, [], opgenomen, null, 2026)).toEqual({
+    expect(vacationBalance(contract, [], opgenomen, null, "2026-08-15")).toEqual({
       entitled: 200, used: 56, remaining: 144,
     });
   });
@@ -161,8 +173,19 @@ describe("vacationBalance", () => {
     // De 8 uur van maart zit al in de 340 verwerkt en telt niet nog eens mee.
     // Het recht loopt vanaf het contract in 2020, dus zeven jaar × 200.
     const opening = { date: "2026-07-01", used: 340 };
-    expect(vacationBalance(contract, [], opgenomen, opening, 2026)).toEqual({
+    expect(vacationBalance(contract, [], opgenomen, opening, "2026-08-15")).toEqual({
       entitled: 1400, used: 388, remaining: 1012,
+    });
+  });
+
+  it("does subtract leave booked in the tail of a contract that runs into next year", () => {
+    // Die januari valt binnen het lopende contract, dus binnen hetzelfde
+    // venster als de opbouw. Hem laten staan zou het saldo te hoog maken.
+    const overDeJaargrens = [{ startDate: "2026-02-01", endDate: "2027-01-31", vacationHours: 208 }];
+    const peil = { date: "2026-02-01", used: 0 };
+    const inJanuari = [{ date: "2027-01-12", hours: 8 }];
+    expect(vacationBalance(overDeJaargrens, [], inJanuari, peil, "2026-08-15")).toEqual({
+      entitled: 208, used: 8, remaining: 200,
     });
   });
 
@@ -170,13 +193,13 @@ describe("vacationBalance", () => {
     // Dat recht wordt pas volgend jaar opgebouwd, dus het hoort er nu ook niet
     // vanaf te gaan.
     const volgendJaar = [...opgenomen, { date: "2027-02-01", hours: 24 }];
-    expect(vacationBalance(contract, [], volgendJaar, null, 2026).used).toBe(56);
+    expect(vacationBalance(contract, [], volgendJaar, null, "2026-08-15").used).toBe(56);
   });
 
   it("counts what was taken on the reference date itself", () => {
     // 10 maart valt niet vóór de peildatum, dus die 8 uur komt boven op de 100.
     const opening = { date: "2026-03-10", used: 100 };
-    expect(vacationBalance(contract, [], opgenomen, opening, 2026).used).toBe(156);
+    expect(vacationBalance(contract, [], opgenomen, opening, "2026-08-15").used).toBe(156);
   });
 });
 
@@ -189,7 +212,7 @@ describe("contractYearBalance", () => {
   ];
   const opening = { date: "2025-09-01", used: 400 };
   const opgenomen = [{ date: "2026-07-23", hours: 48 }];
-  const saldo = () => vacationBalance(loopbaan, [], opgenomen, opening, 2026);
+  const saldo = () => vacationBalance(loopbaan, [], opgenomen, opening, "2026-08-15");
 
   it("splits the balance into what was carried over and what this contract gives", () => {
     const uitsplitsing = contractYearBalance(loopbaan, opgenomen, saldo(), opening, "2026-08-15")!;
@@ -214,7 +237,7 @@ describe("contractYearBalance", () => {
   it("counts vacation registered between the reference date and the contract start as taken before", () => {
     const vroeg = { date: "2025-01-01", used: 300 };
     const met = [{ date: "2025-03-10", hours: 16 }, ...opgenomen];
-    const uitsplitsing = contractYearBalance(loopbaan, met, vacationBalance(loopbaan, [], met, vroeg, 2026), vroeg, "2026-08-15")!;
+    const uitsplitsing = contractYearBalance(loopbaan, met, vacationBalance(loopbaan, [], met, vroeg, "2026-08-15"), vroeg, "2026-08-15")!;
     // De 16 uur van maart 2025 hoort bij het vorige contract, niet bij dit.
     expect(uitsplitsing.used).toBe(48);
     expect(uitsplitsing.carriedOver).toBe(128.44);
@@ -240,7 +263,7 @@ describe("vacationLedger", () => {
   const opgenomen = [{ date: "2026-07-23", until: "2026-07-31", hours: 48 }];
 
   it("lists every contract, the manual total and each leave, in date order", () => {
-    expect(vacationLedger(perJaar, opgenomen, opening, 2026)).toEqual([
+    expect(vacationLedger(perJaar, opgenomen, opening, "2026-08-15")).toEqual([
       { kind: "contract", date: "2023-09-01", until: "2024-08-31", hours: 168 },
       { kind: "contract", date: "2024-09-01", until: "2025-08-31", hours: 168 },
       // Op dezelfde dag als het lopende contract, maar het gaat over de periode
@@ -253,9 +276,9 @@ describe("vacationLedger", () => {
 
   it("adds up to exactly the remaining balance", () => {
     // Dit is waar de opsomming voor bestaat: hij moet het saldo verklaren.
-    const regels = vacationLedger(perJaar, opgenomen, opening, 2026);
+    const regels = vacationLedger(perJaar, opgenomen, opening, "2026-08-15");
     const som = afgerondOpCent(regels.reduce((s, r) => s + r.hours, 0));
-    expect(som).toBe(vacationBalance(perJaar, [], opgenomen, opening, 2026).remaining);
+    expect(som).toBe(vacationBalance(perJaar, [], opgenomen, opening, "2026-08-15").remaining);
   });
 
   it("also adds up when a contract does not run a whole year", () => {
@@ -263,26 +286,26 @@ describe("vacationLedger", () => {
       { startDate: "2023-01-09", endDate: "2024-05-31", vacationHours: 168 },
       { startDate: "2024-06-01", endDate: null, vacationHours: 168 },
     ];
-    const regels = vacationLedger(scheef, opgenomen, opening, 2026);
+    const regels = vacationLedger(scheef, opgenomen, opening, "2026-08-15");
     const som = afgerondOpCent(regels.reduce((s, r) => s + r.hours, 0));
-    expect(som).toBe(vacationBalance(scheef, [], opgenomen, opening, 2026).remaining);
+    expect(som).toBe(vacationBalance(scheef, [], opgenomen, opening, "2026-08-15").remaining);
   });
 
   it("leaves out a contract that has not built up anything", () => {
     const zonderUren = [...perJaar, { startDate: "2022-01-01", endDate: "2023-08-31", vacationHours: null }];
-    const soorten = vacationLedger(zonderUren, [], { date: "2025-09-01", used: 0 }, 2026);
+    const soorten = vacationLedger(zonderUren, [], { date: "2025-09-01", used: 0 }, "2026-08-15");
     expect(soorten).toHaveLength(3);
     expect(soorten.every((r) => r.kind === "contract")).toBe(true);
   });
 
   it("leaves out leave that falls before the reference date", () => {
     const eerder = [{ date: "2025-03-01", until: "2025-03-05", hours: 24 }, ...opgenomen];
-    const regels = vacationLedger(perJaar, eerder, opening, 2026);
+    const regels = vacationLedger(perJaar, eerder, opening, "2026-08-15");
     expect(regels.filter((r) => r.kind === "leave")).toHaveLength(1);
   });
 
   it("gives nothing at all without a contract", () => {
-    expect(vacationLedger([], opgenomen, opening, 2026)).toEqual([]);
+    expect(vacationLedger([], opgenomen, opening, "2026-08-15")).toEqual([]);
   });
 });
 
