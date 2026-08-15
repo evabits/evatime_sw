@@ -101,6 +101,7 @@ export function NewInvoiceClient({ customers }: Props) {
   const [selectedKmIds, setSelectedKmIds] = useState<Set<string>>(new Set());
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   useEffect(() => {
     if (!customerId) { setUnbilledTime([]); setUnbilledKm([]); setUnbilledExpenses([]); return; }
@@ -244,16 +245,27 @@ export function NewInvoiceClient({ customers }: Props) {
   async function createInvoice() {
     if (!customerId || lines.length === 0) return;
     setLoading(true);
-    const res = await fetch("/api/invoices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customerId, issueDate, dueDate, vatRate, notes, lines }),
-    });
-    if (res.ok) {
-      const invoice = await res.json();
-      router.push(`/invoices/${invoice.id}`);
+    setServerError("");
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, issueDate, dueDate, vatRate, notes, lines }),
+      });
+      if (res.ok) {
+        const invoice = await res.json();
+        router.push(`/invoices/${invoice.id}`);
+        return;
+      }
+      // Zonder deze tak viel de knop stil bij elke mislukking: geen melding,
+      // geen spoor, en een factuur die er niet was zonder dat iets dat zei.
+      const err = await res.json().catch(() => ({}));
+      setServerError(err.error ?? `De factuur kon niet worden aangemaakt (${res.status}).`);
+    } catch {
+      setServerError("De server was niet bereikbaar. Probeer het opnieuw.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -565,11 +577,14 @@ export function NewInvoiceClient({ customers }: Props) {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2">
-        <Button onClick={createInvoice} disabled={loading || !customerId || lines.length === 0}>
-          {loading ? "Aanmaken..." : "Factuur aanmaken"}
-        </Button>
-        <Button variant="outline" asChild><Link href="/invoices">Annuleren</Link></Button>
+      <div className="space-y-2">
+        {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+        <div className="flex gap-2">
+          <Button onClick={createInvoice} disabled={loading || !customerId || lines.length === 0}>
+            {loading ? "Aanmaken..." : "Factuur aanmaken"}
+          </Button>
+          <Button variant="outline" asChild><Link href="/invoices">Annuleren</Link></Button>
+        </div>
       </div>
     </div>
   );
