@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EvaTime",
+  title: "EVAtime",
   description: "Time registration and invoicing",
 };
 

@@ -1,5 +1,5 @@
 /**
- * Canonical role definitions for EvaTime.
+ * Canonical role definitions for EVAtime.
  *
  * When adding a new feature, check this file to understand what each role
  * should be able to do, then add the appropriate permission here and enforce
