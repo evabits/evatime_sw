@@ -15,12 +15,13 @@ model User {
   role                Role              @default(EMPLOYEE)
   weeklyHours         Decimal?          @db.Decimal(5, 2)
   workLevel           WorkLevel?
-  // Het vakantiesaldo waarmee deze medewerker EVAtime binnenkomt, en de datum
-  // waarop dat gold. Vanaf die datum bouwt de app zelf verder op uit de
-  // contracten; wat ervóór is opgenomen zit in het saldo verwerkt. Beide leeg
-  // betekent: alleen het recht van het lopende jaar, zoals het altijd was.
-  vacationOpeningDate  DateTime?        @db.Date
-  vacationOpeningHours Decimal?         @db.Decimal(6, 2)
+  // De peildatum en het totaal aantal vakantie-uren dat deze medewerker tot
+  // die datum had opgenomen. Zo ver gaat de registratie in EVAtime niet terug;
+  // vanaf de peildatum telt ze zelf. Het opgebouwde recht komt altijd uit de
+  // contracten. Geen peildatum betekent: alleen het lopende jaar, zoals het
+  // altijd was.
+  vacationOpeningDate DateTime?         @db.Date
+  vacationOpeningUsed Decimal?          @db.Decimal(7, 2)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   archivedAt          DateTime?

@@ -61,7 +61,7 @@ export default async function AbsencePage() {
     }),
     prisma.user.findMany({
       where: admin ? {} : { id: userId },
-      select: { id: true, vacationOpeningDate: true, vacationOpeningHours: true },
+      select: { id: true, vacationOpeningDate: true, vacationOpeningUsed: true },
     }),
   ]);
 
