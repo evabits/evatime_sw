@@ -28,6 +28,7 @@ export async function GET(req: Request) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const projectId = searchParams.get("projectId");
+    const customerId = searchParams.get("customerId");
     const reimbursableOnly = searchParams.get("reimbursable") === "1";
 
     const dateFilter = from || to
@@ -37,6 +38,9 @@ export async function GET(req: Request) {
     let where: any = {
       ...dateFilter,
       ...(projectId ? { projectId } : {}),
+      // Zoals /api/time en /api/km: de factuuropbouw vraagt om alles van één
+      // klant, en die zit aan het project vast.
+      ...(customerId ? { project: { customerId } } : {}),
     };
 
     if (canViewAllEntries(role)) {

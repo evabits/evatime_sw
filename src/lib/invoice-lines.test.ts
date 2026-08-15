@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupHourEntriesForInvoice, type HourEntryForInvoice } from "./invoice-lines";
+import { groupHourEntriesForInvoice, type HourEntryForInvoice, expenseInvoiceLines } from "./invoice-lines";
 
 function entry(over: Partial<HourEntryForInvoice> & { id: string }): HourEntryForInvoice {
   return {
@@ -138,5 +138,50 @@ describe("groupKmEntriesForInvoice", () => {
     expect(lines).toEqual([
       { description: "Reiskosten", quantity: 12.5, unitPrice: 0.23, kmEntryIds: ["k1"] },
     ]);
+  });
+});
+
+describe("expenseInvoiceLines", () => {
+  const uitgave = {
+    id: "e1",
+    amount: "107.27",
+    description: "Late levering SAMTEC connectors",
+    category: { name: "Materiaal" },
+  };
+
+  it("makes one line per expense with its own description", () => {
+    expect(expenseInvoiceLines([uitgave])).toEqual([
+      {
+        description: "Late levering SAMTEC connectors",
+        quantity: 1,
+        unitPrice: 107.27,
+        expenseIds: ["e1"],
+      },
+    ]);
+  });
+
+  it("keeps two expenses apart even when they cost the same", () => {
+    // Groeperen zou hier de omschrijvingen opeten, en die zijn juist de reden
+    // dat een uitgave op de factuur staat.
+    const regels = expenseInvoiceLines([uitgave, { ...uitgave, id: "e2", description: "Spoedvracht" }]);
+    expect(regels.map((r) => r.description)).toEqual(["Late levering SAMTEC connectors", "Spoedvracht"]);
+    expect(regels.map((r) => r.expenseIds)).toEqual([["e1"], ["e2"]]);
+  });
+
+  it("falls back to the category when the expense has no description", () => {
+    expect(expenseInvoiceLines([{ ...uitgave, description: null }])[0].description).toBe("Materiaal");
+    expect(expenseInvoiceLines([{ ...uitgave, description: "   " }])[0].description).toBe("Materiaal");
+  });
+
+  it("falls back to a plain word when there is no category either", () => {
+    expect(expenseInvoiceLines([{ id: "e1", amount: 50 }])[0].description).toBe("Uitgave");
+  });
+
+  it("leaves out an expense of nought, which cannot be invoiced", () => {
+    expect(expenseInvoiceLines([{ ...uitgave, amount: 0 }])).toEqual([]);
+  });
+
+  it("gives no lines for an empty list", () => {
+    expect(expenseInvoiceLines([])).toEqual([]);
   });
 });

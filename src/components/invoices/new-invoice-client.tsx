@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
-import { groupHourEntriesForInvoice, groupKmEntriesForInvoice } from "@/lib/invoice-lines";
+import { expenseInvoiceLines, groupHourEntriesForInvoice, groupKmEntriesForInvoice } from "@/lib/invoice-lines";
 import { kmRate } from "@/lib/report-totals";
 import { resolvePeriod } from "@/lib/periods";
 import { splitInvoicePeriod } from "@/lib/invoice-period";
@@ -28,9 +28,10 @@ interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
-  lineType: "HOURS" | "KM" | "OTHER";
+  lineType: "HOURS" | "KM" | "EXPENSE" | "OTHER";
   timeEntryIds?: string[];
   kmEntryIds?: string[];
+  expenseIds?: string[];
 }
 
 /**
@@ -96,17 +97,21 @@ export function NewInvoiceClient({ customers }: Props) {
   const [unbilledTime, setUnbilledTime] = useState<any[]>([]);
   const [unbilledKm, setUnbilledKm] = useState<any[]>([]);
   const [selectedTimeIds, setSelectedTimeIds] = useState<Set<string>>(new Set());
+  const [unbilledExpenses, setUnbilledExpenses] = useState<any[]>([]);
   const [selectedKmIds, setSelectedKmIds] = useState<Set<string>>(new Set());
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!customerId) { setUnbilledTime([]); setUnbilledKm([]); return; }
+    if (!customerId) { setUnbilledTime([]); setUnbilledKm([]); setUnbilledExpenses([]); return; }
     Promise.all([
       fetch(`/api/time?customerId=${customerId}`).then((r) => r.json()),
       fetch(`/api/km?customerId=${customerId}`).then((r) => r.json()),
-    ]).then(([time, km]) => {
+      fetch(`/api/expenses?customerId=${customerId}`).then((r) => r.json()),
+    ]).then(([time, km, expenses]) => {
       setUnbilledTime(time.filter((e: any) => !e.invoiced && isBillable(e) === true));
       setUnbilledKm(km.filter((e: any) => !e.invoiced && isBillable(e) === true));
+      setUnbilledExpenses(expenses.filter((e: any) => !e.invoiced && isBillable(e) === true));
     });
   }, [customerId]);
 
@@ -115,14 +120,17 @@ export function NewInvoiceClient({ customers }: Props) {
   // zodat er niets op de factuur kan belanden wat je niet in beeld hebt.
   const tijdSplitsing = splitInvoicePeriod(unbilledTime, periodeVan, periodeTot);
   const kmSplitsing = splitInvoicePeriod(unbilledKm, periodeVan, periodeTot);
+  const uitgaveSplitsing = splitInvoicePeriod(unbilledExpenses, periodeVan, periodeTot);
   const zichtbaarTijd = tijdSplitsing.binnen;
   const zichtbaarKm = kmSplitsing.binnen;
+  const zichtbareUitgaven = uitgaveSplitsing.binnen;
 
-  const achterstandAantal = tijdSplitsing.ervoorAantal + kmSplitsing.ervoorAantal;
+  const achterstandAantal =
+    tijdSplitsing.ervoorAantal + kmSplitsing.ervoorAantal + uitgaveSplitsing.ervoorAantal;
   // De oudste van de twee lijsten. Sorteren mag op de string, want YYYY-MM-DD
   // loopt lexicografisch gelijk met de kalender.
   const achterstandOudste =
-    [tijdSplitsing.ervoorOudste, kmSplitsing.ervoorOudste]
+    [tijdSplitsing.ervoorOudste, kmSplitsing.ervoorOudste, uitgaveSplitsing.ervoorOudste]
       .filter((d): d is string => d !== null)
       .sort()[0] ?? null;
 
@@ -140,10 +148,15 @@ export function NewInvoiceClient({ customers }: Props) {
       const next = new Set([...prev].filter((id) => zichtbaarK.has(id)));
       return next.size === prev.size ? prev : next;
     });
+    const zichtbaarU = new Set(zichtbareUitgaven.map((e) => e.id));
+    setSelectedExpenseIds((prev) => {
+      const next = new Set([...prev].filter((id) => zichtbaarU.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
     // zichtbaarTijd en zichtbaarKm zijn elke render nieuwe arrays en kunnen
     // dus geen dependency zijn; de waarden waaruit ze volgen wel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodeVan, periodeTot, unbilledTime, unbilledKm]);
+  }, [periodeVan, periodeTot, unbilledTime, unbilledKm, unbilledExpenses]);
 
   function toggleTimeEntry(id: string) {
     setSelectedTimeIds((prev) => {
@@ -155,6 +168,14 @@ export function NewInvoiceClient({ customers }: Props) {
 
   function toggleKmEntry(id: string) {
     setSelectedKmIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleExpense(id: string) {
+    setSelectedExpenseIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -176,6 +197,7 @@ export function NewInvoiceClient({ customers }: Props) {
     setLines([]);
     setSelectedTimeIds(new Set());
     setSelectedKmIds(new Set());
+    setSelectedExpenseIds(new Set());
     setCustomerId(nieuw);
   }
 
@@ -198,9 +220,17 @@ export function NewInvoiceClient({ customers }: Props) {
       newLines.push({ ...line, lineType: "KM" });
     }
 
+    const selectedExpenses = zichtbareUitgaven.filter((e) => selectedExpenseIds.has(e.id));
+    // Eén regel per uitgave: de eigen omschrijving is juist waarom hij op de
+    // factuur staat, en groeperen zou die opeten.
+    for (const line of expenseInvoiceLines(selectedExpenses)) {
+      newLines.push({ ...line, lineType: "EXPENSE" });
+    }
+
     setLines((prev) => [...prev, ...newLines]);
     setSelectedTimeIds(new Set());
     setSelectedKmIds(new Set());
+    setSelectedExpenseIds(new Set());
   }
 
   function updateLine(i: number, field: keyof InvoiceLine, value: any) {
@@ -271,12 +301,12 @@ export function NewInvoiceClient({ customers }: Props) {
         </CardContent>
       </Card>
 
-      {customerId && (unbilledTime.length > 0 || unbilledKm.length > 0) && (
+      {customerId && (unbilledTime.length > 0 || unbilledKm.length > 0 || unbilledExpenses.length > 0) && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Niet-gefactureerde registraties</CardTitle>
-              <Button size="sm" onClick={addLinesFromSelection} disabled={selectedTimeIds.size === 0 && selectedKmIds.size === 0}>
+              <Button size="sm" onClick={addLinesFromSelection} disabled={selectedTimeIds.size === 0 && selectedKmIds.size === 0 && selectedExpenseIds.size === 0}>
                 <Plus className="h-4 w-4 mr-2" /> Toevoegen aan factuur
               </Button>
             </div>
@@ -405,7 +435,54 @@ export function NewInvoiceClient({ customers }: Props) {
                 </Table>
               </div>
             )}
-            {zichtbaarTijd.length === 0 && zichtbaarKm.length === 0 && (
+            {zichtbareUitgaven.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Uitgaven</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8">
+                        <AllesVinkje
+                          ids={zichtbareUitgaven.filter((e) => Number(e.amount) > 0).map((e) => e.id)}
+                          geselecteerd={selectedExpenseIds}
+                          onChange={setSelectedExpenseIds}
+                        />
+                      </TableHead>
+                      <TableHead>Datum</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Omschrijving</TableHead>
+                      <TableHead className="text-right">Bedrag</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {zichtbareUitgaven.map((e) => {
+                      // Nul euro valt weg bij het omzetten naar factuurregels,
+                      // dus hier ook niet aan te vinken — net als een rit zonder
+                      // kilometertarief.
+                      const bedrag = Number(e.amount);
+                      return (
+                      <TableRow key={e.id} className={selectedExpenseIds.has(e.id) ? "bg-primary/5" : ""}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedExpenseIds.has(e.id)}
+                            onChange={() => toggleExpense(e.id)}
+                            disabled={bedrag <= 0}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
+                        <TableCell>{e.project?.name}</TableCell>
+                        <TableCell className="max-w-32 truncate">{e.description?.trim() || e.category?.name || "—"}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(bedrag)}</TableCell>
+                      </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {zichtbaarTijd.length === 0 && zichtbaarKm.length === 0 && zichtbareUitgaven.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 Geen registraties in deze periode.
               </p>
