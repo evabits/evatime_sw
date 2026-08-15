@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -73,9 +74,20 @@ interface User {
   name: string;
 }
 
+// Het vakantiesaldo van één medewerker, op de server geteld vanaf zijn
+// peildatum. `since` is die datum, of null als er geen beginsaldo is en het
+// dus bij het lopende jaar blijft.
+interface Saldo {
+  entitled: number;
+  used: number;
+  remaining: number;
+  since: string | null;
+}
+
 interface Props {
   initialRequests: AbsenceRequest[];
   initialBudgets: VacationBudget[];
+  saldi: Record<string, Saldo>;
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
@@ -145,6 +157,7 @@ function typeBadge(type: AbsenceType) {
 export function AbsenceClient({
   initialRequests,
   initialBudgets,
+  saldi,
   users,
   currentUserId,
   isAdmin,
@@ -153,6 +166,9 @@ export function AbsenceClient({
   weeklyHours,
   schedules,
 }: Props) {
+  // Het saldo komt van de server, dus na elke wijziging moet de pagina zich
+  // opnieuw laten uitrekenen; de lijst bijwerken in de state doet dat niet.
+  const router = useRouter();
   const [requests, setRequests] = useState<AbsenceRequest[]>(initialRequests);
   const [budgets, setBudgets] = useState<VacationBudget[]>(initialBudgets);
   const [activeTab, setActiveTab] = useState<Tab>("requests");
@@ -183,16 +199,17 @@ export function AbsenceClient({
   const watchedHours = useWatch({ control: requestForm.control, name: "hours" });
   const watchedType = useWatch({ control: requestForm.control, name: "type" });
 
-  // My vacation balance (only VACATION type counts against budget)
-  const myBudget = budgets.find((b) => b.userId === currentUserId);
-  const myApprovedVacation = requests
-    .filter((r) => r.userId === currentUserId && r.status === "APPROVED" && r.type === "VACATION")
-    .reduce((s, r) => s + r.hours, 0);
+  // My vacation balance (only VACATION type counts against budget). Komt van
+  // de server, want vanaf een peildatum in een eerder jaar telt er meer mee dan
+  // de lijst hierboven bevat.
+  const LEEG_SALDO: Saldo = { entitled: 0, used: 0, remaining: 0, since: null };
+  const mySaldo = saldi[currentUserId] ?? LEEG_SALDO;
+  const myApprovedVacation = mySaldo.used;
   const myPendingVacation = requests
     .filter((r) => r.userId === currentUserId && r.status === "PENDING" && r.type === "VACATION")
     .reduce((s, r) => s + r.hours, 0);
-  const myBudgetHours = myBudget?.hours ?? 0;
-  const myRemaining = myBudgetHours - myApprovedVacation;
+  const myBudgetHours = mySaldo.entitled;
+  const myRemaining = mySaldo.remaining;
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
   // Balance preview shown inside the request dialog. Gaat over de medewerker
@@ -201,12 +218,9 @@ export function AbsenceClient({
   // Anders toont een admin die voor een collega verlof aanvraagt zijn eigen
   // saldo in plaats van dat van de collega.
   const doelMedewerkerId = editingRequest?.userId ?? gekozenMedewerker ?? currentUserId;
-  const doelBudget = budgets.find((b) => b.userId === doelMedewerkerId);
-  const doelApprovedVacation = requests
-    .filter((r) => r.userId === doelMedewerkerId && r.status === "APPROVED" && r.type === "VACATION")
-    .reduce((s, r) => s + r.hours, 0);
-  const doelBudgetHours = doelBudget?.hours ?? 0;
-  const doelRemaining = doelBudgetHours - doelApprovedVacation;
+  const doelSaldo = saldi[doelMedewerkerId] ?? LEEG_SALDO;
+  const doelBudgetHours = doelSaldo.entitled;
+  const doelRemaining = doelSaldo.remaining;
 
   const dialogRequestedHours = Number(watchedHours) || 0;
   const isVacationType = watchedType === "VACATION";
@@ -329,11 +343,15 @@ export function AbsenceClient({
       editingRequest ? prev.map((r) => (r.id === saved.id ? saved : r)) : [saved, ...prev]
     );
     setRequestDialogOpen(false);
+    router.refresh();
   }
 
   async function deleteRequest(id: string) {
     const res = await fetch(`/api/absence-requests/${id}`, { method: "DELETE" });
-    if (res.ok) setRequests((prev) => prev.filter((r) => r.id !== id));
+    if (res.ok) {
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      router.refresh();
+    }
   }
 
   async function cancelRequest(id: string) {
@@ -349,6 +367,7 @@ export function AbsenceClient({
     }
     const updated: AbsenceRequest = await res.json();
     setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    router.refresh();
   }
 
   async function reviewRequest(id: string, status: "APPROVED" | "REJECTED") {
@@ -364,6 +383,7 @@ export function AbsenceClient({
     }
     const updated: AbsenceRequest = await res.json();
     setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    router.refresh();
   }
 
   async function submitBudget(values: BudgetForm) {
@@ -441,11 +461,15 @@ export function AbsenceClient({
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Vakantiebudget {year}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {mySaldo.since ? "Vakantie opgebouwd" : `Vakantiebudget ${year}`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{myBudgetHours}u</div>
-            <p className="text-xs text-muted-foreground">toegekende vakantie-uren</p>
+            <p className="text-xs text-muted-foreground">
+              {mySaldo.since ? `sinds ${formatDate(mySaldo.since)}` : "toegekende vakantie-uren"}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -540,8 +564,8 @@ export function AbsenceClient({
                       <th className="px-4 py-3 text-left font-medium">Medewerker</th>
                       <th className="px-4 py-3 text-left font-medium">Jaar</th>
                       <th className="px-4 py-3 text-right font-medium">Budget (u)</th>
-                      <th className="px-4 py-3 text-right font-medium">Opgenomen (u)</th>
-                      <th className="px-4 py-3 text-right font-medium">Resterend (u)</th>
+                      <th className="px-4 py-3 text-right font-medium">Opgenomen dit jaar (u)</th>
+                      <th className="px-4 py-3 text-right font-medium">Resterend dit jaar (u)</th>
                       <th className="px-4 py-3" />
                     </tr>
                   </thead>
@@ -727,7 +751,7 @@ export function AbsenceClient({
                   Rooster: {roosterInfo.entries.length} dagen, {roosterInfo.total.toFixed(2)} uur in totaal
                 </p>
               )}
-              {balanceAfterRequest !== null && doelBudget !== undefined && dialogRequestedHours > 0 && (
+              {balanceAfterRequest !== null && doelBudgetHours > 0 && dialogRequestedHours > 0 && (
                 <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
                   Saldo na aanvraag: {balanceAfterRequest}u (van {doelBudgetHours}u budget)
                 </p>

@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
-import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
+import {
+  vacationOpeningDateField, vacationOpeningHoursField, weeklyHoursField, workLevelField,
+} from "@/lib/user-schema";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -13,10 +15,13 @@ const updateSchema = z.object({
   password: z.string().min(8).optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,
+  vacationOpeningDate: vacationOpeningDateField,
+  vacationOpeningHours: vacationOpeningHoursField,
 });
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
+  vacationOpeningDate: true, vacationOpeningHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -24,6 +29,12 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
   return {
     ...u,
     weeklyHours: u.weeklyHours != null ? Number(u.weeklyHours) : null,
+    // Als @db.Date leest Prisma dit terug als middernacht UTC; de kale datum is
+    // wat het formulier nodig heeft.
+    vacationOpeningDate: u.vacationOpeningDate
+      ? u.vacationOpeningDate.toISOString().slice(0, 10)
+      : null,
+    vacationOpeningHours: u.vacationOpeningHours != null ? Number(u.vacationOpeningHours) : null,
   };
 }
 
@@ -49,6 +60,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       updateData.role = data.role;
       updateData.weeklyHours = data.weeklyHours ?? null;
       updateData.workLevel = data.workLevel ?? null;
+      // De datum als middernacht UTC, zodat een @db.Date-kolom precies de dag
+      // bewaart die is ingevuld en niet die ervoor.
+      updateData.vacationOpeningDate = data.vacationOpeningDate
+        ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
+        : null;
+      updateData.vacationOpeningHours = data.vacationOpeningHours ?? null;
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 

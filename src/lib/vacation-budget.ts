@@ -48,6 +48,107 @@ export function contractVacationHours(contracts: ContractVacation[], year: numbe
 }
 
 /**
+ * Het saldo waarmee een medewerker EVAtime binnenkomt: wat hij op `date` nog
+ * had staan. Wat daarvóór is opgenomen zit erin verwerkt en wordt niet meer
+ * apart geteld — de app kent dat verleden niet.
+ */
+export type VacationOpening = { date: string; hours: number };
+
+/** Het recht over één jaar: een budgetrij gaat vóór het contract. */
+function jaarrecht(
+  contracts: ContractVacation[],
+  budgets: Array<{ year: number; hours: number }>,
+  year: number,
+): number {
+  const rij = budgets.find((b) => b.year === year);
+  return rij ? rij.hours : (contractVacationHours(contracts, year) ?? 0);
+}
+
+/**
+ * Het opgebouwde vakantierecht t/m `year`: het beginsaldo plus het recht van
+ * elk jaar vanaf de peildatum.
+ *
+ * Het jaar waarin de peildatum valt telt naar rato van de dagen die er nog van
+ * over zijn — het deel ervóór zit al in het beginsaldo. Elk jaar daarna telt
+ * heel mee, en een jaar dat geen contract meer raakt levert vanzelf nul op,
+ * zodat de opbouw stopt zodra iemand uit dienst is.
+ *
+ * Zonder beginsaldo blijft het bij het recht van het lopende jaar, zoals het
+ * altijd was. Zo verspringt het getal van niemand voordat de peildatum is
+ * ingevuld.
+ */
+export function accruedVacationHours(
+  contracts: ContractVacation[],
+  budgets: Array<{ year: number; hours: number }>,
+  opening: VacationOpening | null,
+  year: number,
+): number {
+  if (!opening) return jaarrecht(contracts, budgets, year);
+
+  const vanaf = Date.parse(`${opening.date}T00:00:00Z`);
+  const startJaar = Number(opening.date.slice(0, 4));
+
+  let totaal = opening.hours;
+  for (let y = startJaar; y <= year; y++) {
+    const jaarStart = Date.UTC(y, 0, 1);
+    const jaarEind = Date.UTC(y + 1, 0, 1);
+    const deel = (jaarEind - Math.max(vanaf, jaarStart)) / (jaarEind - jaarStart);
+    if (deel <= 0) continue;
+    totaal += jaarrecht(contracts, budgets, y) * deel;
+  }
+  return Math.round(totaal * 100) / 100;
+}
+
+/**
+ * De datum vanaf wanneer er geteld wordt: de peildatum van het beginsaldo, of
+ * anders 1 januari van het lopende jaar. Alles ervóór zit in het beginsaldo of
+ * valt buiten het jaar.
+ */
+export function vacationCountFrom(opening: VacationOpening | null, year: number): string {
+  return opening ? opening.date : `${year}-01-01`;
+}
+
+/**
+ * De beginsaldovelden van een Prisma-gebruiker naar de vorm die `vacationBalance`
+ * verwacht. Zonder peildatum is er geen beginsaldo, ook al staat er een getal.
+ */
+export function toVacationOpening(
+  user: { vacationOpeningDate: Date | null; vacationOpeningHours: unknown } | null,
+): VacationOpening | null {
+  if (!user?.vacationOpeningDate) return null;
+  return {
+    date: user.vacationOpeningDate.toISOString().slice(0, 10),
+    hours: Number(user.vacationOpeningHours ?? 0),
+  };
+}
+
+export type VacationBalance = { entitled: number; used: number; remaining: number };
+
+/**
+ * Het vakantiesaldo van één medewerker: wat hij heeft opgebouwd, wat hij ervan
+ * heeft opgenomen en wat er overblijft.
+ *
+ * Beide kanten beslaan hetzelfde venster — vanaf de peildatum t/m het eind van
+ * `year`. Anders zou vakantie die al voor volgend jaar is vastgelegd worden
+ * afgetrokken van een recht dat pas volgend jaar wordt opgebouwd.
+ */
+export function vacationBalance(
+  contracts: ContractVacation[],
+  budgets: Array<{ year: number; hours: number }>,
+  approved: Array<{ date: string; hours: number }>,
+  opening: VacationOpening | null,
+  year: number,
+): VacationBalance {
+  const vanaf = vacationCountFrom(opening, year);
+  const tot = `${year}-12-31`;
+  const entitled = accruedVacationHours(contracts, budgets, opening, year);
+  const used = approved
+    .filter((a) => a.date >= vanaf && a.date <= tot)
+    .reduce((s, a) => s + a.hours, 0);
+  return { entitled, used, remaining: Math.round((entitled - used) * 100) / 100 };
+}
+
+/**
  * De budgetlijst aangevuld met wat de contracten opleveren.
  *
  * Een bestaande rij blijft ongemoeid — die is met de hand gezet en gaat vóór

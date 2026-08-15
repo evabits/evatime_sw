@@ -12,7 +12,7 @@ import { isBillable } from "@/lib/billable";
 import { canLeadStandup } from "@/lib/roles";
 import { previousWorkingDay } from "@/lib/working-days";
 import { countMissingHours } from "@/lib/missing-hours";
-import { contractVacationHours, toContractVacation } from "@/lib/vacation-budget";
+import { toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   // Employees see only their own totals; admins see company-wide.
   const ownerFilter = isAdmin ? {} : { userId };
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudget, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten] = await Promise.all([
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudgets, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten, eigenGebruiker] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -74,12 +74,15 @@ export default async function DashboardPage() {
       take: 5,
       include: { project: { select: { name: true } } },
     }),
-    prisma.vacationBudget.findUnique({
-      where: { userId_year: { userId, year: currentYear } },
+    // Alle jaren, niet alleen het lopende: het saldo stapelt vanaf de
+    // peildatum en heeft het recht van elk jaar daarna nodig.
+    prisma.vacationBudget.findMany({
+      where: { userId },
+      select: { year: true, hours: true },
     }),
-    prisma.absenceRequest.aggregate({
-      where: { userId, status: "APPROVED", type: "VACATION", startDate: { gte: new Date(currentYear, 0, 1) } },
-      _sum: { hours: true },
+    prisma.absenceRequest.findMany({
+      where: { userId, status: "APPROVED", type: "VACATION" },
+      select: { startDate: true, hours: true },
     }),
     isAdmin
       ? prisma.absenceRequest.findMany({
@@ -102,6 +105,10 @@ export default async function DashboardPage() {
       where: { userId },
       select: { userId: true, startDate: true, endDate: true, vacationHours: true },
     }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { vacationOpeningDate: true, vacationOpeningHours: true },
+    }),
   ]);
 
   const pendingReview = userId
@@ -114,13 +121,20 @@ export default async function DashboardPage() {
 
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
-  // Een budgetrij voor dit jaar wint; anders zegt het contract het. Zonder
-  // allebei blijft het nul, zoals het altijd was.
-  const vacBudgetHours = vacationBudget
-    ? Number(vacationBudget.hours)
-    : (contractVacationHours(toContractVacation(eigenContracten), currentYear) ?? 0);
-  const vacUsedHours = Number(vacationApproved._sum.hours ?? 0);
-  const vacRemainingHours = vacBudgetHours - vacUsedHours;
+  // Een budgetrij voor een jaar wint; anders zegt het contract het. Met een
+  // beginsaldo stapelt het recht vanaf de peildatum, zonder blijft het bij het
+  // lopende jaar.
+  const { entitled: vacBudgetHours, used: vacUsedHours, remaining: vacRemainingHours } =
+    vacationBalance(
+      toContractVacation(eigenContracten),
+      vacationBudgets.map((b) => ({ year: b.year, hours: Number(b.hours) })),
+      vacationApproved.map((a) => ({
+        date: a.startDate.toISOString().slice(0, 10),
+        hours: Number(a.hours),
+      })),
+      toVacationOpening(eigenGebruiker),
+      currentYear,
+    );
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const projectBillable = isBillable({ project }) === true;
