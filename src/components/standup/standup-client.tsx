@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MemberPicker } from "@/components/shared/member-picker";
-import { formatHours } from "@/lib/utils";
+import { formatDate, formatHours, formatWeekday } from "@/lib/utils";
 import { readHiddenIds, hiddenStorageKey } from "@/lib/hidden-members";
 import { missingHours } from "@/lib/work-schedule";
 
@@ -36,27 +36,17 @@ interface Data {
 }
 
 function nl(d: string) {
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString("nl-NL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
+  return `${formatWeekday(d)} ${formatDate(d)}`;
 }
 
 function weekdag(d: string) {
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString("nl-NL", { weekday: "long", timeZone: "UTC" });
+  return formatWeekday(d);
 }
 
-// Kort, want deze datum staat midden in een regel en niet in een kop:
-// "vr 3 aug" in plaats van "vrijdag 3 augustus".
+// Korte weekdag, want deze datum staat midden in een regel en niet in een
+// kop: "vr 03-AUG-2026" in plaats van "vrijdag 03-AUG-2026".
 function kortNl(d: string) {
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString("nl-NL", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
+  return `${formatWeekday(d, true)} ${formatDate(d)}`;
 }
 
 function EntryList({ entries }: { entries: Entry[] }) {

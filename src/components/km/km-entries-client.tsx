@@ -441,7 +441,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm font-medium tabular-nums">
-                    {format(weekStart, "d MMM")} – {format(weekEnd, "d MMM yyyy")}
+                    {formatDate(weekStart)} – {formatDate(weekEnd)}
                   </span>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleWeekNav(weekOffset + 1)}>
                     <ChevronRight className="h-4 w-4" />

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatHours } from "@/lib/utils";
+import { formatDate, formatHours } from "@/lib/utils";
 
 interface OverviewEntry {
   userId: string;
@@ -37,8 +37,8 @@ function periodLabel(mode: Mode, ref: Date) {
   const { from, to } = periodBounds(mode, ref);
   if (mode === "week") {
     const weekNum = getISOWeek(from);
-    const fromStr = from.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
-    const toStr = to.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+    const fromStr = formatDate(from);
+    const toStr = formatDate(to);
     return `Week ${weekNum}, ${fromStr} – ${toStr}`;
   }
   return ref.toLocaleDateString("nl-NL", { month: "long", year: "numeric" });

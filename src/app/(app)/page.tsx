@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency, formatDate, formatHours } from "@/lib/utils";
+import { formatCurrency, formatDate, formatHours, formatWeekday } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
@@ -233,12 +233,7 @@ export default async function DashboardPage() {
                   {missendeUren === 1
                     ? "1 medewerker miste uren"
                     : `${missendeUren} medewerkers misten uren`}{" "}
-                  op {new Date(`${standupDag}T00:00:00Z`).toLocaleDateString("nl-NL", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    timeZone: "UTC",
-                  })}
+                  op {formatWeekday(standupDag)} {formatDate(standupDag)}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Laat ze bijboeken vóór de standup begint.
@@ -359,9 +354,9 @@ export default async function DashboardPage() {
                   <li key={v.id} className="text-xs flex justify-between gap-2">
                     <span className="font-medium truncate">{v.user.name}</span>
                     <span className="text-muted-foreground whitespace-nowrap">
-                      {new Date(v.startDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                      {formatDate(v.startDate)}
                       {v.startDate !== v.endDate && (
-                        <> – {new Date(v.endDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</>
+                        <> – {formatDate(v.endDate)}</>
                       )}
                     </span>
                   </li>

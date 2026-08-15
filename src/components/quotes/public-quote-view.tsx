@@ -1,10 +1,6 @@
 "use client";
 import { useState } from "react";
-import { formatCurrency } from "@/lib/utils";
-
-function fmt(date: string) {
-  return new Date(date).toLocaleDateString("nl-NL");
-}
+import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 export function PublicQuoteView({ quote, settings }: { quote: any; settings: any }) {
   const [status, setStatus] = useState(quote.status);
@@ -126,7 +122,7 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Offerte goedgekeurd</div>
             {approvedAt && (
               <div style={{ fontSize: 13, color: "#555" }}>
-                Goedgekeurd op {new Date(approvedAt).toLocaleDateString("nl-NL")}
+                Goedgekeurd op {fmt(approvedAt)}
               </div>
             )}
           </div>

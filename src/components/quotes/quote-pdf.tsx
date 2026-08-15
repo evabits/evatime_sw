@@ -1,4 +1,5 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { formatDate as fmt } from "@/lib/utils";
 
 const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 10, color: "#111", padding: "40px 48px 64px" },
@@ -25,10 +26,6 @@ const s = StyleSheet.create({
   notes: { marginTop: 24, fontSize: 10, color: "#444", lineHeight: 1.5 },
   bold: { fontFamily: "Helvetica-Bold" },
 });
-
-function fmt(date: string) {
-  return new Date(date).toLocaleDateString("nl-NL");
-}
 
 function fmtCurrency(n: number) {
   return `€ ${n.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

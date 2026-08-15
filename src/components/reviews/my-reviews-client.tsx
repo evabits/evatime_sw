@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,10 +39,6 @@ const STATUS_VARIANTS: Record<ReviewStatus, "default" | "secondary" | "outline">
   SELF_COMPLETED: "secondary",
   COMPLETED: "outline",
 };
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
-}
 
 function ReviewCard({ review }: { review: Review }) {
   const router = useRouter();

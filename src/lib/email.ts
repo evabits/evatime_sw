@@ -4,17 +4,13 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { InvoicePdf } from "@/components/invoices/invoice-pdf";
 import { QuotePdf } from "@/components/quotes/quote-pdf";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 const transport = nodemailer.createTransport(
   MailtrapTransport({ token: process.env.MAILTRAP_API_TOKEN! })
 );
 
 const FROM_ADDRESS = "no-reply@time.evabits.work"; // ponytail: single source; was inline ×8
-
-function fmt(date: string) {
-  return new Date(date).toLocaleDateString("nl-NL");
-}
 
 function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   const linesHtml = invoice.lines
@@ -214,7 +210,7 @@ export async function sendContractExpiryEmail(
   settings: any,
 ): Promise<void> {
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
-  const end = new Date(contract.endDate).toLocaleDateString("nl-NL");
+  const end = fmt(contract.endDate);
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
     <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
@@ -238,7 +234,7 @@ export async function sendReviewPlannedEmail(
 ): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
-  const when = review.plannedDate ? new Date(review.plannedDate).toLocaleDateString("nl-NL") : "nader te bepalen";
+  const when = review.plannedDate ? fmt(review.plannedDate) : "nader te bepalen";
   const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111;background:#fff;margin:0;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
     <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
