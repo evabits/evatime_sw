@@ -4,14 +4,19 @@ import { serialize } from "@/lib/utils";
 import { isAdmin } from "@/lib/roles";
 import { AbsenceClient } from "@/components/vacation/absence-client";
 import { toWeekSchedule } from "@/lib/work-schedule";
-import { fillBudgets, toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
+import {
+  contractYearBalance, fillBudgets, toContractVacation, toVacationOpening, vacationBalance,
+} from "@/lib/vacation-budget";
+import { format } from "date-fns";
 
 export default async function AbsencePage() {
   const session = await auth();
   const userId = session?.user?.id ?? "";
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
   const admin = isAdmin(role);
-  const year = new Date().getFullYear();
+  const nu = new Date();
+  const year = nu.getFullYear();
+  const vandaag = format(nu, "yyyy-MM-dd");
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31);
 
@@ -92,16 +97,23 @@ export default async function AbsencePage() {
   const saldi = Object.fromEntries(
     [...saldoIds].map((id) => {
       const opening = openings.get(id) ?? null;
+      const eigenContracten = contracten.filter((c) => c.userId === id);
+      const opnames = vakantieOpnames
+        .filter((a) => a.userId === id)
+        .map((a) => ({ date: a.startDate.toISOString().slice(0, 10), hours: Number(a.hours) }));
       const saldo = vacationBalance(
-        contracten.filter((c) => c.userId === id),
+        eigenContracten,
         budgets.filter((b) => b.userId === id).map((b) => ({ year: b.year, hours: Number(b.hours) })),
-        vakantieOpnames
-          .filter((a) => a.userId === id)
-          .map((a) => ({ date: a.startDate.toISOString().slice(0, 10), hours: Number(a.hours) })),
+        opnames,
         opening,
         year,
       );
-      return [id, { ...saldo, since: opening?.date ?? null }];
+      // Hetzelfde saldo, uitgesplitst naar het lopende contractjaar. Null zodra
+      // die grens niet te trekken is; dan blijven de tegels bij het kalenderjaar.
+      const contractJaar = opening
+        ? contractYearBalance(eigenContracten, opnames, saldo, opening, vandaag)
+        : null;
+      return [id, { ...saldo, since: opening?.date ?? null, contractJaar }];
     }),
   );
 
