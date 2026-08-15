@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contractVacationHours, fillBudgets, toContractVacation } from "./vacation-budget";
+import { accruedVacationHours, contractVacationHours, fillBudgets, toContractVacation } from "./vacation-budget";
 
 const lopend = { startDate: "2020-01-01", endDate: null, vacationHours: 160 };
 
@@ -41,6 +41,61 @@ describe("contractVacationHours", () => {
     const oud = { startDate: "2020-01-01", endDate: "2025-12-31", vacationHours: 160 };
     const nieuw = { startDate: "2026-01-01", endDate: null, vacationHours: null };
     expect(contractVacationHours([oud, nieuw], 2026)).toBeNull();
+  });
+});
+
+describe("accruedVacationHours", () => {
+  const contract = [{ startDate: "2020-01-01", endDate: null, vacationHours: 200 }];
+
+  it("gives only this year's entitlement when there is no opening balance", () => {
+    expect(accruedVacationHours(contract, [], null, 2026)).toBe(200);
+  });
+
+  it("gives nought when neither a budget row nor a contract says anything", () => {
+    expect(accruedVacationHours([], [], null, 2026)).toBe(0);
+  });
+
+  it("adds the part of the opening year that falls after the reference date", () => {
+    // 1 juli t/m 31 december is 184 van de 365 dagen: 200 × 184/365 = 100,82.
+    const opening = { date: "2026-07-01", hours: 40 };
+    expect(accruedVacationHours(contract, [], opening, 2026)).toBe(140.82);
+  });
+
+  it("counts the whole year when the reference date is 1 January", () => {
+    const opening = { date: "2026-01-01", hours: 0 };
+    expect(accruedVacationHours(contract, [], opening, 2026)).toBe(200);
+  });
+
+  it("counts a leap year by its 366 days", () => {
+    // 1 juli 2028 t/m 31 december is 184 van de 366 dagen.
+    const opening = { date: "2028-07-01", hours: 0 };
+    expect(accruedVacationHours(contract, [], opening, 2028)).toBe(100.55);
+  });
+
+  it("stacks the years after the opening year in full", () => {
+    const opening = { date: "2026-07-01", hours: 0 };
+    // 100,82 over 2026 plus 200 over 2027 en nog eens 200 over 2028.
+    expect(accruedVacationHours(contract, [], opening, 2028)).toBe(500.82);
+  });
+
+  it("stops accruing once the contract has run out", () => {
+    const aflopend = [{ startDate: "2020-01-01", endDate: "2027-06-30", vacationHours: 200 }];
+    const opening = { date: "2026-01-01", hours: 0 };
+    // 2026 en 2027 leveren allebei nog het jaarrecht; 2028 raakt geen contract meer.
+    expect(accruedVacationHours(aflopend, [], opening, 2028)).toBe(400);
+  });
+
+  it("lets a budget row override the contract for its own year", () => {
+    const opening = { date: "2026-01-01", hours: 0 };
+    const budgets = [{ year: 2027, hours: 80 }];
+    expect(accruedVacationHours(contract, budgets, opening, 2027)).toBe(280);
+  });
+
+  it("ignores a reference date that lies after the year being asked about", () => {
+    // Iemand die pas volgend jaar begint heeft nu nog niets opgebouwd; het
+    // beginsaldo staat er wel, want dat is wat hij meeneemt.
+    const opening = { date: "2027-01-01", hours: 40 };
+    expect(accruedVacationHours(contract, [], opening, 2026)).toBe(40);
   });
 });
 
