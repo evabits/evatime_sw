@@ -118,3 +118,43 @@ export function groupKmEntriesForInvoice(entries: KmEntryForInvoice[]): KmInvoic
     kmEntryIds: groep.map((e) => e.id),
   }));
 }
+
+export type ExpenseForInvoice = {
+  id: string;
+  amount: number | string;
+  description?: string | null;
+  category?: { name: string } | null;
+};
+
+export type ExpenseInvoiceLine = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  expenseIds: string[];
+};
+
+/**
+ * Zet uitgaven om naar factuurregels: één regel per uitgave, niet gegroepeerd.
+ *
+ * Uren en kilometers groeperen op tarief omdat hun omschrijving toch vast
+ * staat. Bij een uitgave is die omschrijving juist het punt — "Late levering
+ * SAMTEC connectors" is wat de klant wil lezen — en die zou bij groeperen
+ * verdwijnen.
+ *
+ * Zonder eigen omschrijving valt hij terug op de categorie; is die er ook niet,
+ * dan blijft er "Uitgave" over, want een factuurregel zonder omschrijving is
+ * geen factuurregel.
+ *
+ * Een bedrag van nul of minder valt weg, net als een urenregel zonder tarief:
+ * de factuurroute eist een positieve prijs.
+ */
+export function expenseInvoiceLines(expenses: ExpenseForInvoice[]): ExpenseInvoiceLine[] {
+  return expenses
+    .filter((e) => Number(e.amount) > 0)
+    .map((e) => ({
+      description: e.description?.trim() || e.category?.name || "Uitgave",
+      quantity: 1,
+      unitPrice: Number(e.amount),
+      expenseIds: [e.id],
+    }));
+}
