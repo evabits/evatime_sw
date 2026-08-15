@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency, formatHours } from "@/lib/utils";
+import { formatCurrency, formatDate, formatHours } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
@@ -12,7 +12,7 @@ import { isBillable } from "@/lib/billable";
 import { canLeadStandup } from "@/lib/roles";
 import { previousWorkingDay } from "@/lib/working-days";
 import { countMissingHours } from "@/lib/missing-hours";
-import { toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
+import { contractYearBalance, toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -122,19 +122,33 @@ export default async function DashboardPage() {
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
   // Een budgetrij voor een jaar wint; anders zegt het contract het. Met een
-  // beginsaldo stapelt het recht vanaf de peildatum, zonder blijft het bij het
-  // lopende jaar.
-  const { entitled: vacBudgetHours, used: vacUsedHours, remaining: vacRemainingHours } =
-    vacationBalance(
-      toContractVacation(eigenContracten),
-      vacationBudgets.map((b) => ({ year: b.year, hours: Number(b.hours) })),
-      vacationApproved.map((a) => ({
-        date: a.startDate.toISOString().slice(0, 10),
-        hours: Number(a.hours),
-      })),
-      toVacationOpening(eigenGebruiker),
-      currentYear,
-    );
+  // peildatum stapelt het recht over alle contractjaren, zonder blijft het bij
+  // het lopende jaar.
+  const eigenVakantieContracten = toContractVacation(eigenContracten);
+  const eigenOpening = toVacationOpening(eigenGebruiker);
+  const eigenOpnames = vacationApproved.map((a) => ({
+    date: a.startDate.toISOString().slice(0, 10),
+    hours: Number(a.hours),
+  }));
+  const vacSaldo = vacationBalance(
+    eigenVakantieContracten,
+    vacationBudgets.map((b) => ({ year: b.year, hours: Number(b.hours) })),
+    eigenOpnames,
+    eigenOpening,
+    currentYear,
+  );
+  const { entitled: vacBudgetHours, used: vacUsedHours, remaining: vacRemainingHours } = vacSaldo;
+  // Hetzelfde saldo, maar uitgesplitst naar het lopende contractjaar. Null
+  // zodra die grens niet te trekken is; dan blijft de tegel bij het kalenderjaar.
+  const contractJaar = eigenOpening
+    ? contractYearBalance(
+        eigenVakantieContracten,
+        eigenOpnames,
+        vacSaldo,
+        eigenOpening,
+        format(now, "yyyy-MM-dd"),
+      )
+    : null;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const projectBillable = isBillable({ project }) === true;
@@ -277,16 +291,26 @@ export default async function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Vakantie resterend {currentYear}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {contractJaar ? "Vakantie resterend" : `Vakantie resterend ${currentYear}`}
+            </CardTitle>
             <Umbrella className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${vacRemainingHours < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
               {vacRemainingHours}u
             </div>
-            <p className="text-xs text-muted-foreground">
-              {vacUsedHours}u van {vacBudgetHours}u opgenomen
-            </p>
+            {contractJaar ? (
+              <p className="text-xs text-muted-foreground">
+                {contractJaar.carriedOver}u meegenomen + {contractJaar.contractTotal}u dit contract
+                {" − "}{contractJaar.used}u opgenomen
+                {contractJaar.endDate && <>, tot {formatDate(contractJaar.endDate)}</>}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {vacUsedHours}u van {vacBudgetHours}u opgenomen
+              </p>
+            )}
             <Link href="/absence" className="text-xs text-primary underline-offset-2 hover:underline mt-1 block">
               Bekijken →
             </Link>

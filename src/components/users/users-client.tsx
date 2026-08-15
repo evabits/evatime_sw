@@ -315,7 +315,7 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                       {editForm.formState.errors.vacationOpeningUsed && <p className="text-xs text-destructive">{editForm.formState.errors.vacationOpeningUsed.message}</p>}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Het totaal dat vóór die datum is opgenomen, uit je eigen administratie. Vanaf die datum telt EVAtime zelf. Het opgebouwde recht komt altijd uit de contracten. Leeg = alleen het lopende jaar.</p>
+                  <p className="text-xs text-muted-foreground">Het totaal dat vóór die datum is opgenomen, uit je eigen administratie. Vanaf die datum telt EVAtime zelf; het opgebouwde recht komt altijd uit de contracten. Neem de startdatum van het lopende contract — dan splitst het dashboard het saldo in meegenomen uren en dit contractjaar. Leeg = alleen het lopende jaar.</p>
                   {editingId && <p className="text-xs text-muted-foreground">Contracten beheren via <a className="underline" href={`/personeel/${editingId}`}>Personeel</a>.</p>}
                 </>
               )}
