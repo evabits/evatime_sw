@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { canViewInvoices, canEditInvoices } from "@/lib/roles";
+import { handleError } from "@/lib/api";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -47,6 +48,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  try {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -176,7 +178,16 @@ export async function POST(req: Request) {
       where: { id: inv.id },
       include: { lines: true },
     });
+  }, {
+    // Twee queries per factuurregel, na elkaar. Sinds elke registratie een
+    // eigen regel krijgt zijn dat er tientallen tot ruim honderd, en de
+    // standaard van vijf seconden is daar niet op gebouwd. Sneuvelt de
+    // transactie halverwege, dan rolt alles terug — maar dan sta je wel met
+    // lege handen na een halve minuut wachten.
+    timeout: 30_000,
+    maxWait: 15_000,
   });
 
   return NextResponse.json(invoice, { status: 201 });
+  } catch (e) { return handleError(e); }
 }
