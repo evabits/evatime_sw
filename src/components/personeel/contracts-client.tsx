@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2, Paperclip, Copy } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { getEffectiveContract, rangeOverlaps, nextDay } from "@/lib/contracts";
 
 interface Contract {
@@ -309,7 +309,7 @@ export function ContractsClient({
                   return (
                     <TableRow key={c.id} className={isCurrent ? "bg-muted/50" : undefined}>
                       <TableCell className="font-mono text-sm whitespace-nowrap">
-                        {c.startDate ?? "—"} → {c.endDate ?? "heden"}
+                        {c.startDate ? formatDate(c.startDate) : "—"} → {c.endDate ? formatDate(c.endDate) : "heden"}
                         {isCurrent && <Badge variant="secondary" className="ml-2 text-xs">Huidig</Badge>}
                       </TableCell>
                       <TableCell>{c.jobTitle ?? <span className="text-muted-foreground">—</span>}</TableCell>
