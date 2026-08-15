@@ -292,6 +292,17 @@ export function AbsenceClient({
   const roosterTotaal = roosterInfo?.total ?? null;
 
   useEffect(() => {
+    // De meeste aanvragen gaan over één dag, dus laat de einddatum de
+    // startdatum volgen. Alleen wanneer er nog niets staat of wanneer de
+    // einddatum vóór de nieuwe startdatum ligt: een periode die je zelf hebt
+    // gekozen blijft staan.
+    if (!watchedStart) return;
+    if (!watchedEnd || watchedEnd < watchedStart) {
+      requestForm.setValue("endDate", watchedStart, { shouldValidate: false });
+    }
+  }, [watchedStart, watchedEnd, requestForm]);
+
+  useEffect(() => {
     // Met een patroon is het urenveld alleen-lezen en toont het het afgeleide
     // totaal. De werkdagentelling zou dat overschrijven zodra je een datum
     // aanraakt, en zonder een waarde in het veld komt het formulier niet langs
