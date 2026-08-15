@@ -6,6 +6,7 @@ import { AbsenceClient } from "@/components/vacation/absence-client";
 import { toWeekSchedule } from "@/lib/work-schedule";
 import {
   contractYearBalance, fillBudgets, toContractVacation, toVacationOpening, vacationBalance,
+  vacationLedger,
 } from "@/lib/vacation-budget";
 import { format } from "date-fns";
 
@@ -62,7 +63,7 @@ export default async function AbsencePage() {
     // peildatum en die kan in een eerder jaar liggen.
     prisma.absenceRequest.findMany({
       where: { ...(admin ? {} : { userId }), status: "APPROVED", type: "VACATION" },
-      select: { userId: true, startDate: true, hours: true },
+      select: { userId: true, startDate: true, endDate: true, hours: true },
     }),
     prisma.user.findMany({
       where: admin ? {} : { id: userId },
@@ -100,7 +101,11 @@ export default async function AbsencePage() {
       const eigenContracten = contracten.filter((c) => c.userId === id);
       const opnames = vakantieOpnames
         .filter((a) => a.userId === id)
-        .map((a) => ({ date: a.startDate.toISOString().slice(0, 10), hours: Number(a.hours) }));
+        .map((a) => ({
+          date: a.startDate.toISOString().slice(0, 10),
+          until: a.endDate.toISOString().slice(0, 10),
+          hours: Number(a.hours),
+        }));
       const saldo = vacationBalance(
         eigenContracten,
         budgets.filter((b) => b.userId === id).map((b) => ({ year: b.year, hours: Number(b.hours) })),
@@ -117,6 +122,25 @@ export default async function AbsencePage() {
     }),
   );
 
+  // De opsomming die het saldo verklaart, alleen voor de medewerker die je
+  // bekijkt: die van een hele afdeling meesturen is een berg data waar het
+  // scherm niets mee doet.
+  const eigenOpening = openings.get(userId) ?? null;
+  const ledger = eigenOpening
+    ? vacationLedger(
+        contracten.filter((c) => c.userId === userId),
+        vakantieOpnames
+          .filter((a) => a.userId === userId)
+          .map((a) => ({
+            date: a.startDate.toISOString().slice(0, 10),
+            until: a.endDate.toISOString().slice(0, 10),
+            hours: Number(a.hours),
+          })),
+        eigenOpening,
+        year,
+      )
+    : [];
+
   return (
     <AbsenceClient
       // toWeekSchedule maakt er null van als er geen patroon is. Zonder die
@@ -130,6 +154,7 @@ export default async function AbsencePage() {
       }))}
       initialBudgets={budgetRegels}
       saldi={saldi}
+      ledger={ledger}
       users={users}
       currentUserId={userId}
       isAdmin={admin}

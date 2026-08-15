@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  accruedVacationHours, contractVacationHours, contractYearBalance, fillBudgets,
-  proRataYearHours, toContractVacation, vacationBalance,
+  accruedBetween, accruedVacationHours, contractVacationHours, contractYearBalance, fillBudgets,
+  toContractVacation, vacationBalance, vacationLedger,
 } from "./vacation-budget";
 
 const afgerondOpCent = (n: number) => Math.round(n * 100) / 100;
@@ -49,45 +49,47 @@ describe("contractVacationHours", () => {
   });
 });
 
-describe("proRataYearHours", () => {
-  it("gives the full year to a contract that covers it", () => {
-    expect(proRataYearHours([{ startDate: "2020-01-01", endDate: null, vacationHours: 200 }], [], 2026)).toBe(200);
+describe("accruedBetween", () => {
+  it("gives a contract that runs exactly one year its own hours, leap day and all", () => {
+    // 1-9-2023 t/m 31-8-2024 bevat 29 februari. Gemeten vanaf de contractstart
+    // is dat precies één jaar, dus precies 168 uur.
+    const c = [{ startDate: "2023-09-01", endDate: "2024-08-31", vacationHours: 168 }];
+    expect(accruedBetween(c, "2023-09-01", "2027-01-01")).toBe(168);
   });
 
-  it("counts a contract that starts during the year by its days", () => {
+  it("counts a contract that started during the year by its days", () => {
     // 9 januari t/m 31 december is 357 van de 365 dagen: 168 × 357/365 = 164,32.
     const c = [{ startDate: "2026-01-09", endDate: null, vacationHours: 168 }];
-    expect(proRataYearHours(c, [], 2026)).toBe(164.32);
+    expect(accruedBetween(c, "2026-01-09", "2027-01-01")).toBe(164.32);
   });
 
-  it("counts the last day of the contract as worked", () => {
-    // Een contract dat op oudjaar afloopt heeft het hele jaar geduurd.
-    const c = [{ startDate: "2020-01-01", endDate: "2026-12-31", vacationHours: 200 }];
-    expect(proRataYearHours(c, [], 2026)).toBe(200);
+  it("gives a two-year contract twice its yearly hours", () => {
+    const c = [{ startDate: "2024-01-01", endDate: "2025-12-31", vacationHours: 168 }];
+    expect(accruedBetween(c, "2024-01-01", "2026-01-01")).toBe(336);
   });
 
-  it("adds up two contracts that split the year between them", () => {
-    // Tot en met 31 augustus is 243 dagen, daarna 122: 168×243/365 + 200×122/365.
+  it("adds up the contracts that follow each other", () => {
     const c = [
-      { startDate: "2020-01-01", endDate: "2026-08-31", vacationHours: 168 },
-      { startDate: "2026-09-01", endDate: null, vacationHours: 200 },
+      { startDate: "2023-09-01", endDate: "2024-08-31", vacationHours: 168 },
+      { startDate: "2024-09-01", endDate: "2025-08-31", vacationHours: 168 },
+      { startDate: "2025-09-01", endDate: "2026-08-31", vacationHours: 200 },
     ];
-    expect(proRataYearHours(c, [], 2026)).toBe(178.7);
+    expect(accruedBetween(c, "2023-09-01", "2027-01-01")).toBe(536);
   });
 
   it("skips a contract that says nothing about vacation hours", () => {
     const c = [{ startDate: "2020-01-01", endDate: null, vacationHours: null }];
-    expect(proRataYearHours(c, [], 2026)).toBe(0);
+    expect(accruedBetween(c, "2026-01-01", "2027-01-01")).toBe(0);
   });
 
-  it("skips a contract that does not touch the year", () => {
+  it("skips a contract that does not touch the window", () => {
     const c = [{ startDate: "2020-01-01", endDate: "2025-12-31", vacationHours: 200 }];
-    expect(proRataYearHours(c, [], 2026)).toBe(0);
+    expect(accruedBetween(c, "2026-01-01", "2027-01-01")).toBe(0);
   });
 
-  it("lets a budget row for that year replace the contracts entirely", () => {
-    const c = [{ startDate: "2026-07-01", endDate: null, vacationHours: 200 }];
-    expect(proRataYearHours(c, [{ year: 2026, hours: 144 }], 2026)).toBe(144);
+  it("gives nothing for an empty window", () => {
+    const c = [{ startDate: "2020-01-01", endDate: null, vacationHours: 200 }];
+    expect(accruedBetween(c, "2026-01-01", "2026-01-01")).toBe(0);
   });
 });
 
@@ -108,10 +110,20 @@ describe("accruedVacationHours", () => {
     expect(accruedVacationHours(vanaf2024, [], peildatum, 2026)).toBe(600);
   });
 
-  it("counts the first year by the days the contract ran", () => {
-    // 2024 telt vanaf 1 juli (184/366), 2025 en 2026 tellen heel mee.
+  it("counts the running contract year only as far as it has come", () => {
+    // Twee volle contractjaren vanaf 1 juli 2024, plus 184 van de 365 dagen
+    // van het derde: 200 + 200 + 100,82.
     const halverwege = [{ startDate: "2024-07-01", endDate: null, vacationHours: 200 }];
-    expect(accruedVacationHours(halverwege, [], peildatum, 2026)).toBe(500.55);
+    expect(accruedVacationHours(halverwege, [], peildatum, 2026)).toBe(500.82);
+  });
+
+  it("gives a career of neat one-year contracts exactly their hours", () => {
+    const perJaar = [
+      { startDate: "2023-09-01", endDate: "2024-08-31", vacationHours: 168 },
+      { startDate: "2024-09-01", endDate: "2025-08-31", vacationHours: 168 },
+      { startDate: "2025-09-01", endDate: "2026-08-31", vacationHours: 200 },
+    ];
+    expect(accruedVacationHours(perJaar, [], peildatum, 2026)).toBe(536);
   });
 
   it("stops accruing once the contract has run out", () => {
@@ -126,8 +138,9 @@ describe("accruedVacationHours", () => {
       { startDate: "2024-06-01", endDate: "2025-08-31", vacationHours: 168 },
       { startDate: "2025-09-01", endDate: "2026-08-31", vacationHours: 200 },
     ];
-    // 2023: 164,32 · 2024: 168 · 2025: 178,70 · 2026: 133,15, ongerond opgeteld.
-    expect(accruedVacationHours(loopbaan, [], peildatum, 2026)).toBe(644.16);
+    // Het eerste contract duurde ruim 16 maanden en levert daarom meer dan zijn
+    // jaarbedrag: 234,10. Het tweede 210,34, het derde precies zijn 200.
+    expect(accruedVacationHours(loopbaan, [], peildatum, 2026)).toBe(644.44);
   });
 });
 
@@ -180,9 +193,9 @@ describe("contractYearBalance", () => {
 
   it("splits the balance into what was carried over and what this contract gives", () => {
     const uitsplitsing = contractYearBalance(loopbaan, opgenomen, saldo(), opening, "2026-08-15")!;
-    // Opgebouwd t/m 31-8-2025 is 164,32 + 168 + 111,85 = 444,16; daar gaat 400
+    // Opgebouwd t/m 31-8-2025 is 234,10 + 210,34 = 444,44; daar gaat 400
     // opgenomen vanaf. Het lopende contract geeft precies zijn 200 uur.
-    expect(uitsplitsing.carriedOver).toBe(44.16);
+    expect(uitsplitsing.carriedOver).toBe(44.44);
     expect(uitsplitsing.contractTotal).toBe(200);
     expect(uitsplitsing.used).toBe(48);
     expect(uitsplitsing.endDate).toBe("2026-08-31");
@@ -204,7 +217,7 @@ describe("contractYearBalance", () => {
     const uitsplitsing = contractYearBalance(loopbaan, met, vacationBalance(loopbaan, [], met, vroeg, 2026), vroeg, "2026-08-15")!;
     // De 16 uur van maart 2025 hoort bij het vorige contract, niet bij dit.
     expect(uitsplitsing.used).toBe(48);
-    expect(uitsplitsing.carriedOver).toBe(128.16);
+    expect(uitsplitsing.carriedOver).toBe(128.44);
   });
 
   it("refuses to split when the reference date lies inside the current contract year", () => {
@@ -214,6 +227,62 @@ describe("contractYearBalance", () => {
 
   it("refuses to split when no contract is in force today", () => {
     expect(contractYearBalance(loopbaan, opgenomen, saldo(), opening, "2026-09-15")).toBeNull();
+  });
+});
+
+describe("vacationLedger", () => {
+  const perJaar = [
+    { startDate: "2023-09-01", endDate: "2024-08-31", vacationHours: 168 },
+    { startDate: "2024-09-01", endDate: "2025-08-31", vacationHours: 168 },
+    { startDate: "2025-09-01", endDate: "2026-08-31", vacationHours: 200 },
+  ];
+  const opening = { date: "2025-09-01", used: 300 };
+  const opgenomen = [{ date: "2026-07-23", until: "2026-07-31", hours: 48 }];
+
+  it("lists every contract, the manual total and each leave, in date order", () => {
+    expect(vacationLedger(perJaar, opgenomen, opening, 2026)).toEqual([
+      { kind: "contract", date: "2023-09-01", until: "2024-08-31", hours: 168 },
+      { kind: "contract", date: "2024-09-01", until: "2025-08-31", hours: 168 },
+      // Op dezelfde dag als het lopende contract, maar het gaat over de periode
+      // ervóór en staat er daarom boven.
+      { kind: "opening", date: "2025-09-01", until: null, hours: -300 },
+      { kind: "contract", date: "2025-09-01", until: "2026-08-31", hours: 200 },
+      { kind: "leave", date: "2026-07-23", until: "2026-07-31", hours: -48 },
+    ]);
+  });
+
+  it("adds up to exactly the remaining balance", () => {
+    // Dit is waar de opsomming voor bestaat: hij moet het saldo verklaren.
+    const regels = vacationLedger(perJaar, opgenomen, opening, 2026);
+    const som = afgerondOpCent(regels.reduce((s, r) => s + r.hours, 0));
+    expect(som).toBe(vacationBalance(perJaar, [], opgenomen, opening, 2026).remaining);
+  });
+
+  it("also adds up when a contract does not run a whole year", () => {
+    const scheef = [
+      { startDate: "2023-01-09", endDate: "2024-05-31", vacationHours: 168 },
+      { startDate: "2024-06-01", endDate: null, vacationHours: 168 },
+    ];
+    const regels = vacationLedger(scheef, opgenomen, opening, 2026);
+    const som = afgerondOpCent(regels.reduce((s, r) => s + r.hours, 0));
+    expect(som).toBe(vacationBalance(scheef, [], opgenomen, opening, 2026).remaining);
+  });
+
+  it("leaves out a contract that has not built up anything", () => {
+    const zonderUren = [...perJaar, { startDate: "2022-01-01", endDate: "2023-08-31", vacationHours: null }];
+    const soorten = vacationLedger(zonderUren, [], { date: "2025-09-01", used: 0 }, 2026);
+    expect(soorten).toHaveLength(3);
+    expect(soorten.every((r) => r.kind === "contract")).toBe(true);
+  });
+
+  it("leaves out leave that falls before the reference date", () => {
+    const eerder = [{ date: "2025-03-01", until: "2025-03-05", hours: 24 }, ...opgenomen];
+    const regels = vacationLedger(perJaar, eerder, opening, 2026);
+    expect(regels.filter((r) => r.kind === "leave")).toHaveLength(1);
+  });
+
+  it("gives nothing at all without a contract", () => {
+    expect(vacationLedger([], opgenomen, opening, 2026)).toEqual([]);
   });
 });
 

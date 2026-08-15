@@ -61,48 +61,64 @@ function afgerond(getal: number): number {
   return Math.round(getal * 100) / 100;
 }
 
-/**
- * Wat de contracten tussen twee datums aan vakantie-uren opbouwen. `to` valt
- * er net buiten, zoals bij elk halfopen bereik.
- *
- * De rekeneenheid is het kalenderjaar, want het contract spreekt van uren *per
- * jaar* en een jaar is 365 of 366 dagen. Daarom wordt het venster eerst per
- * jaar opgeknipt en dan pas tegen de contracten gelegd.
- */
-export function accruedBetween(contracts: ContractVacation[], from: string, to: string): number {
-  return afgerond(opbouwRuw(contracts, from, to));
-}
+const dag = (datum: string) => Date.parse(`${datum}T00:00:00Z`);
 
 /**
- * Hetzelfde, maar zonder afronding. Binnen de module wordt hier gerekend en
- * pas aan de rand afgerond: rond je elk jaar apart af, dan tellen de posten op
- * het dashboard net niet op tot het saldo op het verlofscherm.
+ * Wat één contract tussen twee datums aan vakantie-uren opbouwt. `to` valt er
+ * net buiten, zoals bij elk halfopen bereik.
+ *
+ * Het contract spreekt van uren *per jaar*, en dat jaar wordt gemeten vanaf de
+ * contractstart — niet vanaf 1 januari. Een contract dat van 1 september tot
+ * 31 augustus loopt levert daardoor exact zijn eigen uren, ook als er een
+ * schrikkeldag in valt. Een contract dat korter of langer duurt krijgt zijn
+ * evenredige deel.
+ *
+ * Zonder begindatum is er geen jubileumdatum om vanaf te meten; dan valt het
+ * terug op het kalenderjaar.
  */
-function opbouwRuw(contracts: ContractVacation[], from: string, to: string): number {
-  if (from >= to) return 0;
-  const vanaf = Date.parse(`${from}T00:00:00Z`);
-  const tot = Date.parse(`${to}T00:00:00Z`);
+function contractOpbouw(c: ContractVacation, from: string, to: string): number {
+  if (c.vacationHours == null) return 0;
+
+  const start = c.startDate ? dag(c.startDate) : -Infinity;
+  // De einddatum is de laatste dag die meetelt, dus het contract loopt tot en
+  // met de dag erna om middernacht.
+  const eind = c.endDate ? dag(c.endDate) + DAG : Infinity;
+  const vanaf = Math.max(start, dag(from));
+  const tot = Math.min(eind, dag(to));
+  if (tot <= vanaf) return 0;
+
+  const anker = c.startDate
+    ? c.startDate.split("-").map(Number)
+    : [Number(from.slice(0, 4)), 1, 1];
+  const [ankerJaar, ankerMaand, ankerDag] = anker;
 
   let totaal = 0;
-  for (let y = Number(from.slice(0, 4)); y <= Number(to.slice(0, 4)); y++) {
-    const jaarStart = Date.UTC(y, 0, 1);
-    const jaarEind = Date.UTC(y + 1, 0, 1);
+  for (let k = 0; ; k++) {
+    const jaarStart = Date.UTC(ankerJaar + k, ankerMaand - 1, ankerDag);
+    if (jaarStart >= tot) break;
+    const jaarEind = Date.UTC(ankerJaar + k + 1, ankerMaand - 1, ankerDag);
     const vensterStart = Math.max(vanaf, jaarStart);
     const vensterEind = Math.min(tot, jaarEind);
-    if (vensterEind <= vensterStart) continue;
-
-    for (const c of contracts) {
-      if (c.vacationHours == null) continue;
-      const start = c.startDate ? Date.parse(`${c.startDate}T00:00:00Z`) : -Infinity;
-      // De einddatum is de laatste dag die meetelt, dus het contract loopt tot
-      // en met de dag erna om middernacht.
-      const eind = c.endDate ? Date.parse(`${c.endDate}T00:00:00Z`) + DAG : Infinity;
-      const overlap = Math.min(eind, vensterEind) - Math.max(start, vensterStart);
-      if (overlap <= 0) continue;
-      totaal += (c.vacationHours * overlap) / (jaarEind - jaarStart);
+    if (vensterEind > vensterStart) {
+      totaal += (c.vacationHours * (vensterEind - vensterStart)) / (jaarEind - jaarStart);
     }
   }
   return totaal;
+}
+
+/**
+ * Wat alle contracten samen tussen twee datums opbouwen. Binnen de module
+ * wordt met het ongeronde getal gerekend en pas aan de rand afgerond: rond je
+ * elke post apart af, dan tellen ze net niet op tot het saldo.
+ */
+function opbouwRuw(contracts: ContractVacation[], from: string, to: string): number {
+  if (from >= to) return 0;
+  return contracts.reduce((s, c) => s + contractOpbouw(c, from, to), 0);
+}
+
+/** Wat de contracten tussen twee datums opbouwen, afgerond op honderdsten. */
+export function accruedBetween(contracts: ContractVacation[], from: string, to: string): number {
+  return afgerond(opbouwRuw(contracts, from, to));
 }
 
 /** De eerste dag waarop er een contract begint, of null als er geen enkel is. */
@@ -111,34 +127,23 @@ function eersteContractdag(contracts: ContractVacation[]): string | null {
   return starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : null;
 }
 
-/**
- * Wat de contracten over één jaar aan vakantie-uren opleveren, naar rato van de
- * dagen die ze van dat jaar beslaan. Wie in november in dienst kwam bouwt over
- * dat jaar geen heel jaar vakantie op, en een jaar waarin twee contracten
- * elkaar opvolgen levert van allebei het eigen deel.
- *
- * Een budgetrij voor dat jaar vervangt de contracten volledig: die is met de
- * hand gezet en gaat voor.
- */
-export function proRataYearHours(
-  contracts: ContractVacation[],
-  budgets: Array<{ year: number; hours: number }>,
-  year: number,
-): number {
-  const rij = budgets.find((b) => b.year === year);
-  if (rij) return rij.hours;
-  return accruedBetween(contracts, `${year}-01-01`, `${year + 1}-01-01`);
+/** De horizon van de opbouw: t/m het eind van `year`. */
+function opbouwTot(year: number): string {
+  return `${year + 1}-01-01`;
 }
 
 /**
- * Het vakantierecht dat iemand t/m `year` heeft opgebouwd: elk jaar vanaf zijn
- * eerste contract, naar rato van de contractdagen. Een jaar zonder contract
- * levert vanzelf nul op, zodat de opbouw stopt zodra iemand uit dienst is.
+ * Het vakantierecht dat iemand t/m `year` heeft opgebouwd: alles wat zijn
+ * contracten sinds de eerste contractdag hebben opgeleverd. Een periode zonder
+ * contract levert vanzelf nul op, zodat de opbouw stopt zodra iemand uit
+ * dienst is.
  *
- * Zonder peildatum blijft het bij het recht van het lopende jaar, zoals het
- * altijd was. De opbouw over eerdere jaren zegt namelijk niets zolang er geen
- * getal tegenover staat voor wat er in die jaren is opgenomen — en dat getal
- * is precies wat de peildatum meebrengt.
+ * Met een peildatum bepalen de contracten de opbouw en telt een handmatige
+ * budgetrij niet mee: die gaat over een kalenderjaar en dat is dan niet meer de
+ * eenheid. Zonder peildatum blijft alles zoals het was — het recht van het
+ * lopende jaar, waarbij een budgetrij wél voorgaat. De opbouw over eerdere
+ * jaren zegt namelijk niets zolang er geen getal tegenover staat voor wat er in
+ * die jaren is opgenomen, en dat getal is precies wat de peildatum meebrengt.
  */
 export function accruedVacationHours(
   contracts: ContractVacation[],
@@ -152,14 +157,8 @@ export function accruedVacationHours(
   }
 
   const eerste = eersteContractdag(contracts);
-  const eersteJaar = eerste ? Math.min(Number(eerste.slice(0, 4)), year) : year;
-
-  let totaal = 0;
-  for (let y = eersteJaar; y <= year; y++) {
-    const rij = budgets.find((b) => b.year === y);
-    totaal += rij ? rij.hours : opbouwRuw(contracts, `${y}-01-01`, `${y + 1}-01-01`);
-  }
-  return afgerond(totaal);
+  if (!eerste) return 0;
+  return afgerond(opbouwRuw(contracts, eerste, opbouwTot(year)));
 }
 
 /**
@@ -269,6 +268,63 @@ export function contractYearBalance(
     remaining: balance.remaining,
     endDate: huidig.endDate,
   };
+}
+
+/**
+ * Eén regel uit de opsomming die het saldo verklaart. De tekst wordt in het
+ * scherm gemaakt; hier staat alleen wat voor soort mutatie het is, waar hij bij
+ * hoort en hoeveel uur hij optelt of aftrekt.
+ */
+export type VacationLedgerLine = {
+  kind: "contract" | "opening" | "leave";
+  /** Begin van de periode; hier wordt ook chronologisch op gesorteerd. */
+  date: string;
+  /** Eind van de periode, of null bij een contract zonder einddatum. */
+  until: string | null;
+  hours: number;
+};
+
+/**
+ * Alle mutaties die samen het saldo vormen, op volgorde van datum: wat elk
+ * contract opbouwt, het handmatig ingevulde totaal van vóór de peildatum, en
+ * elke goedgekeurde vakantie daarna.
+ *
+ * De regels tellen op tot `vacationBalance(...).remaining` — daar is de
+ * opsomming voor. Contracten die niets bijdragen blijven weg; een regel van nul
+ * uur verklaart niets.
+ */
+export function vacationLedger(
+  contracts: ContractVacation[],
+  approved: Array<{ date: string; until?: string | null; hours: number }>,
+  opening: VacationOpening,
+  year: number,
+): VacationLedgerLine[] {
+  const eerste = eersteContractdag(contracts);
+  if (!eerste) return [];
+  const tot = opbouwTot(year);
+
+  const regels: VacationLedgerLine[] = [];
+  for (const c of contracts) {
+    const uren = afgerond(contractOpbouw(c, eerste, tot));
+    if (uren === 0) continue;
+    regels.push({ kind: "contract", date: c.startDate ?? eerste, until: c.endDate, hours: uren });
+  }
+
+  if (opening.used !== 0) {
+    regels.push({ kind: "opening", date: opening.date, until: null, hours: -opening.used });
+  }
+
+  for (const a of approved) {
+    if (a.date < opening.date || a.date > `${year}-12-31`) continue;
+    regels.push({ kind: "leave", date: a.date, until: a.until ?? null, hours: -a.hours });
+  }
+
+  // Valt de peildatum samen met een contractstart — en dat hoort zo — dan komt
+  // het handmatige totaal eerst: het vat de periode ervóór samen.
+  const volgorde = { opening: 0, contract: 1, leave: 2 };
+  return regels.sort(
+    (a, b) => a.date.localeCompare(b.date) || volgorde[a.kind] - volgorde[b.kind],
+  );
 }
 
 /**

@@ -92,10 +92,19 @@ interface Saldo {
   } | null;
 }
 
+// Eén mutatie uit de opsomming die het saldo verklaart.
+interface LedgerLine {
+  kind: "contract" | "opening" | "leave";
+  date: string;
+  until: string | null;
+  hours: number;
+}
+
 interface Props {
   initialRequests: AbsenceRequest[];
   initialBudgets: VacationBudget[];
   saldi: Record<string, Saldo>;
+  ledger: LedgerLine[];
   users: User[];
   currentUserId: string;
   isAdmin: boolean;
@@ -104,6 +113,18 @@ interface Props {
   weeklyHours: number;
   // Het weekrooster per gebruikers-id. Wie er geen heeft staat er niet in.
   schedules: Record<string, WeekSchedule>;
+}
+
+/** Het opschrift bij een regel uit de opsomming. */
+function ledgerLabel(r: LedgerLine): string {
+  if (r.kind === "contract") {
+    return `Contract ${formatDate(r.date)} t/m ${r.until ? formatDate(r.until) : "heden"}`;
+  }
+  if (r.kind === "opening") {
+    return `Opgenomen vóór ${formatDate(r.date)}, buiten EVAtime`;
+  }
+  const periode = r.until && r.until !== r.date ? ` t/m ${formatDate(r.until)}` : "";
+  return `Vakantie ${formatDate(r.date)}${periode}`;
 }
 
 function countWorkingHours(startStr: string, endStr: string, weeklyHours: number): number {
@@ -166,6 +187,7 @@ export function AbsenceClient({
   initialRequests,
   initialBudgets,
   saldi,
+  ledger,
   users,
   currentUserId,
   isAdmin,
@@ -534,6 +556,34 @@ export function AbsenceClient({
           </CardContent>
         </Card>
       </div>
+
+      {ledger.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Opbouw en opnames</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <tbody>
+                {ledger.map((r, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{ledgerLabel(r)}</td>
+                    <td className={`py-2 text-right tabular-nums whitespace-nowrap ${r.hours < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                      {r.hours > 0 ? "+" : ""}{r.hours}u
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t-2">
+                  <td className="py-2 pr-4 font-medium">Resterend</td>
+                  <td className="py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                    {Math.round(ledger.reduce((s, r) => s + r.hours, 0) * 100) / 100}u
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {isAdmin ? (
         <div>
