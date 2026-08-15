@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { canViewInvoices, canEditInvoices } from "@/lib/roles";
 import { handleError } from "@/lib/api";
+import { receiptAttachments } from "@/lib/receipt-attachments";
+import { head } from "@vercel/blob";
 
 const lineSchema = z.object({
   description: z.string().min(1),
@@ -187,6 +189,44 @@ export async function POST(req: Request) {
     timeout: 30_000,
     maxWait: 15_000,
   });
+
+  // De bonnetjes van de gefactureerde uitgaven als bijlage, buiten de
+  // transactie. Een bijlage die misgaat mag geen factuur laten sneuvelen die
+  // verder klopt — dan hang je hem met de hand alsnog aan.
+  //
+  // De bijlage wijst naar hetzelfde bestand als het bonnetje. Dat mag omdat een
+  // gefactureerde uitgave niet meer te wijzigen is; de verwijderroute van
+  // bijlagen weet dat het bestand dan van twee kanten wordt gebruikt.
+  if (expenseIds.length > 0) {
+    try {
+      const bonnen = await prisma.expense.findMany({
+        where: { id: { in: expenseIds }, receiptUrl: { not: null } },
+        select: { receiptUrl: true },
+      });
+      const bijlagen = receiptAttachments(bonnen);
+      if (bijlagen.length > 0) {
+        // De grootte staat niet bij de uitgave, en de factuurpagina toont hem
+        // wel. Opvragen bij de opslag dus, en anders nul — een bijlage die er
+        // is met een onbekende grootte is beter dan geen bijlage.
+        const metGrootte = await Promise.all(
+          bijlagen.map(async (b) => ({
+            ...b,
+            size: await head(b.url).then((m) => m.size).catch(() => 0),
+          })),
+        );
+        await prisma.invoiceAttachment.createMany({
+          data: metGrootte.map((b) => ({
+            invoiceId: invoice.id,
+            filename: b.filename,
+            url: b.url,
+            size: b.size,
+          })),
+        });
+      }
+    } catch (e) {
+      console.error("Bonnetjes koppelen aan factuur mislukt", e);
+    }
+  }
 
   return NextResponse.json(invoice, { status: 201 });
   } catch (e) { return handleError(e); }

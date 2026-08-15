@@ -16,7 +16,12 @@ export async function DELETE(
     const attachment = await prisma.invoiceAttachment.findUnique({ where: { id: attachmentId } });
     if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await del(attachment.url);
+    // Een bijlage die uit een uitgave komt wijst naar hetzelfde bestand als
+    // het bonnetje daar. Het bestand wissen zou dat bonnetje meenemen, en dan
+    // is een uitgave zijn bewijs kwijt door een handeling op een heel ander
+    // scherm. Alleen wissen als niemand er meer naar wijst.
+    const nogInGebruik = await prisma.expense.count({ where: { receiptUrl: attachment.url } });
+    if (nogInGebruik === 0) await del(attachment.url);
     await prisma.invoiceAttachment.delete({ where: { id: attachmentId } });
 
     return NextResponse.json({ success: true });
