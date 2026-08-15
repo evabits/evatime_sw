@@ -130,7 +130,7 @@ export function Sidebar({ user, role }: SidebarProps) {
         </button>
         <Image
           src="/logo.png"
-          alt="EvaTime"
+          alt="EVAtime"
           width={100}
           height={34}
           className="object-contain dark:brightness-0 dark:invert"
@@ -156,7 +156,7 @@ export function Sidebar({ user, role }: SidebarProps) {
         <div className="p-5 border-b flex items-center justify-between">
           <Image
             src="/logo.png"
-            alt="EvaTime"
+            alt="EVAtime"
             width={110}
             height={37}
             className="object-contain dark:brightness-0 dark:invert"

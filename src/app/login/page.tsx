@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-primary">EvaTime</CardTitle>
+          <CardTitle className="text-2xl text-primary">EVAtime</CardTitle>
           <CardDescription>Log in op uw account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -69,10 +69,10 @@ export async function GET(req: Request) {
     const calendar = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//EvaTime//Vakantiekalender//NL",
+      "PRODID:-//EVAtime//Vakantiekalender//NL",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:EvaTime Vakanties",
+      "X-WR-CALNAME:EVAtime Vakanties",
       events,
       "END:VCALENDAR",
     ]
