@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { resolveHourRate } from "@/lib/rates";
 import { isBillable } from "@/lib/billable";
-import { expenseInvoiceLines, groupHourEntriesForInvoice, groupKmEntriesForInvoice } from "@/lib/invoice-lines";
+import { expenseInvoiceLines, hourInvoiceLines, kmInvoiceLines } from "@/lib/invoice-lines";
 import { kmRate } from "@/lib/report-totals";
 import { resolvePeriod } from "@/lib/periods";
 import { splitInvoicePeriod } from "@/lib/invoice-period";
@@ -205,18 +205,14 @@ export function NewInvoiceClient({ customers }: Props) {
     const newLines: InvoiceLine[] = [];
 
     const selectedTime = zichtbaarTijd.filter((e) => selectedTimeIds.has(e.id));
-    // Groepeert de geselecteerde urenregels tot factuurregels: één regel per
-    // project + tarief + werkniveau. Zie invoice-lines.ts voor waarom de
-    // sleutel op project-id (niet -naam) en niveau steunt.
-    for (const line of groupHourEntriesForInvoice(selectedTime)) {
+    // Eén regel per registratie, op datum en naam. Zie invoice-lines.ts.
+    for (const line of hourInvoiceLines(selectedTime)) {
       newLines.push({ ...line, lineType: "HOURS" });
     }
 
     const selectedKm = zichtbaarKm.filter((e) => selectedKmIds.has(e.id));
-    // Eén regel per tarief. Alles onder het tarief van de eerste selectie
-    // scharen factureerde bij twee projecten met verschillende kilometer-
-    // tarieven stilzwijgend te weinig.
-    for (const line of groupKmEntriesForInvoice(selectedKm)) {
+    // Ook per rit, met dezelfde opbouw als de uren.
+    for (const line of kmInvoiceLines(selectedKm)) {
       newLines.push({ ...line, lineType: "KM" });
     }
 
