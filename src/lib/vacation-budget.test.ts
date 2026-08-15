@@ -120,6 +120,13 @@ describe("vacationBalance", () => {
     });
   });
 
+  it("leaves out vacation that is already booked for next year", () => {
+    // Dat recht wordt pas volgend jaar opgebouwd, dus het hoort er nu ook niet
+    // vanaf te gaan.
+    const volgendJaar = [...opgenomen, { date: "2027-02-01", hours: 24 }];
+    expect(vacationBalance(contract, [], volgendJaar, null, 2026).used).toBe(56);
+  });
+
   it("counts what was taken on the reference date itself", () => {
     const opening = { date: "2026-03-10", hours: 0 };
     expect(vacationBalance(contract, [], opgenomen, opening, 2026).used).toBe(56);

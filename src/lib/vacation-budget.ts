@@ -126,8 +126,11 @@ export type VacationBalance = { entitled: number; used: number; remaining: numbe
 
 /**
  * Het vakantiesaldo van één medewerker: wat hij heeft opgebouwd, wat hij ervan
- * heeft opgenomen en wat er overblijft. Beide kanten tellen vanaf dezelfde
- * datum, anders trek je opgenomen uren af van een recht dat ze niet dekt.
+ * heeft opgenomen en wat er overblijft.
+ *
+ * Beide kanten beslaan hetzelfde venster — vanaf de peildatum t/m het eind van
+ * `year`. Anders zou vakantie die al voor volgend jaar is vastgelegd worden
+ * afgetrokken van een recht dat pas volgend jaar wordt opgebouwd.
  */
 export function vacationBalance(
   contracts: ContractVacation[],
@@ -137,8 +140,11 @@ export function vacationBalance(
   year: number,
 ): VacationBalance {
   const vanaf = vacationCountFrom(opening, year);
+  const tot = `${year}-12-31`;
   const entitled = accruedVacationHours(contracts, budgets, opening, year);
-  const used = approved.filter((a) => a.date >= vanaf).reduce((s, a) => s + a.hours, 0);
+  const used = approved
+    .filter((a) => a.date >= vanaf && a.date <= tot)
+    .reduce((s, a) => s + a.hours, 0);
   return { entitled, used, remaining: Math.round((entitled - used) * 100) / 100 };
 }
 

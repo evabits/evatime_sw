@@ -751,7 +751,7 @@ export function AbsenceClient({
                   Rooster: {roosterInfo.entries.length} dagen, {roosterInfo.total.toFixed(2)} uur in totaal
                 </p>
               )}
-              {balanceAfterRequest !== null && saldi[doelMedewerkerId] !== undefined && dialogRequestedHours > 0 && (
+              {balanceAfterRequest !== null && doelBudgetHours > 0 && dialogRequestedHours > 0 && (
                 <p className={`text-xs mt-1 ${balanceAfterRequest < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"}`}>
                   Saldo na aanvraag: {balanceAfterRequest}u (van {doelBudgetHours}u budget)
                 </p>
