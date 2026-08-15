@@ -12,12 +12,17 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
+      vacationOpeningDate: true, vacationOpeningHours: true,
       createdAt: true, archivedAt: true,
     },
   });
   const users = rawUsers.map((u) => ({
     ...u,
     weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null,
+    vacationOpeningDate: u.vacationOpeningDate
+      ? u.vacationOpeningDate.toISOString().slice(0, 10)
+      : null,
+    vacationOpeningHours: u.vacationOpeningHours != null ? Number(u.vacationOpeningHours) : null,
     createdAt: u.createdAt.toISOString(),
     archivedAt: u.archivedAt ? u.archivedAt.toISOString() : null,
   }));

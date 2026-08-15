@@ -19,6 +19,7 @@ const createSchema = z.object({
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
+  vacationOpeningDate: true, vacationOpeningHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -26,6 +27,10 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
   return {
     ...u,
     weeklyHours: u.weeklyHours != null ? Number(u.weeklyHours) : null,
+    vacationOpeningDate: u.vacationOpeningDate
+      ? u.vacationOpeningDate.toISOString().slice(0, 10)
+      : null,
+    vacationOpeningHours: u.vacationOpeningHours != null ? Number(u.vacationOpeningHours) : null,
   };
 }
 

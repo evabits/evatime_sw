@@ -100,6 +100,35 @@ export function accruedVacationHours(
 }
 
 /**
+ * De datum vanaf wanneer er geteld wordt: de peildatum van het beginsaldo, of
+ * anders 1 januari van het lopende jaar. Alles ervóór zit in het beginsaldo of
+ * valt buiten het jaar.
+ */
+export function vacationCountFrom(opening: VacationOpening | null, year: number): string {
+  return opening ? opening.date : `${year}-01-01`;
+}
+
+export type VacationBalance = { entitled: number; used: number; remaining: number };
+
+/**
+ * Het vakantiesaldo van één medewerker: wat hij heeft opgebouwd, wat hij ervan
+ * heeft opgenomen en wat er overblijft. Beide kanten tellen vanaf dezelfde
+ * datum, anders trek je opgenomen uren af van een recht dat ze niet dekt.
+ */
+export function vacationBalance(
+  contracts: ContractVacation[],
+  budgets: Array<{ year: number; hours: number }>,
+  approved: Array<{ date: string; hours: number }>,
+  opening: VacationOpening | null,
+  year: number,
+): VacationBalance {
+  const vanaf = vacationCountFrom(opening, year);
+  const entitled = accruedVacationHours(contracts, budgets, opening, year);
+  const used = approved.filter((a) => a.date >= vanaf).reduce((s, a) => s + a.hours, 0);
+  return { entitled, used, remaining: Math.round((entitled - used) * 100) / 100 };
+}
+
+/**
  * De budgetlijst aangevuld met wat de contracten opleveren.
  *
  * Een bestaande rij blijft ongemoeid — die is met de hand gezet en gaat vóór

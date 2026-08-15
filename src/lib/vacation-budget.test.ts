@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { accruedVacationHours, contractVacationHours, fillBudgets, toContractVacation } from "./vacation-budget";
+import { accruedVacationHours, contractVacationHours, fillBudgets, toContractVacation, vacationBalance } from "./vacation-budget";
 
 const lopend = { startDate: "2020-01-01", endDate: null, vacationHours: 160 };
 
@@ -96,6 +96,33 @@ describe("accruedVacationHours", () => {
     // beginsaldo staat er wel, want dat is wat hij meeneemt.
     const opening = { date: "2027-01-01", hours: 40 };
     expect(accruedVacationHours(contract, [], opening, 2026)).toBe(40);
+  });
+});
+
+describe("vacationBalance", () => {
+  const contract = [{ startDate: "2020-01-01", endDate: null, vacationHours: 200 }];
+  const opgenomen = [
+    { date: "2026-03-10", hours: 8 },
+    { date: "2026-07-23", hours: 48 },
+  ];
+
+  it("counts only this year without an opening balance", () => {
+    expect(vacationBalance(contract, [], opgenomen, null, 2026)).toEqual({
+      entitled: 200, used: 56, remaining: 144,
+    });
+  });
+
+  it("ignores what was taken before the reference date", () => {
+    // De 8 uur van maart zit al in het beginsaldo verwerkt.
+    const opening = { date: "2026-07-01", hours: 40 };
+    expect(vacationBalance(contract, [], opgenomen, opening, 2026)).toEqual({
+      entitled: 140.82, used: 48, remaining: 92.82,
+    });
+  });
+
+  it("counts what was taken on the reference date itself", () => {
+    const opening = { date: "2026-03-10", hours: 0 };
+    expect(vacationBalance(contract, [], opgenomen, opening, 2026).used).toBe(56);
   });
 });
 

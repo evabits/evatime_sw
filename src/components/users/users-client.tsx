@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { weeklyHoursField, workLevelField } from "@/lib/user-schema";
+import {
+  vacationOpeningDateField, vacationOpeningHoursField, weeklyHoursField, workLevelField,
+} from "@/lib/user-schema";
 import { WORK_LEVEL_ORDER, WORK_LEVEL_LABELS } from "@/lib/work-levels";
 import { getRoleLabel } from "@/lib/roles";
 
@@ -33,6 +35,8 @@ const editSchema = z.object({
   password: z.string().min(8, "Minimaal 8 tekens").optional().or(z.literal("")),
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,
+  vacationOpeningDate: vacationOpeningDateField,
+  vacationOpeningHours: vacationOpeningHoursField,
 });
 
 type CreateData = z.infer<typeof createSchema>;
@@ -45,6 +49,8 @@ interface User {
   role: "ADMIN" | "FINANCE" | "TEAMLEAD" | "EMPLOYEE";
   weeklyHours: number | null;
   workLevel: string | null;
+  vacationOpeningDate: string | null;
+  vacationOpeningHours: number | null;
   createdAt: string;
   archivedAt?: string | null;
 }
@@ -83,6 +89,8 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
       name: user.name, email: user.email, role: user.role, password: "",
       weeklyHours: user.weeklyHours ?? undefined,
       workLevel: user.workLevel ?? undefined,
+      vacationOpeningDate: user.vacationOpeningDate ?? undefined,
+      vacationOpeningHours: user.vacationOpeningHours ?? undefined,
     });
     setServerError("");
     setDialogOpen(true);
@@ -295,6 +303,19 @@ export function UsersClient({ initialUsers, currentUserId, isAdmin }: Props) {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Vakantiesaldo op</Label>
+                      <Input type="date" {...editForm.register("vacationOpeningDate")} />
+                      {editForm.formState.errors.vacationOpeningDate && <p className="text-xs text-destructive">{editForm.formState.errors.vacationOpeningDate.message}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Saldo (uren)</Label>
+                      <Input type="number" step="0.5" placeholder="bijv. 120" {...editForm.register("vacationOpeningHours")} />
+                      {editForm.formState.errors.vacationOpeningHours && <p className="text-xs text-destructive">{editForm.formState.errors.vacationOpeningHours.message}</p>}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Het saldo dat op die datum nog openstond. Vanaf dan telt EVAtime er het recht uit de contracten bij op en trekt de goedgekeurde vakantie eraf. Leeg = alleen het recht van het lopende jaar.</p>
                   {editingId && <p className="text-xs text-muted-foreground">Contracten beheren via <a className="underline" href={`/personeel/${editingId}`}>Personeel</a>.</p>}
                 </>
               )}
