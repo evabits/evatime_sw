@@ -62,6 +62,56 @@ function afgerond(getal: number): number {
 }
 
 /**
+ * Wat de contracten tussen twee datums aan vakantie-uren opbouwen. `to` valt
+ * er net buiten, zoals bij elk halfopen bereik.
+ *
+ * De rekeneenheid is het kalenderjaar, want het contract spreekt van uren *per
+ * jaar* en een jaar is 365 of 366 dagen. Daarom wordt het venster eerst per
+ * jaar opgeknipt en dan pas tegen de contracten gelegd.
+ */
+export function accruedBetween(contracts: ContractVacation[], from: string, to: string): number {
+  return afgerond(opbouwRuw(contracts, from, to));
+}
+
+/**
+ * Hetzelfde, maar zonder afronding. Binnen de module wordt hier gerekend en
+ * pas aan de rand afgerond: rond je elk jaar apart af, dan tellen de posten op
+ * het dashboard net niet op tot het saldo op het verlofscherm.
+ */
+function opbouwRuw(contracts: ContractVacation[], from: string, to: string): number {
+  if (from >= to) return 0;
+  const vanaf = Date.parse(`${from}T00:00:00Z`);
+  const tot = Date.parse(`${to}T00:00:00Z`);
+
+  let totaal = 0;
+  for (let y = Number(from.slice(0, 4)); y <= Number(to.slice(0, 4)); y++) {
+    const jaarStart = Date.UTC(y, 0, 1);
+    const jaarEind = Date.UTC(y + 1, 0, 1);
+    const vensterStart = Math.max(vanaf, jaarStart);
+    const vensterEind = Math.min(tot, jaarEind);
+    if (vensterEind <= vensterStart) continue;
+
+    for (const c of contracts) {
+      if (c.vacationHours == null) continue;
+      const start = c.startDate ? Date.parse(`${c.startDate}T00:00:00Z`) : -Infinity;
+      // De einddatum is de laatste dag die meetelt, dus het contract loopt tot
+      // en met de dag erna om middernacht.
+      const eind = c.endDate ? Date.parse(`${c.endDate}T00:00:00Z`) + DAG : Infinity;
+      const overlap = Math.min(eind, vensterEind) - Math.max(start, vensterStart);
+      if (overlap <= 0) continue;
+      totaal += (c.vacationHours * overlap) / (jaarEind - jaarStart);
+    }
+  }
+  return totaal;
+}
+
+/** De eerste dag waarop er een contract begint, of null als er geen enkel is. */
+function eersteContractdag(contracts: ContractVacation[]): string | null {
+  const starts = contracts.map((c) => c.startDate).filter((d): d is string => d != null);
+  return starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : null;
+}
+
+/**
  * Wat de contracten over één jaar aan vakantie-uren opleveren, naar rato van de
  * dagen die ze van dat jaar beslaan. Wie in november in dienst kwam bouwt over
  * dat jaar geen heel jaar vakantie op, en een jaar waarin twee contracten
@@ -77,21 +127,7 @@ export function proRataYearHours(
 ): number {
   const rij = budgets.find((b) => b.year === year);
   if (rij) return rij.hours;
-
-  const jaarStart = Date.UTC(year, 0, 1);
-  const jaarEind = Date.UTC(year + 1, 0, 1);
-  let totaal = 0;
-  for (const c of contracts) {
-    if (c.vacationHours == null) continue;
-    const start = c.startDate ? Date.parse(`${c.startDate}T00:00:00Z`) : -Infinity;
-    // De einddatum is de laatste dag die meetelt, dus het contract loopt tot
-    // en met de dag erna om middernacht.
-    const eind = c.endDate ? Date.parse(`${c.endDate}T00:00:00Z`) + DAG : Infinity;
-    const overlap = Math.min(eind, jaarEind) - Math.max(start, jaarStart);
-    if (overlap <= 0) continue;
-    totaal += (c.vacationHours * overlap) / (jaarEind - jaarStart);
-  }
-  return afgerond(totaal);
+  return accruedBetween(contracts, `${year}-01-01`, `${year + 1}-01-01`);
 }
 
 /**
@@ -115,13 +151,14 @@ export function accruedVacationHours(
     return rij ? rij.hours : (contractVacationHours(contracts, year) ?? 0);
   }
 
-  const jaren = contracts
-    .map((c) => (c.startDate ? Number(c.startDate.slice(0, 4)) : year))
-    .filter((y) => y <= year);
-  const eersteJaar = jaren.length ? Math.min(...jaren) : year;
+  const eerste = eersteContractdag(contracts);
+  const eersteJaar = eerste ? Math.min(Number(eerste.slice(0, 4)), year) : year;
 
   let totaal = 0;
-  for (let y = eersteJaar; y <= year; y++) totaal += proRataYearHours(contracts, budgets, y);
+  for (let y = eersteJaar; y <= year; y++) {
+    const rij = budgets.find((b) => b.year === y);
+    totaal += rij ? rij.hours : opbouwRuw(contracts, `${y}-01-01`, `${y + 1}-01-01`);
+  }
   return afgerond(totaal);
 }
 
@@ -173,6 +210,65 @@ export function vacationBalance(
       approved.filter((a) => a.date >= vanaf && a.date <= tot).reduce((s, a) => s + a.hours, 0),
   );
   return { entitled, used, remaining: afgerond(entitled - used) };
+}
+
+/**
+ * Het saldo uitgesplitst naar het lopende contractjaar: wat er uit de vorige
+ * contracten is meegenomen, wat dit contract erbij geeft, wat er sinds de
+ * contractstart is opgenomen en wat er tot de einddatum overblijft.
+ */
+export type ContractYearBalance = {
+  carriedOver: number;
+  contractTotal: number;
+  used: number;
+  remaining: number;
+  endDate: string | null;
+};
+
+/**
+ * De uitsplitsing hierboven, of null wanneer ze niet te maken is.
+ *
+ * Het `remaining` dat eruit komt is per constructie hetzelfde getal als
+ * `balance.remaining`; de drie posten erboven verdelen dat alleen. Daarom komt
+ * `contractTotal` uit het verschil en niet rechtstreeks uit het contract: zo
+ * kan een handmatige budgetrij het totaal niet stiekem laten afwijken van wat
+ * het verlofscherm toont.
+ *
+ * Splitsen lukt niet als er vandaag geen contract loopt, als dat contract geen
+ * begindatum heeft, of als de peildatum ná de contractstart ligt — dan valt een
+ * deel van het lopende contractjaar in het handmatig ingevulde totaal en is de
+ * grens niet meer te trekken.
+ */
+export function contractYearBalance(
+  contracts: ContractVacation[],
+  approved: Array<{ date: string; hours: number }>,
+  balance: VacationBalance,
+  opening: VacationOpening,
+  today: string,
+): ContractYearBalance | null {
+  const huidig = getEffectiveContract(contracts, today);
+  if (!huidig?.startDate || opening.date > huidig.startDate) return null;
+
+  const eerste = eersteContractdag(contracts);
+  if (!eerste) return null;
+
+  // Alles wat vóór dit contract is opgenomen: het handmatige totaal, plus wat
+  // er tussen de peildatum en de contractstart alsnog is geregistreerd.
+  const opgenomenDavoor = afgerond(
+    opening.used +
+      approved
+        .filter((a) => a.date >= opening.date && a.date < huidig.startDate!)
+        .reduce((s, a) => s + a.hours, 0),
+  );
+  const opgebouwdDavoor = opbouwRuw(contracts, eerste, huidig.startDate);
+
+  return {
+    carriedOver: afgerond(opgebouwdDavoor - opgenomenDavoor),
+    contractTotal: afgerond(balance.entitled - opgebouwdDavoor),
+    used: afgerond(balance.used - opgenomenDavoor),
+    remaining: balance.remaining,
+    endDate: huidig.endDate,
+  };
 }
 
 /**
