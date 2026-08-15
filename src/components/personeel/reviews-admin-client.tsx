@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -331,7 +332,7 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
                         {STATUS_LABELS[r.status] ?? r.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{r.plannedDate ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-sm">{r.plannedDate ? formatDate(r.plannedDate) : <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell className="text-sm">{r.reviewer?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
