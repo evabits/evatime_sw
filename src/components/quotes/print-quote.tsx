@@ -1,10 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { formatCurrency } from "@/lib/utils";
-
-function fmt(date: string) {
-  return new Date(date).toLocaleDateString("nl-NL");
-}
+import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 interface Props {
   quote: any;

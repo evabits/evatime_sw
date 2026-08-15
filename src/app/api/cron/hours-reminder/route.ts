@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { sendHoursReminderEmail } from "@/lib/email";
 import { startOfWeek, endOfWeek } from "date-fns";
 import { targetSoFar, weekTotal, toWeekSchedule } from "@/lib/work-schedule";
+import { formatDate } from "@/lib/utils";
 
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -49,8 +50,7 @@ export async function GET(req: Request) {
 
   const settings = await prisma.companySettings.findFirst();
 
-  const weekLabel = weekStart.toLocaleDateString("nl-NL", { day: "numeric", month: "long" }) +
-    " – " + weekEnd.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+  const weekLabel = `${formatDate(weekStart)} – ${formatDate(weekEnd)}`;
 
   let reminded = 0;
   for (const user of users) {

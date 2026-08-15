@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDate, formatWeekday } from "@/lib/utils";
 
 interface Note {
   id: string;
@@ -21,13 +22,7 @@ export function MyStandupNotes({ notes }: { notes: Note[] }) {
           notes.map((n) => (
             <div key={n.id} className="text-sm">
               <span className="block text-xs text-muted-foreground">
-                {new Date(`${n.date}T00:00:00Z`).toLocaleDateString("nl-NL", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
+                {formatWeekday(n.date)} {formatDate(n.date)}
               </span>
               {n.note}
             </div>

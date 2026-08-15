@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, Eye, Mail, Paperclip, Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -325,8 +325,8 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
 
           {(quote.sentAt || quote.approvedAt) && (
             <div className="mt-4 flex flex-wrap gap-4 border-t pt-4 text-xs text-muted-foreground">
-              {quote.sentAt && <span>Verzonden: {new Date(quote.sentAt).toLocaleString("nl-NL")}</span>}
-              {quote.approvedAt && <span>Goedgekeurd: {new Date(quote.approvedAt).toLocaleString("nl-NL")}</span>}
+              {quote.sentAt && <span>Verzonden: {formatDateTime(quote.sentAt)}</span>}
+              {quote.approvedAt && <span>Goedgekeurd: {formatDateTime(quote.approvedAt)}</span>}
             </div>
           )}
         </CardContent>

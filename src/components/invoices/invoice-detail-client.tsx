@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
@@ -419,10 +419,10 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
           {(invoice.sentAt || invoice.reminderSentAt) && (
             <div className="mt-4 flex flex-wrap gap-4 border-t pt-4 text-xs text-muted-foreground">
               {invoice.sentAt && (
-                <span>Verzonden: {new Date(invoice.sentAt).toLocaleString("nl-NL")}</span>
+                <span>Verzonden: {formatDateTime(invoice.sentAt)}</span>
               )}
               {invoice.reminderSentAt && (
-                <span>Herinnering: {new Date(invoice.reminderSentAt).toLocaleString("nl-NL")}</span>
+                <span>Herinnering: {formatDateTime(invoice.reminderSentAt)}</span>
               )}
             </div>
           )}
