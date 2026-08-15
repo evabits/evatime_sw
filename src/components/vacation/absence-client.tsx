@@ -82,6 +82,14 @@ interface Saldo {
   used: number;
   remaining: number;
   since: string | null;
+  // Hetzelfde saldo uitgesplitst naar het lopende contractjaar, of null als
+  // die grens niet te trekken is. `remaining` is er per constructie gelijk aan.
+  contractJaar: {
+    carriedOver: number;
+    contractTotal: number;
+    used: number;
+    endDate: string | null;
+  } | null;
 }
 
 interface Props {
@@ -202,13 +210,14 @@ export function AbsenceClient({
   // My vacation balance (only VACATION type counts against budget). Komt van
   // de server, want vanaf een peildatum in een eerder jaar telt er meer mee dan
   // de lijst hierboven bevat.
-  const LEEG_SALDO: Saldo = { entitled: 0, used: 0, remaining: 0, since: null };
+  const LEEG_SALDO: Saldo = { entitled: 0, used: 0, remaining: 0, since: null, contractJaar: null };
   const mySaldo = saldi[currentUserId] ?? LEEG_SALDO;
-  const myApprovedVacation = mySaldo.used;
+  const myContractJaar = mySaldo.contractJaar;
+  const myApprovedVacation = myContractJaar ? myContractJaar.used : mySaldo.used;
   const myPendingVacation = requests
     .filter((r) => r.userId === currentUserId && r.status === "PENDING" && r.type === "VACATION")
     .reduce((s, r) => s + r.hours, 0);
-  const myBudgetHours = mySaldo.entitled;
+  const myBudgetHours = myContractJaar ? myContractJaar.carriedOver : mySaldo.entitled;
   const myRemaining = mySaldo.remaining;
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
@@ -219,7 +228,12 @@ export function AbsenceClient({
   // saldo in plaats van dat van de collega.
   const doelMedewerkerId = editingRequest?.userId ?? gekozenMedewerker ?? currentUserId;
   const doelSaldo = saldi[doelMedewerkerId] ?? LEEG_SALDO;
-  const doelBudgetHours = doelSaldo.entitled;
+  // Waar de aanvraag tegenaan wordt gehouden: binnen een contractjaar is dat
+  // het meegenomen saldo plus wat dat contract geeft, niet de opbouw van alle
+  // jaren samen.
+  const doelBudgetHours = doelSaldo.contractJaar
+    ? doelSaldo.contractJaar.carriedOver + doelSaldo.contractJaar.contractTotal
+    : doelSaldo.entitled;
   const doelRemaining = doelSaldo.remaining;
 
   const dialogRequestedHours = Number(watchedHours) || 0;
@@ -462,13 +476,21 @@ export function AbsenceClient({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
-              {mySaldo.since ? "Vakantie opgebouwd" : `Vakantiebudget ${year}`}
+              {myContractJaar
+                ? "Meegenomen uit vorige periodes"
+                : mySaldo.since
+                  ? "Vakantie opgebouwd"
+                  : `Vakantiebudget ${year}`}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{myBudgetHours}u</div>
             <p className="text-xs text-muted-foreground">
-              {mySaldo.since ? "uit alle contracten" : "toegekende vakantie-uren"}
+              {myContractJaar
+                ? `plus ${myContractJaar.contractTotal}u uit dit contract`
+                : mySaldo.since
+                  ? "uit alle contracten"
+                  : "toegekende vakantie-uren"}
             </p>
           </CardContent>
         </Card>
@@ -479,7 +501,11 @@ export function AbsenceClient({
           <CardContent>
             <div className="text-2xl font-bold">{myApprovedVacation}u</div>
             <p className="text-xs text-muted-foreground">
-              {mySaldo.since ? `totaal, met ${formatDate(mySaldo.since)} als peildatum` : "goedgekeurde vakantie"}
+              {myContractJaar
+                ? "in deze contractperiode"
+                : mySaldo.since
+                  ? `totaal, met ${formatDate(mySaldo.since)} als peildatum`
+                  : "goedgekeurde vakantie"}
             </p>
           </CardContent>
         </Card>
@@ -494,7 +520,11 @@ export function AbsenceClient({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Vakantie resterend</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {myContractJaar?.endDate
+                ? `Vakantie resterend tot ${formatDate(myContractJaar.endDate)}`
+                : "Vakantie resterend"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${myRemaining < 0 ? "text-red-600 dark:text-red-400" : ""}`}>

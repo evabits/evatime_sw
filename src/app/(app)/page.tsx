@@ -13,6 +13,7 @@ import { canLeadStandup } from "@/lib/roles";
 import { previousWorkingDay } from "@/lib/working-days";
 import { countMissingHours } from "@/lib/missing-hours";
 import { contractYearBalance, toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
+import { getEffectiveContract } from "@/lib/contracts";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -149,6 +150,15 @@ export default async function DashboardPage() {
         format(now, "yyyy-MM-dd"),
       )
     : null;
+  // De einddatum waar het saldo naartoe rekent. Alleen als het contract binnen
+  // dit jaar afloopt, want anders stopt de opbouw op 31 december en zou de kop
+  // een datum beloven waar het getal niet over gaat. Zonder peildatum gaat het
+  // saldo sowieso over het kalenderjaar.
+  const huidigContract = getEffectiveContract(eigenVakantieContracten, format(now, "yyyy-MM-dd"));
+  const vakantieTot =
+    eigenOpening && huidigContract?.endDate && huidigContract.endDate <= `${currentYear}-12-31`
+      ? huidigContract.endDate
+      : null;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const projectBillable = isBillable({ project }) === true;
@@ -292,7 +302,9 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              {contractJaar ? "Vakantie resterend" : `Vakantie resterend ${currentYear}`}
+              {vakantieTot
+                ? `Vakantie resterend tot ${formatDate(vakantieTot)}`
+                : `Vakantie resterend ${currentYear}`}
             </CardTitle>
             <Umbrella className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -304,7 +316,6 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">
                 {contractJaar.carriedOver}u meegenomen + {contractJaar.contractTotal}u dit contract
                 {" − "}{contractJaar.used}u opgenomen
-                {contractJaar.endDate && <>, tot {formatDate(contractJaar.endDate)}</>}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
