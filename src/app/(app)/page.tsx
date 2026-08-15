@@ -107,7 +107,7 @@ export default async function DashboardPage() {
     }),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { vacationOpeningDate: true, vacationOpeningHours: true },
+      select: { vacationOpeningDate: true, vacationOpeningUsed: true },
     }),
   ]);
 

@@ -468,7 +468,7 @@ export function AbsenceClient({
           <CardContent>
             <div className="text-2xl font-bold">{myBudgetHours}u</div>
             <p className="text-xs text-muted-foreground">
-              {mySaldo.since ? `sinds ${formatDate(mySaldo.since)}` : "toegekende vakantie-uren"}
+              {mySaldo.since ? "uit alle contracten" : "toegekende vakantie-uren"}
             </p>
           </CardContent>
         </Card>
@@ -478,7 +478,9 @@ export function AbsenceClient({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{myApprovedVacation}u</div>
-            <p className="text-xs text-muted-foreground">goedgekeurde vakantie</p>
+            <p className="text-xs text-muted-foreground">
+              {mySaldo.since ? `totaal, met ${formatDate(mySaldo.since)} als peildatum` : "goedgekeurde vakantie"}
+            </p>
           </CardContent>
         </Card>
         <Card>

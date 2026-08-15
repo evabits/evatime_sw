@@ -48,34 +48,61 @@ export function contractVacationHours(contracts: ContractVacation[], year: numbe
 }
 
 /**
- * Het saldo waarmee een medewerker EVAtime binnenkomt: wat hij op `date` nog
- * had staan. Wat daarvóór is opgenomen zit erin verwerkt en wordt niet meer
- * apart geteld — de app kent dat verleden niet.
+ * De streep die het handgeschreven verleden van de registratie scheidt.
+ * `used` is het totaal dat de medewerker tot `date` had opgenomen — dat weet
+ * de app niet, want zo ver gaat de administratie niet terug. Vanaf `date` telt
+ * ze zelf.
  */
-export type VacationOpening = { date: string; hours: number };
+export type VacationOpening = { date: string; used: number };
 
-/** Het recht over één jaar: een budgetrij gaat vóór het contract. */
-function jaarrecht(
+const DAG = 86_400_000;
+
+function afgerond(getal: number): number {
+  return Math.round(getal * 100) / 100;
+}
+
+/**
+ * Wat de contracten over één jaar aan vakantie-uren opleveren, naar rato van de
+ * dagen die ze van dat jaar beslaan. Wie in november in dienst kwam bouwt over
+ * dat jaar geen heel jaar vakantie op, en een jaar waarin twee contracten
+ * elkaar opvolgen levert van allebei het eigen deel.
+ *
+ * Een budgetrij voor dat jaar vervangt de contracten volledig: die is met de
+ * hand gezet en gaat voor.
+ */
+export function proRataYearHours(
   contracts: ContractVacation[],
   budgets: Array<{ year: number; hours: number }>,
   year: number,
 ): number {
   const rij = budgets.find((b) => b.year === year);
-  return rij ? rij.hours : (contractVacationHours(contracts, year) ?? 0);
+  if (rij) return rij.hours;
+
+  const jaarStart = Date.UTC(year, 0, 1);
+  const jaarEind = Date.UTC(year + 1, 0, 1);
+  let totaal = 0;
+  for (const c of contracts) {
+    if (c.vacationHours == null) continue;
+    const start = c.startDate ? Date.parse(`${c.startDate}T00:00:00Z`) : -Infinity;
+    // De einddatum is de laatste dag die meetelt, dus het contract loopt tot
+    // en met de dag erna om middernacht.
+    const eind = c.endDate ? Date.parse(`${c.endDate}T00:00:00Z`) + DAG : Infinity;
+    const overlap = Math.min(eind, jaarEind) - Math.max(start, jaarStart);
+    if (overlap <= 0) continue;
+    totaal += (c.vacationHours * overlap) / (jaarEind - jaarStart);
+  }
+  return afgerond(totaal);
 }
 
 /**
- * Het opgebouwde vakantierecht t/m `year`: het beginsaldo plus het recht van
- * elk jaar vanaf de peildatum.
+ * Het vakantierecht dat iemand t/m `year` heeft opgebouwd: elk jaar vanaf zijn
+ * eerste contract, naar rato van de contractdagen. Een jaar zonder contract
+ * levert vanzelf nul op, zodat de opbouw stopt zodra iemand uit dienst is.
  *
- * Het jaar waarin de peildatum valt telt naar rato van de dagen die er nog van
- * over zijn — het deel ervóór zit al in het beginsaldo. Elk jaar daarna telt
- * heel mee, en een jaar dat geen contract meer raakt levert vanzelf nul op,
- * zodat de opbouw stopt zodra iemand uit dienst is.
- *
- * Zonder beginsaldo blijft het bij het recht van het lopende jaar, zoals het
- * altijd was. Zo verspringt het getal van niemand voordat de peildatum is
- * ingevuld.
+ * Zonder peildatum blijft het bij het recht van het lopende jaar, zoals het
+ * altijd was. De opbouw over eerdere jaren zegt namelijk niets zolang er geen
+ * getal tegenover staat voor wat er in die jaren is opgenomen — en dat getal
+ * is precies wat de peildatum meebrengt.
  */
 export function accruedVacationHours(
   contracts: ContractVacation[],
@@ -83,42 +110,41 @@ export function accruedVacationHours(
   opening: VacationOpening | null,
   year: number,
 ): number {
-  if (!opening) return jaarrecht(contracts, budgets, year);
-
-  const vanaf = Date.parse(`${opening.date}T00:00:00Z`);
-  const startJaar = Number(opening.date.slice(0, 4));
-
-  let totaal = opening.hours;
-  for (let y = startJaar; y <= year; y++) {
-    const jaarStart = Date.UTC(y, 0, 1);
-    const jaarEind = Date.UTC(y + 1, 0, 1);
-    const deel = (jaarEind - Math.max(vanaf, jaarStart)) / (jaarEind - jaarStart);
-    if (deel <= 0) continue;
-    totaal += jaarrecht(contracts, budgets, y) * deel;
+  if (!opening) {
+    const rij = budgets.find((b) => b.year === year);
+    return rij ? rij.hours : (contractVacationHours(contracts, year) ?? 0);
   }
-  return Math.round(totaal * 100) / 100;
+
+  const jaren = contracts
+    .map((c) => (c.startDate ? Number(c.startDate.slice(0, 4)) : year))
+    .filter((y) => y <= year);
+  const eersteJaar = jaren.length ? Math.min(...jaren) : year;
+
+  let totaal = 0;
+  for (let y = eersteJaar; y <= year; y++) totaal += proRataYearHours(contracts, budgets, y);
+  return afgerond(totaal);
 }
 
 /**
- * De datum vanaf wanneer er geteld wordt: de peildatum van het beginsaldo, of
- * anders 1 januari van het lopende jaar. Alles ervóór zit in het beginsaldo of
- * valt buiten het jaar.
+ * De datum vanaf wanneer de geregistreerde vakantie meetelt: de peildatum, of
+ * anders 1 januari van het lopende jaar. Alles ervóór zit in het ingevulde
+ * totaal of valt buiten het jaar.
  */
 export function vacationCountFrom(opening: VacationOpening | null, year: number): string {
   return opening ? opening.date : `${year}-01-01`;
 }
 
 /**
- * De beginsaldovelden van een Prisma-gebruiker naar de vorm die `vacationBalance`
- * verwacht. Zonder peildatum is er geen beginsaldo, ook al staat er een getal.
+ * De peildatumvelden van een Prisma-gebruiker naar de vorm die `vacationBalance`
+ * verwacht. Zonder datum is er geen peildatum, ook al staat er een getal.
  */
 export function toVacationOpening(
-  user: { vacationOpeningDate: Date | null; vacationOpeningHours: unknown } | null,
+  user: { vacationOpeningDate: Date | null; vacationOpeningUsed: unknown } | null,
 ): VacationOpening | null {
   if (!user?.vacationOpeningDate) return null;
   return {
     date: user.vacationOpeningDate.toISOString().slice(0, 10),
-    hours: Number(user.vacationOpeningHours ?? 0),
+    used: Number(user.vacationOpeningUsed ?? 0),
   };
 }
 
@@ -142,10 +168,11 @@ export function vacationBalance(
   const vanaf = vacationCountFrom(opening, year);
   const tot = `${year}-12-31`;
   const entitled = accruedVacationHours(contracts, budgets, opening, year);
-  const used = approved
-    .filter((a) => a.date >= vanaf && a.date <= tot)
-    .reduce((s, a) => s + a.hours, 0);
-  return { entitled, used, remaining: Math.round((entitled - used) * 100) / 100 };
+  const used = afgerond(
+    (opening?.used ?? 0) +
+      approved.filter((a) => a.date >= vanaf && a.date <= tot).reduce((s, a) => s + a.hours, 0),
+  );
+  return { entitled, used, remaining: afgerond(entitled - used) };
 }
 
 /**

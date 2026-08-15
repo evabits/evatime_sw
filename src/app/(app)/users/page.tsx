@@ -12,7 +12,7 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
     select: {
       id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
-      vacationOpeningDate: true, vacationOpeningHours: true,
+      vacationOpeningDate: true, vacationOpeningUsed: true,
       createdAt: true, archivedAt: true,
     },
   });
@@ -22,7 +22,7 @@ export default async function UsersPage() {
     vacationOpeningDate: u.vacationOpeningDate
       ? u.vacationOpeningDate.toISOString().slice(0, 10)
       : null,
-    vacationOpeningHours: u.vacationOpeningHours != null ? Number(u.vacationOpeningHours) : null,
+    vacationOpeningUsed: u.vacationOpeningUsed != null ? Number(u.vacationOpeningUsed) : null,
     createdAt: u.createdAt.toISOString(),
     archivedAt: u.archivedAt ? u.archivedAt.toISOString() : null,
   }));

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
 import {
-  vacationOpeningDateField, vacationOpeningHoursField, weeklyHoursField, workLevelField,
+  vacationOpeningDateField, vacationOpeningUsedField, weeklyHoursField, workLevelField,
 } from "@/lib/user-schema";
 
 const updateSchema = z.object({
@@ -16,12 +16,12 @@ const updateSchema = z.object({
   weeklyHours: weeklyHoursField,
   workLevel: workLevelField,
   vacationOpeningDate: vacationOpeningDateField,
-  vacationOpeningHours: vacationOpeningHoursField,
+  vacationOpeningUsed: vacationOpeningUsedField,
 });
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
-  vacationOpeningDate: true, vacationOpeningHours: true,
+  vacationOpeningDate: true, vacationOpeningUsed: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -34,7 +34,7 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
     vacationOpeningDate: u.vacationOpeningDate
       ? u.vacationOpeningDate.toISOString().slice(0, 10)
       : null,
-    vacationOpeningHours: u.vacationOpeningHours != null ? Number(u.vacationOpeningHours) : null,
+    vacationOpeningUsed: u.vacationOpeningUsed != null ? Number(u.vacationOpeningUsed) : null,
   };
 }
 
@@ -65,7 +65,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       updateData.vacationOpeningDate = data.vacationOpeningDate
         ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
         : null;
-      updateData.vacationOpeningHours = data.vacationOpeningHours ?? null;
+      updateData.vacationOpeningUsed = data.vacationOpeningUsed ?? null;
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 
