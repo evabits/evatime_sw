@@ -111,7 +111,7 @@ export default async function AbsencePage() {
         budgets.filter((b) => b.userId === id).map((b) => ({ year: b.year, hours: Number(b.hours) })),
         opnames,
         opening,
-        year,
+        vandaag,
       );
       // Hetzelfde saldo, uitgesplitst naar het lopende contractjaar. Null zodra
       // die grens niet te trekken is; dan blijven de tegels bij het kalenderjaar.
@@ -137,7 +137,7 @@ export default async function AbsencePage() {
             hours: Number(a.hours),
           })),
         eigenOpening,
-        year,
+        vandaag,
       )
     : [];
 

@@ -1,4 +1,4 @@
-import { getEffectiveContract, rangeOverlaps, type ContractDates } from "./contracts";
+import { getEffectiveContract, nextDay, rangeOverlaps, type ContractDates } from "./contracts";
 
 /**
  * Het vakantiesaldo komt uit twee bronnen, en die moeten niet uit elkaar
@@ -127,16 +127,32 @@ function eersteContractdag(contracts: ContractVacation[]): string | null {
   return starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : null;
 }
 
-/** De horizon van de opbouw: t/m het eind van `year`. */
-function opbouwTot(year: number): string {
-  return `${year + 1}-01-01`;
+/** Het kalenderjaar waar een datum in valt. */
+function jaarVan(today: string): number {
+  return Number(today.slice(0, 4));
 }
 
 /**
- * Het vakantierecht dat iemand t/m `year` heeft opgebouwd: alles wat zijn
- * contracten sinds de eerste contractdag hebben opgeleverd. Een periode zonder
- * contract levert vanzelf nul op, zodat de opbouw stopt zodra iemand uit
- * dienst is.
+ * De horizon waar het saldo naartoe rekent: het einde van het contract dat
+ * vandaag loopt.
+ *
+ * Dat is de periode waar het saldo over gaat — het contract belooft zoveel uur
+ * over zijn eigen looptijd, en die houdt niet op bij oudjaar. Loopt er vandaag
+ * geen contract of heeft het geen einddatum, dan is er geen periode om op te
+ * eindigen en blijft het bij het kalenderjaar.
+ *
+ * Halfopen: de dag ná de laatste contractdag.
+ */
+function opbouwTot(contracts: ContractVacation[], today: string): string {
+  const huidig = getEffectiveContract(contracts, today);
+  return huidig?.endDate ? nextDay(huidig.endDate) : `${jaarVan(today) + 1}-01-01`;
+}
+
+/**
+ * Het vakantierecht dat iemand t/m het einde van zijn lopende contract heeft
+ * opgebouwd: alles wat zijn contracten sinds de eerste contractdag hebben
+ * opgeleverd. Een periode zonder contract levert vanzelf nul op, zodat de
+ * opbouw stopt zodra iemand uit dienst is.
  *
  * Met een peildatum bepalen de contracten de opbouw en telt een handmatige
  * budgetrij niet mee: die gaat over een kalenderjaar en dat is dan niet meer de
@@ -149,25 +165,26 @@ export function accruedVacationHours(
   contracts: ContractVacation[],
   budgets: Array<{ year: number; hours: number }>,
   opening: VacationOpening | null,
-  year: number,
+  today: string,
 ): number {
   if (!opening) {
-    const rij = budgets.find((b) => b.year === year);
-    return rij ? rij.hours : (contractVacationHours(contracts, year) ?? 0);
+    const jaar = jaarVan(today);
+    const rij = budgets.find((b) => b.year === jaar);
+    return rij ? rij.hours : (contractVacationHours(contracts, jaar) ?? 0);
   }
 
   const eerste = eersteContractdag(contracts);
   if (!eerste) return 0;
-  return afgerond(opbouwRuw(contracts, eerste, opbouwTot(year)));
+  return afgerond(opbouwRuw(contracts, eerste, opbouwTot(contracts, today)));
 }
 
 /**
  * De datum vanaf wanneer de geregistreerde vakantie meetelt: de peildatum, of
  * anders 1 januari van het lopende jaar. Alles ervóór zit in het ingevulde
- * totaal of valt buiten het jaar.
+ * totaal of valt buiten de periode.
  */
-export function vacationCountFrom(opening: VacationOpening | null, year: number): string {
-  return opening ? opening.date : `${year}-01-01`;
+export function vacationCountFrom(opening: VacationOpening | null, today: string): string {
+  return opening ? opening.date : `${jaarVan(today)}-01-01`;
 }
 
 /**
@@ -190,23 +207,24 @@ export type VacationBalance = { entitled: number; used: number; remaining: numbe
  * Het vakantiesaldo van één medewerker: wat hij heeft opgebouwd, wat hij ervan
  * heeft opgenomen en wat er overblijft.
  *
- * Beide kanten beslaan hetzelfde venster — vanaf de peildatum t/m het eind van
- * `year`. Anders zou vakantie die al voor volgend jaar is vastgelegd worden
- * afgetrokken van een recht dat pas volgend jaar wordt opgebouwd.
+ * Beide kanten beslaan hetzelfde venster — vanaf de peildatum tot de horizon
+ * waar de opbouw op eindigt. Anders zou vakantie die al voor ná die horizon is
+ * vastgelegd worden afgetrokken van een recht dat pas daarna wordt opgebouwd,
+ * of andersom.
  */
 export function vacationBalance(
   contracts: ContractVacation[],
   budgets: Array<{ year: number; hours: number }>,
   approved: Array<{ date: string; hours: number }>,
   opening: VacationOpening | null,
-  year: number,
+  today: string,
 ): VacationBalance {
-  const vanaf = vacationCountFrom(opening, year);
-  const tot = `${year}-12-31`;
-  const entitled = accruedVacationHours(contracts, budgets, opening, year);
+  const vanaf = vacationCountFrom(opening, today);
+  const tot = opening ? opbouwTot(contracts, today) : `${jaarVan(today) + 1}-01-01`;
+  const entitled = accruedVacationHours(contracts, budgets, opening, today);
   const used = afgerond(
     (opening?.used ?? 0) +
-      approved.filter((a) => a.date >= vanaf && a.date <= tot).reduce((s, a) => s + a.hours, 0),
+      approved.filter((a) => a.date >= vanaf && a.date < tot).reduce((s, a) => s + a.hours, 0),
   );
   return { entitled, used, remaining: afgerond(entitled - used) };
 }
@@ -297,11 +315,11 @@ export function vacationLedger(
   contracts: ContractVacation[],
   approved: Array<{ date: string; until?: string | null; hours: number }>,
   opening: VacationOpening,
-  year: number,
+  today: string,
 ): VacationLedgerLine[] {
   const eerste = eersteContractdag(contracts);
   if (!eerste) return [];
-  const tot = opbouwTot(year);
+  const tot = opbouwTot(contracts, today);
 
   const regels: VacationLedgerLine[] = [];
   for (const c of contracts) {
@@ -315,7 +333,7 @@ export function vacationLedger(
   }
 
   for (const a of approved) {
-    if (a.date < opening.date || a.date > `${year}-12-31`) continue;
+    if (a.date < opening.date || a.date >= tot) continue;
     regels.push({ kind: "leave", date: a.date, until: a.until ?? null, hours: -a.hours });
   }
 

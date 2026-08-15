@@ -125,6 +125,7 @@ export default async function DashboardPage() {
   // Een budgetrij voor een jaar wint; anders zegt het contract het. Met een
   // peildatum stapelt het recht over alle contractjaren, zonder blijft het bij
   // het lopende jaar.
+  const vandaag = format(now, "yyyy-MM-dd");
   const eigenVakantieContracten = toContractVacation(eigenContracten);
   const eigenOpening = toVacationOpening(eigenGebruiker);
   const eigenOpnames = vacationApproved.map((a) => ({
@@ -136,7 +137,7 @@ export default async function DashboardPage() {
     vacationBudgets.map((b) => ({ year: b.year, hours: Number(b.hours) })),
     eigenOpnames,
     eigenOpening,
-    currentYear,
+    vandaag,
   );
   const { entitled: vacBudgetHours, used: vacUsedHours, remaining: vacRemainingHours } = vacSaldo;
   // Hetzelfde saldo, maar uitgesplitst naar het lopende contractjaar. Null
@@ -147,18 +148,14 @@ export default async function DashboardPage() {
         eigenOpnames,
         vacSaldo,
         eigenOpening,
-        format(now, "yyyy-MM-dd"),
+        vandaag,
       )
     : null;
-  // De einddatum waar het saldo naartoe rekent. Alleen als het contract binnen
-  // dit jaar afloopt, want anders stopt de opbouw op 31 december en zou de kop
-  // een datum beloven waar het getal niet over gaat. Zonder peildatum gaat het
-  // saldo sowieso over het kalenderjaar.
-  const huidigContract = getEffectiveContract(eigenVakantieContracten, format(now, "yyyy-MM-dd"));
-  const vakantieTot =
-    eigenOpening && huidigContract?.endDate && huidigContract.endDate <= `${currentYear}-12-31`
-      ? huidigContract.endDate
-      : null;
+  // De einddatum waar het saldo naartoe rekent: het einde van het lopende
+  // contract, precies de horizon die de opbouw aanhoudt. Zonder peildatum of
+  // zonder einddatum gaat het saldo over het kalenderjaar en zegt de kop dat.
+  const huidigContract = getEffectiveContract(eigenVakantieContracten, vandaag);
+  const vakantieTot = eigenOpening ? huidigContract?.endDate ?? null : null;
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const projectBillable = isBillable({ project }) === true;
