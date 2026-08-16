@@ -72,7 +72,9 @@ export function TimeRows({ entries, total, canEdit, selected, selectableIds, onT
                     <div>{e.project?.customer?.name}</div>
                     <div className="text-xs text-muted-foreground">{e.project?.name}</div>
                   </TableCell>
-                  <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                  <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>
+                  {e.description ?? "—"}
+                </TableCell>
                   <TableCell className="text-right font-mono">{formatHours(Number(e.hours))}</TableCell>
                   <TableCell className="text-right">
                     {rate == null

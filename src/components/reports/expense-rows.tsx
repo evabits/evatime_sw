@@ -73,7 +73,9 @@ export function ExpenseRows({ entries, total, canEdit, selected, selectableIds, 
                   ) : "—"}
                 </TableCell>
                 <TableCell>{e.category?.name}</TableCell>
-                <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>
+                  {e.description ?? "—"}
+                </TableCell>
                 <TableCell className="text-right font-mono">{formatCurrency(Number(e.amount))}</TableCell>
                 <TableCell>
                   {e.invoiced && <Badge variant="success" className="text-xs">Gefactureerd</Badge>}
