@@ -10,7 +10,7 @@ const lineSchema = z.object({
   description: z.string().min(1),
   quantity: z.number(),
   unitPrice: z.number(),
-  lineType: z.enum(["HOURS", "KM", "OTHER"]),
+  lineType: z.enum(["HOURS", "KM", "OTHER", "EXPENSE"]),
 });
 
 const updateSchema = z.object({
@@ -75,18 +75,30 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           where: { invoiceLineId: { in: data.lineIdsToDelete } },
           data: { invoiced: false, invoiceLineId: null },
         });
+        // Uitgaven horen hier net zo goed bij: zonder deze stap blijft een
+        // uitgave op "gefactureerd" staan nadat zijn regel van de factuur is
+        // gehaald, en verdwijnt hij uit elke volgende factuurlijst zonder ooit
+        // in rekening te zijn gebracht.
+        await tx.expense.updateMany({
+          where: { invoiceLineId: { in: data.lineIdsToDelete } },
+          data: { invoiced: false, invoiceLineId: null },
+        });
         await tx.invoiceLine.deleteMany({ where: { id: { in: data.lineIdsToDelete } } });
       }
 
       // Upsert lines
       if (data.lines) {
-        for (const line of data.lines) {
+        // De volgorde uit het scherm is leidend. Zonder dit kreeg een regel die
+        // je erbij typt sortOrder nul en sprong hij naar boven, tussen de eerste
+        // regels van de factuur.
+        for (const [positie, line] of data.lines.entries()) {
           const lineData = {
             description: line.description,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             total: line.quantity * line.unitPrice,
             lineType: line.lineType,
+            sortOrder: positie,
           };
           if (line.id) {
             await tx.invoiceLine.update({ where: { id: line.id }, data: lineData });
