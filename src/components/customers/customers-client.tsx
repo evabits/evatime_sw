@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { nextCustomerNumber } from "@/lib/customer-number";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,10 +38,15 @@ const EMPTY: FormData = {
 
 interface Props {
   initialCustomers: any[];
+  /** Alle bestaande klantnummers, ook van gearchiveerde klanten. */
+  initialNumbers: string[];
 }
 
-export function CustomersClient({ initialCustomers }: Props) {
+export function CustomersClient({ initialCustomers, initialNumbers }: Props) {
   const [customers, setCustomers] = useState(initialCustomers);
+  // Groeit mee terwijl je klanten aanmaakt, zodat twee nieuwe klanten achter
+  // elkaar niet hetzelfde voorstel krijgen.
+  const [numbers, setNumbers] = useState<string[]>(initialNumbers);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -90,6 +96,11 @@ export function CustomersClient({ initialCustomers }: Props) {
 
       if (res.ok) {
         const saved = await res.json();
+        // Het zojuist vergeven nummer meteen meetellen, zodat de volgende klant
+        // die je aanmaakt niet hetzelfde voorstel krijgt.
+        if (saved.customerNumber) {
+          setNumbers((prev) => (prev.includes(saved.customerNumber) ? prev : [...prev, saved.customerNumber]));
+        }
         if (editing) {
           setCustomers((prev) => prev.map((c) => (c.id === editing ? { ...c, ...saved } : c)));
         } else {
@@ -168,7 +179,7 @@ export function CustomersClient({ initialCustomers }: Props) {
               onChange={(e) => { setShowArchived(e.target.checked); loadCustomers(e.target.checked); }} />
             Toon gearchiveerd
           </label>
-          <Button onClick={() => { form.reset(EMPTY); setEditing(null); setServerError(""); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
+          <Button onClick={() => { form.reset({ ...EMPTY, customerNumber: nextCustomerNumber(numbers) }); setEditing(null); setServerError(""); setLevelRates({}); setLevelRatesKnown(true); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Klant toevoegen
           </Button>
         </div>

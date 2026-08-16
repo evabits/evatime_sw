@@ -15,5 +15,18 @@ export default async function CustomersPage() {
     include: { _count: { select: { projects: true, invoices: true } }, levelRates: true },
   });
 
-  return <CustomersClient initialCustomers={serialize(customers)} />;
+  // Alle nummers, ook van gearchiveerde klanten: die houden hun nummer bezet
+  // onder de unieke sleutel, dus een voorstel dat ze overslaat komt vroeg of
+  // laat op een nummer uit dat al vergeven is.
+  const nummers = await prisma.customer.findMany({
+    where: { customerNumber: { not: null } },
+    select: { customerNumber: true },
+  });
+
+  return (
+    <CustomersClient
+      initialCustomers={serialize(customers)}
+      initialNumbers={nummers.map((n) => n.customerNumber!)}
+    />
+  );
 }
