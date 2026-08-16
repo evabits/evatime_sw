@@ -16,6 +16,7 @@ import { LevelRateFields } from "@/components/shared/level-rate-fields";
 
 const schema = z.object({
   name: z.string().min(1, "Verplicht"),
+  customerNumber: z.string().optional(),
   email: z.string().email("Ongeldig e-mailadres").or(z.literal("")).optional(),
   phone: z.string().optional(),
   attention: z.string().optional(),
@@ -30,7 +31,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
-  name: "", email: "", phone: "", attention: "", address: "", city: "",
+  name: "", customerNumber: "", email: "", phone: "", attention: "", address: "", city: "",
   postalCode: "", country: "", vatNumber: "", notes: "",
 };
 
@@ -126,6 +127,7 @@ export function CustomersClient({ initialCustomers }: Props) {
       name: customer.name ?? "",
       email: customer.email ?? "",
       phone: customer.phone ?? "",
+      customerNumber: customer.customerNumber ?? "",
       attention: customer.attention ?? "",
       address: customer.address ?? "",
       city: customer.city ?? "",
@@ -245,6 +247,10 @@ export function CustomersClient({ initialCustomers }: Props) {
               {form.formState.errors.name && (
                 <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
               )}
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Klantnummer <span className="text-muted-foreground font-normal">(komt op de factuur)</span></Label>
+              <Input placeholder="bijv. ACQ-01" {...form.register("customerNumber")} />
             </div>
             <div className="space-y-1">
               <Label>E-mail</Label>

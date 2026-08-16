@@ -116,10 +116,12 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
                     <td className="meta-value">{invoice.reference}</td>
                   </tr>
                 )}
-                <tr>
-                  <td className="meta-label">Klantnummer:</td>
-                  <td className="meta-value">{invoice.customerId.slice(-6)}</td>
-                </tr>
+                {invoice.customer?.customerNumber && (
+                  <tr>
+                    <td className="meta-label">Klantnummer:</td>
+                    <td className="meta-value">{invoice.customer.customerNumber}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

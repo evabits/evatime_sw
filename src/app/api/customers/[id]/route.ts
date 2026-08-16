@@ -8,6 +8,7 @@ import { isAdmin } from "@/lib/roles";
 
 const schema = z.object({
   name: z.string().min(1),
+  customerNumber: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   attention: z.string().optional(),
@@ -50,7 +51,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { levelRates, ...data } = schema.parse(await req.json());
     const customer = await prisma.customer.update({
       where: { id },
-      data: { ...data, email: data.email || null },
+      data: {
+        ...data,
+        email: data.email || null,
+        // Leeg moet NULL worden: twee klanten met een lege string botsen
+        // op de unieke sleutel, twee met NULL niet.
+        customerNumber: data.customerNumber?.trim() || null,
+      },
     });
     if (levelRates) {
       await prisma.$transaction([
