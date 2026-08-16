@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { formatDate as fmt } from "@/lib/utils";
+import { customerAddressLines } from "@/lib/customer-address";
 
 const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 10, color: "#111", padding: "40px 48px 64px" },
@@ -39,10 +40,9 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
       <Page size="A4" style={s.page}>
         <View style={s.row}>
           <View style={s.addressBlock}>
-            <Text>{quote.customer.name}</Text>
-            {quote.customer.address && <Text>{quote.customer.address}</Text>}
-            {quote.customer.postalCode && <Text>{quote.customer.postalCode} {quote.customer.city}</Text>}
-            {quote.customer.country && <Text>{quote.customer.country}</Text>}
+            {customerAddressLines(quote.customer).map((regel, i) => (
+              <Text key={i}>{regel}</Text>
+            ))}
           </View>
           <View style={s.companyBlock}>
             {settings?.logoUrl && <Image src={settings.logoUrl} style={s.logo} />}

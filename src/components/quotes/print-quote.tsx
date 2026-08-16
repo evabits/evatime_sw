@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
+import { customerAddressLines } from "@/lib/customer-address";
 
 interface Props {
   quote: any;
@@ -54,10 +55,9 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
       <div className="page">
         <div className="top-header">
           <div className="address-block">
-            <div>{quote.customer.name}</div>
-            {quote.customer.address && <div>{quote.customer.address}</div>}
-            {quote.customer.postalCode && <div>{quote.customer.postalCode} {quote.customer.city}</div>}
-            {quote.customer.country && <div>{quote.customer.country}</div>}
+            {customerAddressLines(quote.customer).map((regel, i) => (
+              <div key={i}>{regel}</div>
+            ))}
           </div>
           <div className="company-block">
             {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}

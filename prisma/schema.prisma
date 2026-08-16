@@ -66,6 +66,9 @@ model Customer {
   name       String
   email      String?
   phone      String?
+  // De persoon of afdeling waar post aan gericht moet worden. Komt op factuur
+  // en offerte achter "T.a.v." te staan, boven het adres.
+  attention  String?
   address    String?
   city       String?
   postalCode String?

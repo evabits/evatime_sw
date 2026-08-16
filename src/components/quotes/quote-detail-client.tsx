@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
+import { customerAddressLines } from "@/lib/customer-address";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, Eye, Mail, Paperclip, Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -285,9 +286,9 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Aan</p>
               <div className="text-sm space-y-0.5">
-                <p className="font-medium">{quote.customer?.name}</p>
-                {quote.customer?.address && <p className="text-muted-foreground">{quote.customer.address}</p>}
-                {quote.customer?.city && <p className="text-muted-foreground">{quote.customer.postalCode} {quote.customer.city}</p>}
+                {customerAddressLines(quote.customer).map((regel, i) => (
+                  <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{regel}</p>
+                ))}
                 {quote.customer?.vatNumber && <p className="text-muted-foreground">BTW: {quote.customer.vatNumber}</p>}
               </div>
             </div>
