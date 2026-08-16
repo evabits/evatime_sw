@@ -53,7 +53,15 @@ export async function GET(req: Request) {
         ...(customerId ? { project: { customerId } } : {}),
         ...(from || to ? { date: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
       },
-      orderBy: { date: "desc" },
+      // Binnen een dag op begintijd, want alleen op datum sorteren laat
+      // Postgres de volgorde kiezen en dan springt een pas geboekte regel
+      // zomaar naar het midden. Registraties zonder tijdvak — wie rechtstreeks
+      // uren typt — komen achteraan; createdAt breekt de laatste gelijkstand.
+      orderBy: [
+        { date: "desc" },
+        { startTime: { sort: "asc", nulls: "last" } },
+        { createdAt: "asc" },
+      ],
       include: {
         project: canSeeRates
           ? {
