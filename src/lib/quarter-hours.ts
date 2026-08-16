@@ -141,3 +141,33 @@ function minutenOpDeDag(waarde: string): number | null {
   if (uren > 23 || minuten > 59) return null;
   return uren * 60 + minuten;
 }
+
+/**
+ * Het tijdvak zoals het in de urenlijst komt te staan: `09:00–17:00`, met de
+ * pauze erachter als die er is.
+ *
+ * Geeft null zodra er geen volledig tijdvak is. Eén van de twee tijden zegt
+ * niets — "vanaf 09:00" zonder eindtijd is geen tijdvak — en wie rechtstreeks
+ * een aantal uren invult heeft ze allebei niet.
+ */
+export function formatTimeRange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  breakMinutes?: number | null,
+): string | null {
+  const van = start?.trim();
+  const tot = end?.trim();
+  if (!van || !tot) return null;
+
+  const pauze = breakMinutes && breakMinutes > 0 ? ` (${breakMinutes} min pauze)` : "";
+  // Een liggend streepje tussen tijden, geen koppelteken: dit is een bereik.
+  return `${normalizeTime(van)}–${normalizeTime(tot)}${pauze}`;
+}
+
+/**
+ * Het zod-veld voor een kloktijd: `HH:MM`, of leeg.
+ *
+ * Leeg komt binnen als "", null of undefined en gaat er als null uit, zodat de
+ * database geen lege tekst krijgt waar "niet ingevuld" bedoeld is.
+ */
+export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;

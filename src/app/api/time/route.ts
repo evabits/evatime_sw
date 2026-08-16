@@ -5,16 +5,24 @@ import { z } from "zod";
 import { handleError, projectMembershipError } from "@/lib/api";
 import { canViewAllEntries, canEditInvoices, isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
-import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+import { isQuarter, NOT_A_QUARTER, TIME_PATTERN, hoursBetween } from "@/lib/quarter-hours";
 
 const schema = z.object({
   projectId: z.string().min(1),
   date: z.string(),
   hours: z.number().positive().refine(isQuarter, NOT_A_QUARTER),
+  startTime: z.string().regex(TIME_PATTERN, "Tijd als uu:mm").optional().nullable().or(z.literal("")),
+  endTime: z.string().regex(TIME_PATTERN, "Tijd als uu:mm").optional().nullable().or(z.literal("")),
+  breakMinutes: z.number().int().min(0).max(24 * 60).optional().nullable(),
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   userId: z.string().optional().nullable(),
-});
+}).refine(
+  // Een eindtijd vóór de begintijd is geen tijdvak. Het formulier houdt het al
+  // tegen, maar de route is de plek waar het niet omheen kan.
+  (d) => !d.startTime || !d.endTime || hoursBetween(d.startTime, d.endTime) !== null,
+  { message: "Eindtijd moet na de begintijd liggen", path: ["endTime"] },
+);
 
 export async function GET(req: Request) {
   try {
@@ -91,7 +99,14 @@ export async function POST(req: Request) {
     if (memberError) return memberError;
 
     const entry = await prisma.timeEntry.create({
-      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel: owner.workLevel },
+      data: { ...entryData, rateOverride, date: new Date(data.date),
+        // "" betekent "niet ingevuld"; dat hoort als NULL in de database te
+        // staan, anders is een leeg tijdvak niet te onderscheiden van een
+        // ingevuld tijdvak dat toevallig leeg is.
+        startTime: data.startTime || null,
+        endTime: data.endTime || null,
+        breakMinutes: data.breakMinutes ?? null,
+        userId: ownerId, workLevel: owner.workLevel },
       include: {
         project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isQuarter, hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES } from "./quarter-hours";
+import { isQuarter, hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES, formatTimeRange } from "./quarter-hours";
 
 describe("isQuarter", () => {
   it("accepts whole hours", () => {
@@ -227,5 +227,33 @@ describe("hoursBetween met pauze", () => {
     expect(uren).toBe(7.67);
     expect(isQuarter(uren!)).toBe(false);
     expect(toQuarter(uren!)).toBe(7.75);
+  });
+});
+
+describe("formatTimeRange", () => {
+  it("writes the span as a range", () => {
+    expect(formatTimeRange("09:00", "17:00")).toBe("09:00–17:00");
+  });
+
+  it("names the break, because otherwise the hours cannot be explained", () => {
+    expect(formatTimeRange("09:00", "17:00", 30)).toBe("09:00–17:00 (30 min pauze)");
+  });
+
+  it("leaves a break of nought out", () => {
+    expect(formatTimeRange("09:00", "17:00", 0)).toBe("09:00–17:00");
+    expect(formatTimeRange("09:00", "17:00", null)).toBe("09:00–17:00");
+  });
+
+  it("gives nothing when only one of the two times is there", () => {
+    // Wie rechtstreeks uren invult heeft ze allebei niet, en "vanaf 09:00"
+    // zonder eindtijd is geen tijdvak.
+    expect(formatTimeRange("09:00", null)).toBeNull();
+    expect(formatTimeRange(null, "17:00")).toBeNull();
+    expect(formatTimeRange("", "")).toBeNull();
+    expect(formatTimeRange(undefined, undefined)).toBeNull();
+  });
+
+  it("pads a time that was typed short", () => {
+    expect(formatTimeRange("9:00", "17:5")).toBe("09:00–17:05");
   });
 });

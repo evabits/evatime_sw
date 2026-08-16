@@ -191,6 +191,15 @@ model TimeEntry {
   project        Project       @relation(fields: [projectId], references: [id])
   date           DateTime      @db.Date
   hours          Decimal       @db.Decimal(5, 2)
+  // Het tijdvak waarop deze uren zijn geboekt, als kloktijd `HH:MM`. Tekst en
+  // geen DateTime: een kloktijd is een aanduiding op een dag, geen moment op
+  // een tijdlijn, en tekst houdt het buiten elk tijdzonegedoe. Leeg bij wie
+  // rechtstreeks een aantal uren invult, en bij alles van vóór dit veld.
+  startTime      String?
+  endTime        String?
+  // De pauze binnen dat tijdvak. Zonder dit getal is 09:00–17:00 naast 7:30 uur
+  // niet te verklaren.
+  breakMinutes   Int?
   description    String?
   rateOverride   Decimal?      @db.Decimal(10, 2)
   workLevel      WorkLevel?
