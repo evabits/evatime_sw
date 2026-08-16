@@ -14,6 +14,7 @@ import { previousWorkingDay } from "@/lib/working-days";
 import { countMissingHours } from "@/lib/missing-hours";
 import { contractYearBalance, toContractVacation, toVacationOpening, vacationBalance } from "@/lib/vacation-budget";
 import { getEffectiveContract } from "@/lib/contracts";
+import { firstOfMonth, unbilledByCustomer } from "@/lib/unbilled";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -36,7 +37,21 @@ export default async function DashboardPage() {
   // Employees see only their own totals; admins see company-wide.
   const ownerFilter = isAdmin ? {} : { userId };
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudgets, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten, eigenGebruiker] = await Promise.all([
+  // Nog te factureren: alles van vóór deze maand op een factureerbaar project
+  // van een klant. Werk deze maand hoort er niet bij — dat gaat begin volgende
+  // maand op de factuur. Zonder klant kun je het aan niemand sturen, en het
+  // factuurscherm laat het om dezelfde reden niet zien.
+  const ONGEFACTUREERD = {
+    invoiced: false,
+    date: { lt: new Date(`${firstOfMonth(format(now, "yyyy-MM-dd"))}T00:00:00Z`) },
+    project: { billable: true, customerId: { not: null } },
+  } as const;
+  const ONGEFACTUREERD_SELECT = {
+    date: true,
+    project: { select: { customer: { select: { id: true, name: true } } } },
+  } as const;
+
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudgets, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten, eigenGebruiker, openUren, openKm, openUitgaven] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -110,6 +125,16 @@ export default async function DashboardPage() {
       where: { id: userId },
       select: { vacationOpeningDate: true, vacationOpeningUsed: true },
     }),
+    // Wat er nog te factureren staat van vóór deze maand. Alleen voor een
+    // beheerder; een medewerker kan er niets mee en het zou hem de omzet van
+    // het hele bedrijf tonen.
+    ...(isAdmin
+      ? [
+          prisma.timeEntry.findMany({ where: ONGEFACTUREERD, select: ONGEFACTUREERD_SELECT }),
+          prisma.kmEntry.findMany({ where: ONGEFACTUREERD, select: ONGEFACTUREERD_SELECT }),
+          prisma.expense.findMany({ where: ONGEFACTUREERD, select: ONGEFACTUREERD_SELECT }),
+        ]
+      : [Promise.resolve([]), Promise.resolve([]), Promise.resolve([])]),
   ]);
 
   const pendingReview = userId
@@ -156,6 +181,15 @@ export default async function DashboardPage() {
   // zonder einddatum gaat het saldo over het kalenderjaar en zegt de kop dat.
   const huidigContract = getEffectiveContract(eigenVakantieContracten, vandaag);
   const vakantieTot = eigenOpening ? huidigContract?.endDate ?? null : null;
+
+  // Per klant wat er nog te factureren staat, oudste eerst. Groeperen gebeurt
+  // hier en niet in de database: Prisma kan niet groeperen op een veld van een
+  // gerelateerde tabel, en het gaat om enkele tientallen regels.
+  const teFactureren = unbilledByCustomer([
+    ...(openUren as any[]),
+    ...(openKm as any[]),
+    ...(openUitgaven as any[]),
+  ]);
 
   const totalRevenue = projectStats.reduce((sum, project) => {
     const projectBillable = isBillable({ project }) === true;
@@ -319,6 +353,30 @@ export default async function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
+
+        {isAdmin && teFactureren.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Nog te factureren</CardTitle>
+              <Euro className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1">
+                {teFactureren.map((k) => (
+                  <li key={k.customerId} className="text-sm flex justify-between gap-2">
+                    <span className="font-medium truncate">{k.name}</span>
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      vanaf {formatDate(k.since)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/invoices/new" className="text-xs text-primary underline-offset-2 hover:underline mt-2 block">
+                Factuur maken →
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         {isAdmin && (
           <Card>
