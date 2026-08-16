@@ -6,16 +6,24 @@ import { handleError, entryMutationError, projectMembershipError } from "@/lib/a
 import { isAdmin } from "@/lib/roles";
 import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
 import { membershipCheckNeeded } from "@/lib/project-members";
-import { isQuarter, NOT_A_QUARTER } from "@/lib/quarter-hours";
+import { isQuarter, NOT_A_QUARTER, TIME_PATTERN, hoursBetween } from "@/lib/quarter-hours";
 
 const schema = z.object({
   projectId: z.string().min(1),
   date: z.string(),
   hours: z.number().positive().refine(isQuarter, NOT_A_QUARTER),
+  startTime: z.string().regex(TIME_PATTERN, "Tijd als uu:mm").optional().nullable().or(z.literal("")),
+  endTime: z.string().regex(TIME_PATTERN, "Tijd als uu:mm").optional().nullable().or(z.literal("")),
+  breakMinutes: z.number().int().min(0).max(24 * 60).optional().nullable(),
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   userId: z.string().optional().nullable(),
-});
+}).refine(
+  // Een eindtijd vóór de begintijd is geen tijdvak. Het formulier houdt het al
+  // tegen, maar de route is de plek waar het niet omheen kan.
+  (d) => !d.startTime || !d.endTime || hoursBetween(d.startTime, d.endTime) !== null,
+  { message: "Eindtijd moet na de begintijd liggen", path: ["endTime"] },
+);
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,7 +76,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const entry = await prisma.timeEntry.update({
       where: { id },
-      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, workLevel },
+      data: { ...entryData, rateOverride, date: new Date(data.date),
+        // Niet meegestuurd betekent "laat staan", meegestuurd als "" of null
+        // betekent "leeggemaakt". Dat onderscheid is nodig omdat het
+        // bewerkscherm in de rapportage naar dezelfde route schrijft zonder
+        // deze velden te kennen; zonder deze tak zou opslaan daar het tijdvak
+        // van een registratie wissen.
+        ...(data.startTime !== undefined ? { startTime: data.startTime || null } : {}),
+        ...(data.endTime !== undefined ? { endTime: data.endTime || null } : {}),
+        ...(data.breakMinutes !== undefined ? { breakMinutes: data.breakMinutes ?? null } : {}),
+        userId: ownerId, workLevel },
       include: {
         project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },

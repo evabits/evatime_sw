@@ -21,7 +21,7 @@ import { isBillable } from "@/lib/billable";
 import type { WorkLevel } from "@/lib/work-levels";
 import { scheduledHoursOn, type WeekSchedule } from "@/lib/work-schedule";
 import { Pencil, Trash2, CalendarDays, List, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
-import { hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES } from "@/lib/quarter-hours";
+import { hoursBetween, toQuarter, normalizeTime, TIME_CHOICES, HOUR_CHOICES, formatTimeRange } from "@/lib/quarter-hours";
 import { perDayTotals } from "@/lib/per-day-totals";
 
 const VERLOF_UITLEG = "Verlofregels wijzig je via de afwezigheidsaanvraag";
@@ -350,9 +350,16 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   async function onSubmit(data: FormData) {
     setLoading(true);
     setSubmitError(null);
+    // Het tijdvak gaat mee zoals het is ingevuld. Het staat los van het
+    // urenveld: wie rechtstreeks een aantal uren typt stuurt hier niets, en wie
+    // het urenveld daarna bijstelt houdt zijn eigen getal.
+    const heeftTijdvak = vanTijd !== "" && totTijd !== "";
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
+      startTime: heeftTijdvak ? normalizeTime(vanTijd) : null,
+      endTime: heeftTijdvak ? normalizeTime(totTijd) : null,
+      breakMinutes: heeftTijdvak && pauzeMinuten > 0 ? pauzeMinuten : null,
     };
     try {
       if (editing) {
@@ -425,9 +432,15 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   function startEdit(entry: any) {
     setEditing(entry.id);
     setSubmitError(null);
-    // De tijden zijn niet opgeslagen, dus bij het bewerken van een bestaande
-    // regel is er niets om te tonen. Leeg laten is eerlijker dan gokken.
+    // De opgeslagen tijden terug in de velden. Zonder dit raak je ze kwijt
+    // zodra je een regel opent en opslaat. Regels van vóór deze velden hebben
+    // ze niet; dan blijft het tijdvak leeg.
     leegTijdvak();
+    if (entry.startTime && entry.endTime) {
+      setVanTijd(entry.startTime);
+      setTotTijd(entry.endTime);
+      if (entry.breakMinutes) setPauze(String(entry.breakMinutes));
+    }
     setSelectedCustomerId(entry.project?.customer?.id ?? "");
     form.reset({
       projectId: entry.projectId,
@@ -843,7 +856,14 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 )}
                 {!fetching && entries.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap">{formatDate(entry.date)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {formatDate(entry.date)}
+                      {formatTimeRange(entry.startTime, entry.endTime, entry.breakMinutes) && (
+                        <div className="text-xs text-muted-foreground">
+                          {formatTimeRange(entry.startTime, entry.endTime, entry.breakMinutes)}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{entry.project?.name}</div>
                       <div className="text-xs text-muted-foreground">{entry.project?.customer?.name}</div>
