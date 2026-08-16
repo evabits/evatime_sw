@@ -807,7 +807,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                         )}
                       </div>
                       {entry.description && (
-                        <div className="text-sm text-muted-foreground mt-0.5 truncate">{entry.description}</div>
+                        <div className="text-sm text-muted-foreground mt-0.5 truncate" title={entry.description ?? undefined}>{entry.description}</div>
                       )}
                       <div className="text-xs text-muted-foreground mt-0.5 flex gap-2">
                         {!selectedDay && <span>{formatDate(entry.date)}</span>}
@@ -868,7 +868,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                       <div className="font-medium">{entry.project?.name}</div>
                       <div className="text-xs text-muted-foreground">{entry.project?.customer?.name}</div>
                     </TableCell>
-                    <TableCell className="max-w-48 truncate">{entry.description ?? "—"}</TableCell>
+                    <TableCell className="max-w-48 truncate" title={entry.description ?? undefined}>{entry.description ?? "—"}</TableCell>
                     {isAdmin && filterUser === "all" && (
                       <TableCell className="text-sm">{entry.user?.name ?? "—"}</TableCell>
                     )}

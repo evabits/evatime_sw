@@ -38,7 +38,7 @@ export function RecentEntries({ timeEntries, kmEntries }: Props) {
               <p className="text-sm font-medium truncate">{entry.project.name}</p>
               <p className="text-xs text-muted-foreground">{formatDate(entry.date)}</p>
               {entry.description && (
-                <p className="text-xs text-muted-foreground truncate">{entry.description}</p>
+                <p className="text-xs text-muted-foreground truncate" title={entry.description ?? undefined}>{entry.description}</p>
               )}
             </div>
             <span className="text-sm font-mono shrink-0">{formatHours(Number(entry.hours))}</span>
@@ -50,7 +50,7 @@ export function RecentEntries({ timeEntries, kmEntries }: Props) {
               <p className="text-sm font-medium truncate">{entry.project.name}</p>
               <p className="text-xs text-muted-foreground">Kilometers · {formatDate(entry.date)}</p>
               {entry.description && (
-                <p className="text-xs text-muted-foreground truncate">{entry.description}</p>
+                <p className="text-xs text-muted-foreground truncate" title={entry.description ?? undefined}>{entry.description}</p>
               )}
             </div>
             <span className="text-sm font-mono shrink-0">{Number(entry.km).toFixed(0)} km</span>
