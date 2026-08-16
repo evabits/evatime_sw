@@ -4,6 +4,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { InvoicePdf } from "@/components/invoices/invoice-pdf";
 import { QuotePdf } from "@/components/quotes/quote-pdf";
+import { customerMailCopy } from "@/lib/mail-copy";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 const transport = nodemailer.createTransport(
@@ -96,6 +97,7 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
   await transport.sendMail({
     from,
     to: invoice.customer.email,
+    ...customerMailCopy(settings),
     subject: `Factuur ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
     html: invoiceHtml(invoice, settings, publicUrl),
     attachments,
@@ -132,6 +134,7 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
   await transport.sendMail({
     from,
     to: invoice.customer.email,
+    ...customerMailCopy(settings),
     subject: `Herinnering: openstaande factuur ${invoice.invoiceNumber}`,
     html,
   });
@@ -321,6 +324,7 @@ export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
   await transport.sendMail({
     from,
     to: quote.customer.email,
+    ...customerMailCopy(settings),
     subject: `Offerte ${quote.quoteNumber}${quote.subject ? ` — ${quote.subject}` : ""}`,
     html,
     attachments: [
