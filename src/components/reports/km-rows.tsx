@@ -72,7 +72,9 @@ export function KmRows({ entries, canEdit, selected, selectableIds, onToggle, on
                     <div>{e.project?.customer?.name}</div>
                     <div className="text-xs text-muted-foreground">{e.project?.name}</div>
                   </TableCell>
-                  <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                  <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>
+                  {e.description ?? "—"}
+                </TableCell>
                   <TableCell className="text-right font-mono">{Number(e.km).toFixed(1)}</TableCell>
                   <TableCell className="text-right">{rate ? `€${rate.toFixed(2)}/km` : "—"}</TableCell>
                   <TableCell className="text-right">{amount ? formatCurrency(amount) : "—"}</TableCell>

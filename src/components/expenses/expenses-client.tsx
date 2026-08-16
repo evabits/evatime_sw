@@ -324,7 +324,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
                         </div>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="max-w-40 truncate">{expense.description || "—"}</TableCell>
+                    <TableCell className="max-w-40 truncate" title={expense.description || undefined}>{expense.description || "—"}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(Number(expense.amount))}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">

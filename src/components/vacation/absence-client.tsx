@@ -1041,7 +1041,7 @@ function RequestsTable({
                 {formatDate(r.startDate)} – {formatDate(r.endDate)}
               </td>
               <td className="px-4 py-3 text-right">{r.hours}u</td>
-              <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.description ?? "—"}</td>
+              <td className="px-4 py-3 text-muted-foreground max-w-xs truncate" title={r.description ?? undefined}>{r.description ?? "—"}</td>
               <td className="px-4 py-3">{statusBadge(r.status)}</td>
               {isAdmin && (
                 <td className="px-4 py-3 text-right">

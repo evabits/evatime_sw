@@ -381,7 +381,7 @@ export function NewInvoiceClient({ customers }: Props) {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
-                        <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                        <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right">{formatHours(Number(e.hours))}</TableCell>
                         <TableCell className="text-right">
                           {rate == null
@@ -439,7 +439,7 @@ export function NewInvoiceClient({ customers }: Props) {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
-                        <TableCell className="max-w-32 truncate">{e.description ?? "—"}</TableCell>
+                        <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>{e.description ?? "—"}</TableCell>
                         <TableCell className="text-right">{Number(e.km).toFixed(1)}</TableCell>
                         <TableCell className="text-right">
                           {tarief <= 0
@@ -491,7 +491,7 @@ export function NewInvoiceClient({ customers }: Props) {
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(e.date)}</TableCell>
                         <TableCell>{e.project?.name}</TableCell>
-                        <TableCell className="max-w-32 truncate">{e.description?.trim() || e.category?.name || "—"}</TableCell>
+                        <TableCell className="max-w-32 truncate" title={e.description?.trim() || e.category?.name || undefined}>{e.description?.trim() || e.category?.name || "—"}</TableCell>
                         <TableCell className="text-right">{formatCurrency(bedrag)}</TableCell>
                       </TableRow>
                       );
