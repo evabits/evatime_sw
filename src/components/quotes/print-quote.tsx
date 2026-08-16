@@ -26,7 +26,9 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         .top-header { display: flex; justify-content: space-between; margin-bottom: 36px; gap: 32px; }
         .address-block { font-size: 12px; line-height: 1.7; }
         .company-block { text-align: right; font-size: 12px; line-height: 1.7; }
-        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; margin-left: auto; margin-bottom: 8px; }
+        .logo-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; }
+        .address-block .customer-name { font-weight: 700; }
         .heading { font-size: 26px; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.02em; }
         .meta-section { display: flex; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #ddd; gap: 32px; }
         .meta-left table, .meta-right table { border-collapse: collapse; }
@@ -53,16 +55,19 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
       `}</style>
 
       <div className="page">
+        {settings?.logoUrl && (
+          <div className="logo-row">
+            <img src={settings.logoUrl} alt="Logo" className="logo" />
+          </div>
+        )}
         <div className="top-header">
           <div className="address-block">
             {customerAddressLines(quote.customer).map((regel, i) => (
-              <div key={i}>{regel}</div>
+              <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
           <div className="company-block">
-            {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}
-            {!settings?.logoUrl && <div style={{ fontWeight: 700 }}>{settings?.name ?? ""}</div>}
-            {settings?.logoUrl && <div style={{ fontWeight: 700 }}>{settings?.name ?? ""}</div>}
+            <div style={{ fontWeight: 700 }}>{settings?.name ?? ""}</div>
             {settings?.address && <div>{settings.address}</div>}
             {settings?.postalCode && <div>{settings.postalCode}{settings?.city ? ` ${settings.city}` : ""}</div>}
             {settings?.email && <><div style={{ height: 8 }} /><div>{settings.email}</div></>}

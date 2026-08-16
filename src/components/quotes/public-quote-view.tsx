@@ -34,7 +34,9 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         .top-header { display: flex; justify-content: space-between; margin-bottom: 36px; gap: 32px; }
         .address-block { font-size: 12px; line-height: 1.7; }
         .company-block { text-align: right; font-size: 12px; line-height: 1.7; }
-        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; margin-left: auto; margin-bottom: 8px; }
+        .logo-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; }
+        .address-block .customer-name { font-weight: 700; }
         .heading { font-size: 26px; font-weight: 700; margin-bottom: 12px; }
         .meta-section { display: flex; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #ddd; }
         .meta-label { color: #444; margin-right: 8px; }
@@ -55,14 +57,18 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
       `}</style>
 
       <div className="page">
+        {settings?.logoUrl && (
+          <div className="logo-row">
+            <img src={settings.logoUrl} alt="Logo" className="logo" />
+          </div>
+        )}
         <div className="top-header">
           <div className="address-block">
             {customerAddressLines(quote.customer).map((regel, i) => (
-              <div key={i}>{regel}</div>
+              <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
           <div className="company-block">
-            {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}
             <div style={{ fontWeight: 700 }}>{settings?.name ?? ""}</div>
             {settings?.address && <div>{settings.address}</div>}
             {settings?.postalCode && <div>{settings.postalCode}{settings?.city ? ` ${settings.city}` : ""}</div>}
