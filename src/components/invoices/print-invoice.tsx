@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useEffect } from "react";
 import { groupLinesByType } from "@/lib/invoice-lines";
+import { customerAddressLines } from "@/lib/customer-address";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 interface Props {
@@ -27,7 +28,6 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         /* Top header: customer left, company right */
         .top-header { display: flex; justify-content: space-between; margin-bottom: 36px; gap: 32px; }
         .address-block { font-size: 12px; line-height: 1.7; }
-        .address-block .attn { color: #444; }
         .company-block { text-align: right; font-size: 12px; line-height: 1.7; }
         .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; margin-left: auto; margin-bottom: 8px; }
         .company-name-text { font-weight: 700; font-size: 13px; }
@@ -79,10 +79,9 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         {/* Top: customer left, company right */}
         <div className="top-header">
           <div className="address-block">
-            <div>{invoice.customer.name}</div>
-            {invoice.customer.address && <div className="attn">T.a.v. {invoice.customer.address}</div>}
-            {invoice.customer.postalCode && <div>{invoice.customer.postalCode} {invoice.customer.city}</div>}
-            {invoice.customer.country && <div>{invoice.customer.country}</div>}
+            {customerAddressLines(invoice.customer).map((regel, i) => (
+              <div key={i}>{regel}</div>
+            ))}
           </div>
           <div className="company-block">
             {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}

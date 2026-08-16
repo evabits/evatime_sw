@@ -18,6 +18,7 @@ const schema = z.object({
   name: z.string().min(1, "Verplicht"),
   email: z.string().email("Ongeldig e-mailadres").or(z.literal("")).optional(),
   phone: z.string().optional(),
+  attention: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   postalCode: z.string().optional(),
@@ -29,7 +30,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
-  name: "", email: "", phone: "", address: "", city: "",
+  name: "", email: "", phone: "", attention: "", address: "", city: "",
   postalCode: "", country: "", vatNumber: "", notes: "",
 };
 
@@ -125,6 +126,7 @@ export function CustomersClient({ initialCustomers }: Props) {
       name: customer.name ?? "",
       email: customer.email ?? "",
       phone: customer.phone ?? "",
+      attention: customer.attention ?? "",
       address: customer.address ?? "",
       city: customer.city ?? "",
       postalCode: customer.postalCode ?? "",
@@ -254,6 +256,10 @@ export function CustomersClient({ initialCustomers }: Props) {
             <div className="space-y-1">
               <Label>Telefoon</Label>
               <Input {...form.register("phone")} />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>T.a.v. <span className="text-muted-foreground font-normal">(persoon of afdeling)</span></Label>
+              <Input placeholder="bijv. Afdeling Inkoop" {...form.register("attention")} />
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Adres</Label>

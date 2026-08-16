@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
+import { customerAddressLines } from "@/lib/customer-address";
 
 export function PublicQuoteView({ quote, settings }: { quote: any; settings: any }) {
   const [status, setStatus] = useState(quote.status);
@@ -56,10 +57,9 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
       <div className="page">
         <div className="top-header">
           <div className="address-block">
-            <div>{quote.customer.name}</div>
-            {quote.customer.address && <div>{quote.customer.address}</div>}
-            {quote.customer.postalCode && <div>{quote.customer.postalCode} {quote.customer.city}</div>}
-            {quote.customer.country && <div>{quote.customer.country}</div>}
+            {customerAddressLines(quote.customer).map((regel, i) => (
+              <div key={i}>{regel}</div>
+            ))}
           </div>
           <div className="company-block">
             {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}

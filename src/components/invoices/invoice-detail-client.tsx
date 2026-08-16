@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
+import { customerAddressLines } from "@/lib/customer-address";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
@@ -361,9 +362,9 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Aan</p>
               <div className="text-sm space-y-0.5">
-                <p className="font-medium">{invoice.customer?.name}</p>
-                {invoice.customer?.address && <p className="text-muted-foreground">{invoice.customer.address}</p>}
-                {invoice.customer?.city && <p className="text-muted-foreground">{invoice.customer.postalCode} {invoice.customer.city}</p>}
+                {customerAddressLines(invoice.customer).map((regel, i) => (
+                  <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{regel}</p>
+                ))}
                 {invoice.customer?.vatNumber && <p className="text-muted-foreground">BTW: {invoice.customer.vatNumber}</p>}
               </div>
             </div>

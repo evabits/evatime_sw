@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { groupLinesByType } from "@/lib/invoice-lines";
+import { customerAddressLines } from "@/lib/customer-address";
 import { formatDate as fmt } from "@/lib/utils";
 
 const s = StyleSheet.create({
@@ -44,10 +45,9 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
         {/* Top: customer left, company right */}
         <View style={s.row}>
           <View style={s.addressBlock}>
-            <Text>{invoice.customer.name}</Text>
-            {invoice.customer.address && <Text>{invoice.customer.address}</Text>}
-            {invoice.customer.postalCode && <Text>{invoice.customer.postalCode} {invoice.customer.city}</Text>}
-            {invoice.customer.country && <Text>{invoice.customer.country}</Text>}
+            {customerAddressLines(invoice.customer).map((regel, i) => (
+              <Text key={i}>{regel}</Text>
+            ))}
           </View>
           <View style={s.companyBlock}>
             {settings?.logoUrl && <Image src={settings.logoUrl} style={s.logo} />}
