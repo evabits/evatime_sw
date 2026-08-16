@@ -24,6 +24,16 @@ interface Props {
   customers: { id: string; name: string }[];
 }
 
+/**
+ * Wat er standaard onder een nieuwe factuur staat. Je kunt het per factuur
+ * aanpassen; dit is alleen de beginwaarde.
+ *
+ * De dertig dagen hier en de vervaldatum hierboven horen bij elkaar — die
+ * staat ook op vandaag plus dertig.
+ */
+const STANDAARD_NOTITIE =
+  "Wij verzoeken u vriendelijk het totaalbedrag binnen 30 dagen over te maken op onze IBAN rekening NL90 INGB 0008 9967 99 t.n.v. EVAbits onder vermelding van het factuurnummer.";
+
 interface InvoiceLine {
   description: string;
   quantity: number;
@@ -92,7 +102,7 @@ export function NewInvoiceClient({ customers }: Props) {
   const [periodeVan, setPeriodeVan] = useState(() => resolvePeriod("last-month", new Date())!.from);
   const [periodeTot, setPeriodeTot] = useState(() => resolvePeriod("last-month", new Date())!.to);
   const [vatRate, setVatRate] = useState(21);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(STANDAARD_NOTITIE);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [unbilledTime, setUnbilledTime] = useState<any[]>([]);
   const [unbilledKm, setUnbilledKm] = useState<any[]>([]);
@@ -303,8 +313,8 @@ export function NewInvoiceClient({ customers }: Props) {
             <Input type="number" min="0" max="100" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} />
           </div>
           <div className="space-y-1 lg:col-span-3">
-            <Label>Notities</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} />
+            <Label>Notities <span className="text-muted-foreground font-normal">(betalingstermijn)</span></Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
           </div>
         </CardContent>
       </Card>
