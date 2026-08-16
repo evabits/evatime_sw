@@ -793,7 +793,18 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
               </div>
             ) : (
               <div>
-                {displayedEntries.map((entry) => (
+                {displayedEntries.map((entry) => {
+                  // De regel onder de omschrijving: datum, tijdvak, medewerker.
+                  // Als lijst opgebouwd en met een punt aan elkaar geregen,
+                  // want welke van de drie er staan wisselt per weergave en per
+                  // rol — een scheidingsteken dat aan één vast onderdeel hangt
+                  // laat dan een zwevende punt achter.
+                  const meta = [
+                    selectedDay ? null : formatDate(entry.date),
+                    formatTimeRange(entry.startTime, entry.endTime, entry.breakMinutes),
+                    isAdmin && filterUser === "all" ? entry.user?.name ?? null : null,
+                  ].filter((d): d is string => Boolean(d));
+                  return (
                   <div
                     key={entry.id}
                     className="flex items-start justify-between px-4 py-3 border-b last:border-b-0 gap-4"
@@ -809,12 +820,9 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                       {entry.description && (
                         <div className="text-sm text-muted-foreground mt-0.5 truncate" title={entry.description ?? undefined}>{entry.description}</div>
                       )}
-                      <div className="text-xs text-muted-foreground mt-0.5 flex gap-2">
-                        {!selectedDay && <span>{formatDate(entry.date)}</span>}
-                        {isAdmin && filterUser === "all" && entry.user?.name && (
-                          <span className={!selectedDay ? "before:content-['·'] before:mr-2" : ""}>{entry.user.name}</span>
-                        )}
-                      </div>
+                      {meta.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{meta.join(" · ")}</div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="font-mono text-sm font-medium w-12 text-right">{formatHours(Number(entry.hours))}</span>
@@ -826,7 +834,8 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
