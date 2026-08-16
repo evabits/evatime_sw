@@ -1,5 +1,6 @@
 "use client";
-import { useState, useRef } from "react";
+import { Fragment, useState, useRef } from "react";
+import { groupLinesByType } from "@/lib/invoice-lines";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +34,7 @@ interface Line {
   quantity: number;
   unitPrice: number;
   total: number;
-  lineType: "HOURS" | "KM" | "OTHER";
+  lineType: "HOURS" | "KM" | "EXPENSE" | "OTHER";
   _new?: boolean;
 }
 
@@ -453,7 +454,21 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayLines.map((line: any, i: number) => (
+              {groupLinesByType(displayLines as any[]).map((groep, gi) => (
+                <Fragment key={groep.heading ?? `los-${gi}`}>
+                  {groep.heading && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={editing ? 5 : 4} className="pt-5 pb-1 font-medium border-b-0">
+                        {groep.heading}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {groep.lines.map((line: any) => {
+                    // De bewerkfuncties werken op de plek in de platte lijst;
+                    // die verandert niet door het groeperen, maar de lus-index
+                    // wel. Dus terugzoeken in plaats van meetellen.
+                    const i = displayLines.indexOf(line);
+                    return (
                 <TableRow key={line.id ?? i}>
                   <TableCell>
                     {editing ? (
@@ -497,6 +512,9 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                     </TableCell>
                   )}
                 </TableRow>
+                    );
+                  })}
+                </Fragment>
               ))}
             </TableBody>
             <TableFooter>

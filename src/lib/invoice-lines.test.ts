@@ -3,6 +3,7 @@ import {
   expenseInvoiceLines,
   hourInvoiceLines,
   kmInvoiceLines,
+  groupLinesByType,
   type HourEntryForInvoice,
 } from "./invoice-lines";
 
@@ -131,5 +132,41 @@ describe("expenseInvoiceLines", () => {
 
   it("gives no lines for an empty list", () => {
     expect(expenseInvoiceLines([])).toEqual([]);
+  });
+});
+
+describe("groupLinesByType", () => {
+  const uur = { id: "1", lineType: "HOURS" };
+  const rit = { id: "2", lineType: "KM" };
+  const uitgave = { id: "3", lineType: "EXPENSE" };
+  const los = { id: "4", lineType: "OTHER" };
+
+  it("puts the groups in the order the invoice screen uses, with a heading each", () => {
+    expect(groupLinesByType([uitgave, los, rit, uur])).toEqual([
+      { heading: "Uren:", lines: [uur] },
+      { heading: "Ritten:", lines: [rit] },
+      { heading: "Uitgaven:", lines: [uitgave] },
+      { heading: null, lines: [los] },
+    ]);
+  });
+
+  it("leaves out a group that has no lines", () => {
+    const groepen = groupLinesByType([uur, uitgave]);
+    expect(groepen.map((g) => g.heading)).toEqual(["Uren:", "Uitgaven:"]);
+  });
+
+  it("keeps the order within a group as it came in", () => {
+    const a = { id: "a", lineType: "HOURS" };
+    const b = { id: "b", lineType: "HOURS" };
+    expect(groupLinesByType([b, a])[0].lines.map((l) => l.id)).toEqual(["b", "a"]);
+  });
+
+  it("treats a line without a type as a loose one", () => {
+    const zonderType = { id: "x" } as { id: string; lineType?: string };
+    expect(groupLinesByType([zonderType])).toEqual([{ heading: null, lines: [zonderType] }]);
+  });
+
+  it("gives nothing for an empty invoice", () => {
+    expect(groupLinesByType([])).toEqual([]);
   });
 });

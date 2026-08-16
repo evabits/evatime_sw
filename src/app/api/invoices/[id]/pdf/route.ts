@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const [invoice, settings] = await Promise.all([
       prisma.invoice.findUnique({
         where: { id },
-        include: { customer: true, lines: { orderBy: { createdAt: "asc" } } },
+        include: { customer: true, lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
       }),
       prisma.companySettings.findFirst(),
     ]);

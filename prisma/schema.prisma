@@ -283,6 +283,11 @@ model InvoiceLine {
   unitPrice   Decimal     @db.Decimal(10, 2)
   total       Decimal     @db.Decimal(10, 2)
   lineType    LineType    @default(HOURS)
+  // De plek die deze regel bij het aanmaken kreeg. Nodig omdat alle regels van
+  // één factuur dezelfde createdAt hebben: Postgres geeft de starttijd van de
+  // transactie, dus daarop sorteren zegt niets. Oude facturen staan op nul en
+  // vallen terug op createdAt, zoals ze altijd al deden.
+  sortOrder   Int         @default(0)
   createdAt   DateTime    @default(now())
   timeEntries TimeEntry[]
   kmEntries   KmEntry[]

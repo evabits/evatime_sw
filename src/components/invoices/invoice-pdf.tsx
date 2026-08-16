@@ -1,4 +1,5 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { groupLinesByType } from "@/lib/invoice-lines";
 import { formatDate as fmt } from "@/lib/utils";
 
 const s = StyleSheet.create({
@@ -26,6 +27,7 @@ const s = StyleSheet.create({
   totalGrand: { flexDirection: "row", justifyContent: "space-between", paddingTop: 5, borderTopWidth: 1, borderColor: "#333" },
   totalGrandText: { fontFamily: "Helvetica-Bold", fontSize: 11 },
   notes: { marginTop: 24, fontSize: 10, color: "#444", lineHeight: 1.5 },
+  groupHeading: { marginTop: 10, marginBottom: 2, fontSize: 10, fontFamily: "Helvetica-Bold", color: "#111" },
   bold: { fontFamily: "Helvetica-Bold" },
 });
 
@@ -101,14 +103,19 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
           <Text style={[s.headerText, s.colBtw]}>Btw</Text>
         </View>
 
-        {/* Lines */}
-        {invoice.lines.map((line: any) => (
-          <View key={line.id} style={s.tableRow}>
-            <Text style={s.colDesc}>{line.description}</Text>
-            <Text style={s.colNum}>{Number(line.quantity).toFixed(2)}</Text>
-            <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice))}</Text>
-            <Text style={s.colTotal}>{fmtCurrency(Number(line.total))}</Text>
-            <Text style={s.colBtw}>{vatRate.toFixed(0)}%</Text>
+        {/* Lines, per soort met een kopje ertussen */}
+        {groupLinesByType(invoice.lines as any[]).map((groep, gi) => (
+          <View key={groep.heading ?? `los-${gi}`}>
+            {groep.heading && <Text style={s.groupHeading}>{groep.heading}</Text>}
+            {groep.lines.map((line: any) => (
+              <View key={line.id} style={s.tableRow}>
+                <Text style={s.colDesc}>{line.description}</Text>
+                <Text style={s.colNum}>{Number(line.quantity).toFixed(2)}</Text>
+                <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice))}</Text>
+                <Text style={s.colTotal}>{fmtCurrency(Number(line.total))}</Text>
+                <Text style={s.colBtw}>{vatRate.toFixed(0)}%</Text>
+              </View>
+            ))}
           </View>
         ))}
 

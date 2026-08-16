@@ -7,7 +7,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const invoice = await prisma.invoice.findUnique({
     where: { id },
-    include: { customer: true, lines: { orderBy: { createdAt: "asc" } }, attachments: { orderBy: { createdAt: "asc" } } },
+    include: { customer: true, lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }, attachments: { orderBy: { createdAt: "asc" } } },
   });
 
   if (!invoice) notFound();
