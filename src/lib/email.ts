@@ -13,6 +13,28 @@ const transport = nodemailer.createTransport(
 
 const FROM_ADDRESS = "no-reply@time.evabits.work"; // ponytail: single source; was inline ×8
 
+/**
+ * Haalt een bijlage op uit de opslag en weigert alles wat geen bestand is.
+ *
+ * Zonder de statuscontrole leverde een geweigerde aanvraag geen fout op maar een
+ * bestandje van enkele tientallen bytes met `{"error":…}` erin, dat vervolgens
+ * als bon of bijlage naar de klant ging. Liever een verzending die stukloopt met
+ * een leesbare reden dan een factuur die aankomt met een kapotte bijlage.
+ */
+async function fetchAttachment(a: { url: string; filename: string }) {
+  const res = await fetch(a.url, {
+    headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Bijlage "${a.filename}" kon niet worden opgehaald (${res.status} ${res.statusText})`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length === 0) {
+    throw new Error(`Bijlage "${a.filename}" kwam leeg terug uit de opslag`);
+  }
+  return { filename: a.filename, content: buf };
+}
+
 function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   const linesHtml = invoice.lines
     .map(
@@ -80,13 +102,7 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
 
   const [pdfBuffer, ...blobAttachments] = await Promise.all([
     renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any),
-    ...(invoice.attachments ?? []).map(async (a: any) => {
-      const res = await fetch(a.url, {
-        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-      });
-      const buf = await res.arrayBuffer();
-      return { filename: a.filename, content: Buffer.from(buf) };
-    }),
+    ...(invoice.attachments ?? []).map(fetchAttachment),
   ]);
 
   const attachments = [
@@ -312,14 +328,7 @@ export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
 
   const pdfBuffer = await renderToBuffer(createElement(QuotePdf, { quote, settings }) as any);
 
-  const attachmentFetches = (quote.attachments ?? []).map(async (a: any) => {
-    const res = await fetch(a.url, {
-      headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-    });
-    const buf = await res.arrayBuffer();
-    return { filename: a.filename, content: Buffer.from(buf) };
-  });
-  const extraAttachments = await Promise.all(attachmentFetches);
+  const extraAttachments = await Promise.all((quote.attachments ?? []).map(fetchAttachment));
 
   await transport.sendMail({
     from,

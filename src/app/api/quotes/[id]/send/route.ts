@@ -28,7 +28,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!quote.customer.email) return NextResponse.json({ error: "Klant heeft geen e-mailadres" }, { status: 400 });
 
-    await sendQuoteEmail(quote, settings);
+    try {
+      await sendQuoteEmail(quote, settings);
+    } catch (e) {
+      // Net als bij de factuur: de reden van de mailserver in beeld in plaats
+      // van een kale "Internal server error".
+      console.error("Offerte verzenden mislukt", e);
+      const reden = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: `Verzenden mislukt: ${reden}` }, { status: 502 });
+    }
 
     const updated = await prisma.quote.update({
       where: { id },
