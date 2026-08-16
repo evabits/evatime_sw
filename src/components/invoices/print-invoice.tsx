@@ -29,7 +29,9 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         .top-header { display: flex; justify-content: space-between; margin-bottom: 36px; gap: 32px; }
         .address-block { font-size: 12px; line-height: 1.7; }
         .company-block { text-align: right; font-size: 12px; line-height: 1.7; }
-        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; margin-left: auto; margin-bottom: 8px; }
+        .logo-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .logo { max-height: 64px; max-width: 180px; object-fit: contain; display: block; }
+        .address-block .customer-name { font-weight: 700; }
         .company-name-text { font-weight: 700; font-size: 13px; }
         .company-spacer { height: 10px; }
 
@@ -77,16 +79,21 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
 
       <div className="page">
         {/* Top: customer left, company right */}
+        {/* Logo op een eigen regel: zo begint de klantnaam hieronder op dezelfde
+            hoogte als de bedrijfsnaam, ongeacht hoe hoog het logo is. */}
+        {settings?.logoUrl && (
+          <div className="logo-row">
+            <img src={settings.logoUrl} alt="Logo" className="logo" />
+          </div>
+        )}
         <div className="top-header">
           <div className="address-block">
             {customerAddressLines(invoice.customer).map((regel, i) => (
-              <div key={i}>{regel}</div>
+              <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
           <div className="company-block">
-            {settings?.logoUrl && <img src={settings.logoUrl} alt="Logo" className="logo" />}
-            {!settings?.logoUrl && <div className="company-name-text">{settings?.name ?? ""}</div>}
-            {settings?.logoUrl && <div className="company-name-text">{settings?.name ?? ""}</div>}
+            <div className="company-name-text">{settings?.name ?? ""}</div>
             {settings?.address && <div>{settings.address}</div>}
             {settings?.postalCode && <div>{settings.postalCode}{settings?.city ? ` ${settings.city}` : ""}</div>}
             {settings?.country && <div>{settings.country}</div>}

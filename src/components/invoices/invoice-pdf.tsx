@@ -7,8 +7,15 @@ const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 10, color: "#111", padding: "40px 48px 64px" },
   row: { flexDirection: "row", justifyContent: "space-between", marginBottom: 32 },
   addressBlock: { fontSize: 10, lineHeight: 1.6 },
-  companyBlock: { fontSize: 10, lineHeight: 1.6, textAlign: "right" },
-  logo: { width: 120, height: 48, objectFit: "contain", marginBottom: 6, alignSelf: "flex-end" },
+  // alignItems en niet textAlign: react-pdf erft textAlign niet van een View
+  // door naar de Text eronder, waardoor elke regel links bleef staan en het
+  // logo boven een rafelige kolom hing.
+  companyBlock: { fontSize: 10, lineHeight: 1.6, alignItems: "flex-end", textAlign: "right" },
+  logoRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 10 },
+  // objectPositionX houdt het beeld tegen de rechterrand van zijn kader.
+  // Zonder dat staat een breed-en-laag logo gecentreerd in dat kader en
+  // lijkt het niet uitgelijnd, ook al zit het kader wel goed.
+  logo: { width: 180, height: 64, objectFit: "contain", objectPositionX: "right" },
   heading: { fontSize: 22, fontFamily: "Helvetica-Bold", marginBottom: 10 },
   metaRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#ddd", paddingVertical: 8, marginBottom: 20 },
   metaLabel: { color: "#555", marginRight: 4 },
@@ -42,15 +49,23 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* Top: customer left, company right */}
+        {/* Logo op een eigen regel, zodat de klantnaam hieronder op dezelfde
+            hoogte begint als de bedrijfsnaam — een logo is niet altijd even
+            hoog en zou de twee kolommen anders uit de pas laten lopen. */}
+        {settings?.logoUrl && (
+          <View style={s.logoRow}>
+            <Image src={settings.logoUrl} style={s.logo} />
+          </View>
+        )}
+
+        {/* Klant links, bedrijf rechts */}
         <View style={s.row}>
           <View style={s.addressBlock}>
             {customerAddressLines(invoice.customer).map((regel, i) => (
-              <Text key={i}>{regel}</Text>
+              <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
           </View>
           <View style={s.companyBlock}>
-            {settings?.logoUrl && <Image src={settings.logoUrl} style={s.logo} />}
             <Text style={s.bold}>{settings?.name ?? ""}</Text>
             {settings?.address && <Text>{settings.address}</Text>}
             {settings?.postalCode && <Text>{settings.postalCode}{settings?.city ? ` ${settings.city}` : ""}</Text>}
