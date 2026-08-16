@@ -170,3 +170,39 @@ export function expenseInvoiceLines(expenses: ExpenseForInvoice[]): ExpenseInvoi
       expenseIds: [e.id],
     }));
 }
+
+/** Het kopje boven elke soort regel op de factuur. */
+export const LINE_TYPE_HEADINGS: Record<string, string> = {
+  HOURS: "Uren:",
+  KM: "Ritten:",
+  EXPENSE: "Uitgaven:",
+};
+
+/** De volgorde waarin de groepen op de factuur staan, gelijk aan het factuurscherm. */
+const GROEP_VOLGORDE = ["HOURS", "KM", "EXPENSE", "OTHER"];
+
+export type LineGroup<T> = {
+  /** Het kopje, of null voor de losse regels die geen kopje krijgen. */
+  heading: string | null;
+  lines: T[];
+};
+
+/**
+ * Zet factuurregels in groepen met een kopje erboven: uren, ritten, uitgaven.
+ *
+ * Handmatig toegevoegde regels ("Overig") komen zonder kopje onderaan. Ze zijn
+ * de rest, en "Overig:" boven een factuur die alleen uit losse regels bestaat
+ * leest gek.
+ *
+ * Binnen een groep blijft de volgorde staan zoals hij binnenkomt — die komt uit
+ * `sortOrder` en is de volgorde waarin de regels zijn aangemaakt. Lege groepen
+ * vallen weg; een kopje zonder regels eronder verklaart niets.
+ */
+export function groupLinesByType<T extends { lineType?: string | null }>(
+  lines: T[],
+): LineGroup<T>[] {
+  return GROEP_VOLGORDE.map((soort) => ({
+    heading: LINE_TYPE_HEADINGS[soort] ?? null,
+    lines: lines.filter((l) => (l.lineType ?? "OTHER") === soort),
+  })).filter((g) => g.lines.length > 0);
+}

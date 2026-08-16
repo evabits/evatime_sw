@@ -39,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       include: {
         customer: true,
-        lines: { orderBy: { createdAt: "asc" } },
+        lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
         attachments: { orderBy: { createdAt: "asc" } },
       },
     });
@@ -122,7 +122,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           ...(data.sentAt !== undefined ? { sentAt: data.sentAt ? new Date(data.sentAt) : null } : {}),
           ...(data.reminderSentAt !== undefined ? { reminderSentAt: data.reminderSentAt ? new Date(data.reminderSentAt) : null } : {}),
         },
-        include: { lines: { orderBy: { createdAt: "asc" } }, customer: true, attachments: { orderBy: { createdAt: "asc" } } },
+        include: { lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }, customer: true, attachments: { orderBy: { createdAt: "asc" } } },
       });
     });
 

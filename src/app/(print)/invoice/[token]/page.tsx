@@ -11,7 +11,7 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
       where: { viewToken: token },
       include: {
         customer: true,
-        lines: { orderBy: { createdAt: "asc" } },
+        lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
         attachments: { orderBy: { createdAt: "asc" } },
       },
     }),

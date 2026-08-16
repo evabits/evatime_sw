@@ -140,7 +140,7 @@ export async function POST(req: Request) {
     // factuur haalde terwijl die uren op "gefactureerd" bleven staan. Ze waren
     // daarmee uit elke volgende factuurlijst verdwenen zonder ooit in rekening
     // te zijn gebracht.
-    for (const line of data.lines) {
+    for (const [positie, line] of data.lines.entries()) {
       const createdLine = await tx.invoiceLine.create({
         data: {
           invoiceId: inv.id,
@@ -149,6 +149,7 @@ export async function POST(req: Request) {
           unitPrice: line.unitPrice,
           total: line.quantity * line.unitPrice,
           lineType: line.lineType,
+          sortOrder: positie,
         },
       });
 

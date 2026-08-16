@@ -1,5 +1,6 @@
 "use client";
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
+import { groupLinesByType } from "@/lib/invoice-lines";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 
 interface Props {
@@ -60,6 +61,7 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
 
         /* Notes */
         .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; }
+        .group-heading { font-weight: 600; padding-top: 14px; border-bottom: none; }
 
         /* Print controls */
         .print-btn { position: fixed; bottom: 24px; right: 24px; display: flex; gap: 8px; }
@@ -153,14 +155,23 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
             </tr>
           </thead>
           <tbody>
-            {invoice.lines.map((line: any, i: number) => (
-              <tr key={line.id ?? i}>
-                <td>{line.description}</td>
-                <td className="right">{Number(line.quantity).toFixed(2)}</td>
-                <td className="right">{formatCurrency(Number(line.unitPrice))}</td>
-                <td className="right">{formatCurrency(Number(line.total))}</td>
-                <td className="right">{Number(invoice.vatRate).toFixed(0)}%</td>
-              </tr>
+            {groupLinesByType(invoice.lines as any[]).map((groep, gi) => (
+              <Fragment key={groep.heading ?? `los-${gi}`}>
+                {groep.heading && (
+                  <tr>
+                    <td colSpan={5} className="group-heading">{groep.heading}</td>
+                  </tr>
+                )}
+                {groep.lines.map((line: any, i: number) => (
+                  <tr key={line.id ?? i}>
+                    <td>{line.description}</td>
+                    <td className="right">{Number(line.quantity).toFixed(2)}</td>
+                    <td className="right">{formatCurrency(Number(line.unitPrice))}</td>
+                    <td className="right">{formatCurrency(Number(line.total))}</td>
+                    <td className="right">{Number(invoice.vatRate).toFixed(0)}%</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -20,7 +20,7 @@ export default async function PrintPage({
   const [invoice, settings] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id },
-      include: { customer: true, lines: { orderBy: { createdAt: "asc" } }, attachments: { orderBy: { createdAt: "asc" } } },
+      include: { customer: true, lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }, attachments: { orderBy: { createdAt: "asc" } } },
     }),
     prisma.companySettings.findFirst(),
   ]);

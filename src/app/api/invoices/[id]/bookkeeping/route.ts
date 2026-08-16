@@ -18,7 +18,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         where: { id },
         include: {
           customer: true,
-          lines: { orderBy: { createdAt: "asc" } },
+          lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           attachments: { orderBy: { createdAt: "asc" } },
         },
       }),
