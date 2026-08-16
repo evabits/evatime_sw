@@ -64,6 +64,10 @@ enum ContractType {
 model Customer {
   id         String    @id @default(cuid())
   name       String
+  // Het nummer dat jij de klant geeft, vrij van vorm. Uniek, want twee klanten
+  // met hetzelfde nummer is geen nummer meer; leeg mag wel vaker voorkomen,
+  // want in Postgres botsen NULL-waarden niet met elkaar.
+  customerNumber String? @unique
   email      String?
   phone      String?
   // De persoon of afdeling waar post aan gericht moet worden. Komt op factuur

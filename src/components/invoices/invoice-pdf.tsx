@@ -78,6 +78,12 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
                 <Text>{invoice.reference}</Text>
               </View>
             )}
+            {invoice.customer?.customerNumber && (
+              <View style={{ flexDirection: "row" }}>
+                <Text style={s.metaLabel}>Klantnummer:</Text>
+                <Text>{invoice.customer.customerNumber}</Text>
+              </View>
+            )}
           </View>
           <View style={{ textAlign: "right" }}>
             <View style={{ flexDirection: "row", marginBottom: 2, justifyContent: "flex-end" }}>

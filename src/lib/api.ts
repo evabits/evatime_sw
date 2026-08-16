@@ -9,6 +9,12 @@ export function handleError(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json({ error: "Validation failed", issues: error.issues }, { status: 400 });
   }
+  // Een unieke sleutel die botst is geen serverfout maar een invoerfout: de
+  // gebruiker heeft een waarde ingevuld die al bestaat. Zonder deze tak kreeg
+  // hij daar "Internal server error" op terug.
+  if (typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002") {
+    return NextResponse.json({ error: "Deze waarde is al in gebruik" }, { status: 409 });
+  }
   console.error(error);
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
