@@ -259,6 +259,7 @@ model Invoice {
   status          InvoiceStatus       @default(DRAFT)
   reference       String?
   subject         String?
+  intro           String?
   notes           String?
   subtotal        Decimal             @db.Decimal(10, 2)
   vatRate         Decimal             @db.Decimal(5, 2) @default(21)
