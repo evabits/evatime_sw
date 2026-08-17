@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Copy, Trash2, RotateCcw, Merge } from "lucide-react";
 import { LevelRateFields } from "@/components/shared/level-rate-fields";
 import { isReservedTagName } from "@/lib/tags";
+import { projectOptions } from "@/lib/project-picker";
 
 /**
  * Radix laat een lege string niet toe als waarde van een SelectItem — die is
@@ -85,6 +86,9 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
   // Het conceptproject dat wordt samengevoegd, of null als het dialoog dicht is.
   const [mergeBron, setMergeBron] = useState<any>(null);
   const [mergeDoel, setMergeDoel] = useState("");
+  const [mergeZoek, setMergeZoek] = useState("");
+
+  const mergeOpties = projectOptions(projects, { excludeId: mergeBron?.id, zoek: mergeZoek });
 
   async function loadProjects(withArchived: boolean) {
     const res = await fetch(`/api/projects${withArchived ? "?includeArchived=1" : ""}`);
@@ -299,6 +303,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     }
     setMergeBron(null);
     setMergeDoel("");
+    setMergeZoek("");
     // Herladen in plaats van de lijst bijwerken: er is een project verdwenen en
     // de urentellingen van het doelproject zijn veranderd.
     loadProjects(showArchived);
@@ -504,7 +509,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
                               variant="ghost"
                               size="icon"
                               title="Samenvoegen met een bestaand project"
-                              onClick={() => { setMergeBron(p); setMergeDoel(""); }}
+                              onClick={() => { setMergeBron(p); setMergeDoel(""); setMergeZoek(""); }}
                             >
                               <Merge className="h-3.5 w-3.5" />
                             </Button>
@@ -691,16 +696,27 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
               gekozen project, en de deelnemers krijgen daar boekrecht. &quot;{mergeBron?.name}&quot;
               wordt daarna verwijderd.
             </p>
+            <Input
+              autoFocus
+              value={mergeZoek}
+              onChange={(e) => {
+                setMergeZoek(e.target.value);
+                // Een gekozen project dat door het typen uit de lijst valt zou
+                // gekozen blijven met een leeg vak erboven. Dan liever loslaten.
+                setMergeDoel("");
+              }}
+              placeholder="Zoek op klant of project"
+            />
             <Select onValueChange={setMergeDoel} value={mergeDoel}>
               <SelectTrigger><SelectValue placeholder="Kies een doelproject" /></SelectTrigger>
               <SelectContent>
-                {projects
-                  .filter((p) => p.id !== mergeBron?.id && !p.archivedAt)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.customer ? `${p.customer.name} — ` : ""}{p.name}
-                    </SelectItem>
-                  ))}
+                {mergeOpties.length === 0 ? (
+                  <p className="px-2 py-3 text-sm text-muted-foreground">Geen project gevonden</p>
+                ) : (
+                  mergeOpties.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
