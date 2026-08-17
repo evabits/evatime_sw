@@ -11,9 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { customerAddressLines } from "@/lib/customer-address";
-import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 
 const statusLabel: Record<string, string> = {
@@ -60,7 +61,9 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [bookkeeping, setBookkeeping] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ type: "send" | "remind" | "bookkeeping" } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [copying, setCopying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Edit state
   const [issueDate, setIssueDate] = useState(format(new Date(invoice.issueDate), "yyyy-MM-dd"));
@@ -167,6 +170,22 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
       const err = await res.json().catch(() => ({}));
       setError(err.error ?? "Fout bij opslaan");
     }
+  }
+
+  async function copyInvoice() {
+    setCopying(true);
+    setError("");
+    const res = await fetch(`/api/invoices/${invoice.id}/copy`, { method: "POST" });
+    if (res.ok) {
+      const kopie = await res.json();
+      router.push(`/invoices/${kopie.id}`);
+      // Bewust niet uit de kopieerstand: de navigatie duurt even en een knop die
+      // alweer klikbaar is levert een tweede kopie op.
+      return;
+    }
+    setCopying(false);
+    const err = await res.json().catch(() => ({}));
+    setError(err.error ?? "Kopiëren mislukt");
   }
 
   async function updateStatus(status: string) {
@@ -310,6 +329,9 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                   <BookOpen className="h-4 w-4 mr-2" /> {bookkeeping ? "Sturen..." : "Boekhouding"}
                 </Button>
               )}
+              <Button variant="outline" onClick={copyInvoice} disabled={copying}>
+                <Copy className="h-4 w-4 mr-2" /> {copying ? "Kopiëren..." : "Kopiëren"}
+              </Button>
               <Button variant="outline" asChild>
                 <Link href={`/invoices/${invoice.id}/print?preview=1`} target="_blank">
                   <Eye className="h-4 w-4 mr-2" /> Voorbeeld
