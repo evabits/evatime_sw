@@ -48,6 +48,9 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         /* Subject line */
         .subject-line { font-size: 12px; margin-bottom: 20px; }
 
+        /* Inleidende tekst boven de regels */
+        .intro { font-size: 12px; line-height: 1.6; color: #333; margin-bottom: 20px; white-space: pre-wrap; }
+
         /* Lines table */
         table.lines { width: 100%; border-collapse: collapse; margin-bottom: 0; }
         table.lines th { text-align: left; padding: 7px 8px; font-size: 11px; font-weight: 700; border-bottom: 1px solid #333; border-top: 1px solid #333; background: #fff; }
@@ -150,6 +153,9 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
 
         {/* Subject */}
         {invoice.subject && <div className="subject-line">{invoice.subject}</div>}
+
+        {/* Inleiding */}
+        {invoice.intro && <div className="intro">{invoice.intro}</div>}
 
         {/* Lines */}
         <table className="lines">

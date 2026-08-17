@@ -69,6 +69,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [notes, setNotes] = useState(invoice.notes ?? "");
   const [reference, setReference] = useState(invoice.reference ?? "");
   const [subject, setSubject] = useState(invoice.subject ?? "");
+  const [intro, setIntro] = useState(invoice.intro ?? "");
   const [lines, setLines] = useState<Line[]>(
     invoice.lines.map((l: any) => ({
       id: l.id,
@@ -135,6 +136,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     setNotes(invoice.notes ?? "");
     setReference(invoice.reference ?? "");
     setSubject(invoice.subject ?? "");
+    setIntro(invoice.intro ?? "");
   }
 
   async function saveEdit() {
@@ -143,7 +145,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     const res = await fetch(`/api/invoices/${invoice.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, intro, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -415,6 +417,25 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                 <p className="text-sm">{invoice.subject || <span className="text-muted-foreground italic">—</span>}</p>
               )}
             </div>
+          </div>
+
+          {/* Inleiding — staat op de factuur boven de regels, dus hier onder kenmerk en
+              onderwerp. Volle breedte, want dit zijn zinnen en geen kenmerk. */}
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground mb-1">Inleiding</p>
+            {editing ? (
+              <Textarea
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
+                placeholder="Bijv. Hierbij ontvangt u de factuur voor de werkzaamheden van juli 2026."
+                rows={3}
+                className="text-sm"
+              />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">
+                {invoice.intro || <span className="text-muted-foreground italic">—</span>}
+              </p>
+            )}
           </div>
 
           {/* Sent timestamps */}

@@ -21,6 +21,7 @@ const s = StyleSheet.create({
   metaLabel: { color: "#555", marginRight: 4 },
   metaBold: { fontFamily: "Helvetica-Bold" },
   subject: { fontSize: 10, marginBottom: 16, color: "#333" },
+  intro: { fontSize: 10, marginBottom: 16, color: "#333", lineHeight: 1.5 },
   tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 4, marginBottom: 2 },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#eee", paddingVertical: 5 },
   colDesc: { flex: 3, paddingRight: 8 },
@@ -114,6 +115,9 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
 
         {/* Subject */}
         {invoice.subject && <Text style={s.subject}>{invoice.subject}</Text>}
+
+        {/* Inleiding */}
+        {invoice.intro && <Text style={s.intro}>{invoice.intro}</Text>}
 
         {/* Table header */}
         <View style={s.tableHeader}>
