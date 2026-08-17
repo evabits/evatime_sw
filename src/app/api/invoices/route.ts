@@ -5,6 +5,7 @@ import { z } from "zod";
 import { canViewInvoices, canEditInvoices } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { receiptAttachments } from "@/lib/receipt-attachments";
+import { nextInvoiceNumber } from "@/lib/invoice-number";
 import { head } from "@vercel/blob";
 
 const lineSchema = z.object({
@@ -25,14 +26,6 @@ const schema = z.object({
   notes: z.string().optional(),
   lines: z.array(lineSchema).min(1),
 });
-
-async function getNextInvoiceNumber(): Promise<string> {
-  const year = new Date().getFullYear();
-  const count = await prisma.invoice.count({
-    where: { invoiceNumber: { startsWith: `${year}-` } },
-  });
-  return `${year}-${String(count + 1).padStart(4, "0")}`;
-}
 
 export async function GET() {
   const session = await auth();
@@ -114,7 +107,7 @@ export async function POST(req: Request) {
   const subtotal = data.lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
   const vatAmount = (subtotal * data.vatRate) / 100;
   const total = subtotal + vatAmount;
-  const invoiceNumber = await getNextInvoiceNumber();
+  const invoiceNumber = await nextInvoiceNumber();
 
   const invoice = await prisma.$transaction(async (tx) => {
     const inv = await tx.invoice.create({

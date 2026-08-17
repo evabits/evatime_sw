@@ -19,9 +19,14 @@ export async function DELETE(
     // Een bijlage die uit een uitgave komt wijst naar hetzelfde bestand als
     // het bonnetje daar. Het bestand wissen zou dat bonnetje meenemen, en dan
     // is een uitgave zijn bewijs kwijt door een handeling op een heel ander
-    // scherm. Alleen wissen als niemand er meer naar wijst.
-    const nogInGebruik = await prisma.expense.count({ where: { receiptUrl: attachment.url } });
-    if (nogInGebruik === 0) await del(attachment.url);
+    // scherm. Sinds een factuur te kopiëren is geldt hetzelfde tussen facturen
+    // onderling: de kopie wijst naar dezelfde bestanden als de bron. Alleen
+    // wissen als niemand er meer naar wijst.
+    const [bijUitgaven, bijAndereFacturen] = await Promise.all([
+      prisma.expense.count({ where: { receiptUrl: attachment.url } }),
+      prisma.invoiceAttachment.count({ where: { url: attachment.url, id: { not: attachmentId } } }),
+    ]);
+    if (bijUitgaven + bijAndereFacturen === 0) await del(attachment.url);
     await prisma.invoiceAttachment.delete({ where: { id: attachmentId } });
 
     return NextResponse.json({ success: true });
