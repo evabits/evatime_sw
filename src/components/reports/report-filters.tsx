@@ -17,6 +17,7 @@ export type FilterState = {
   projectId: string;
   userId: string;
   billable: string;
+  invoiced: string;
   tagIds: string[];
   groupByEmployee: boolean;
 };
@@ -117,6 +118,17 @@ export function ReportFilters({ customers, projects, users, tags, value, onChang
                 <SelectItem value="_all">Alles</SelectItem>
                 <SelectItem value="true">Factureerbaar</SelectItem>
                 <SelectItem value="false">Niet factureerbaar</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Gefactureerd</Label>
+            <Select value={value.invoiced} onValueChange={(v) => set("invoiced", v === "_all" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Alles" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">Alles</SelectItem>
+                <SelectItem value="true">Gefactureerd</SelectItem>
+                <SelectItem value="false">Niet gefactureerd</SelectItem>
               </SelectContent>
             </Select>
           </div>

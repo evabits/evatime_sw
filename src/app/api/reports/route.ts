@@ -3,7 +3,7 @@ import { canViewReports } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
-import { projectWhereForRequiredProject, projectWhereForOptionalProject } from "@/lib/report-filters";
+import { projectWhereForRequiredProject, projectWhereForOptionalProject, invoicedWhere } from "@/lib/report-filters";
 
 export async function GET(req: Request) {
   try {
@@ -19,6 +19,7 @@ export async function GET(req: Request) {
     const projectId = searchParams.get("projectId");
     const userId = searchParams.get("userId");
     const billable = searchParams.get("billable");
+    const invoicedFilter = invoicedWhere(searchParams.get("invoiced"));
     const tagIds = searchParams.get("tags")?.split(",").filter(Boolean) ?? [];
 
     const dateFilter = {
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
         where: {
           ...(from || to ? { date: dateFilter } : {}),
           ...(userId ? { userId } : {}),
+          ...invoicedFilter,
           ...projectWhereForRequiredProject(filterParams),
         },
         include: {
@@ -52,6 +54,7 @@ export async function GET(req: Request) {
         where: {
           ...(from || to ? { date: dateFilter } : {}),
           ...(userId ? { userId } : {}),
+          ...invoicedFilter,
           ...projectWhereForRequiredProject(filterParams),
         },
         include: {
@@ -64,6 +67,7 @@ export async function GET(req: Request) {
         where: {
           ...(from || to ? { date: dateFilter } : {}),
           ...(userId ? { userId } : {}),
+          ...invoicedFilter,
           ...projectWhereForOptionalProject(filterParams),
         },
         include: {
