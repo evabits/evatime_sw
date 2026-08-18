@@ -33,6 +33,7 @@ export function ReportsClient({ customers, projects, users, tags, categories, ro
       projectId: "",
       userId: "",
       billable: "",
+      invoiced: "",
       tagIds: [],
       groupByEmployee: false,
     };
@@ -112,6 +113,7 @@ export function ReportsClient({ customers, projects, users, tags, categories, ro
     if (filters.projectId) params.set("projectId", filters.projectId);
     if (filters.userId) params.set("userId", filters.userId);
     if (filters.billable) params.set("billable", filters.billable);
+    if (filters.invoiced) params.set("invoiced", filters.invoiced);
     if (filters.tagIds.length > 0) params.set("tags", filters.tagIds.join(","));
 
     const res = await fetch(`/api/reports?${params}`);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectWhereForRequiredProject, projectWhereForOptionalProject } from "./report-filters";
+import { projectWhereForRequiredProject, projectWhereForOptionalProject, invoicedWhere } from "./report-filters";
 
 const none = { projectId: null, customerId: null, tagIds: [], billable: null };
 
@@ -65,5 +65,34 @@ describe("projectWhereForOptionalProject (uitgaven)", () => {
     expect(projectWhereForOptionalProject({ ...none, projectId: "p1", customerId: "c1", billable: "false" })).toEqual({
       projectId: "p1", project: { billable: false },
     });
+  });
+});
+
+describe("invoicedWhere", () => {
+  it("filters nothing when no choice is made", () => {
+    expect(invoicedWhere(null)).toEqual({});
+    expect(invoicedWhere("")).toEqual({});
+    expect(invoicedWhere(undefined)).toEqual({});
+  });
+
+  it("filters on invoiced and on not invoiced", () => {
+    expect(invoicedWhere("true")).toEqual({ invoiced: true });
+    expect(invoicedWhere("false")).toEqual({ invoiced: false });
+  });
+
+  it("ignores anything else instead of guessing", () => {
+    // Een onbekende waarde in de URL mag geen half filter opleveren; dan
+    // liever alles tonen dan stilzwijgend de helft weglaten.
+    expect(invoicedWhere("ja")).toEqual({});
+  });
+
+  it("stays out of the project condition, so it combines with billable", () => {
+    // De twee filters grijpen op verschillende plekken aan: dit is de
+    // combinatie "factureerbaar maar nog niet gefactureerd".
+    const where = {
+      ...projectWhereForRequiredProject({ ...none, billable: "true" }),
+      ...invoicedWhere("false"),
+    };
+    expect(where).toEqual({ project: { billable: true }, invoiced: false });
   });
 });

@@ -10,6 +10,19 @@
  * sleutel overschrijven elkaar in plaats van te combineren.
  */
 
+/**
+ * Het gefactureerd-filter. Anders dan factureerbaar staat `invoiced` op de
+ * registratie zelf en niet op het project, dus dit hoort in de where-clause
+ * ernaast en niet in de `project`-conditie hierboven — die twee mogen elkaar
+ * niet in de weg zitten. "factureerbaar én niet gefactureerd" is juist de
+ * combinatie waar je naar zoekt als je wilt weten wat er nog op een factuur moet.
+ */
+export function invoicedWhere(invoiced: string | null | undefined) {
+  if (invoiced === "true") return { invoiced: true };
+  if (invoiced === "false") return { invoiced: false };
+  return {};
+}
+
 export type ReportFilterParams = {
   projectId: string | null;
   customerId: string | null;
