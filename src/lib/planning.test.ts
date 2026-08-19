@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { projectBar, unplannedProjects, validateDateRange, groupByCustomer, timelineWindow, barGeometry, todayOffsetPct, swapOrder } from "./planning";
+import {
+  projectBar, unplannedProjects, validateDateRange, groupByCustomer, timelineWindow,
+  barGeometry, todayOffsetPct, swapOrder, timelineHeader,
+} from "./planning";
+
+const som = (segmenten: { widthPct: number }[]) => segmenten.reduce((s, x) => s + x.widthPct, 0);
 
 const taak = (id: string, start: string, eind: string, sortOrder = 0) => ({
   id, name: `taak ${id}`, startDate: start, endDate: eind, sortOrder,
@@ -228,5 +233,51 @@ describe("swapOrder", () => {
       { id: "c", sortOrder: 1 },
       { id: "b", sortOrder: 2 },
     ]);
+  });
+});
+
+describe("timelineHeader", () => {
+  // Loopt van halverwege september tot begin oktober, dus zowel het eerste
+  // als het laatste segment van elke rij steekt buiten het venster en moet
+  // afgeknipt worden.
+  const venster = { start: new Date("2026-09-15"), end: new Date("2026-10-10") };
+
+  it("toont bij zoom maanden alleen een bovenrij, afgeknipt aan beide randen", () => {
+    const header = timelineHeader(venster, "maanden");
+    expect(header.onder).toEqual([]);
+    expect(header.boven.map((s) => s.label)).toEqual(["SEP 2026", "OKT 2026"]);
+    // Het eerste segment begint bij het venster, niet bij 1 september.
+    expect(header.boven[0].leftPct).toBe(0);
+    // September levert 16 dagen (15 t/m 30) van de 26 vensterdagen.
+    expect(header.boven[0].widthPct).toBeCloseTo((16 / 26) * 100, 5);
+    expect(som(header.boven)).toBeCloseTo(100, 5);
+  });
+
+  it("toont bij zoom weken maanden boven en ISO-weeknummers eronder", () => {
+    const header = timelineHeader(venster, "weken");
+    expect(header.boven.map((s) => s.label)).toEqual(["SEP 2026", "OKT 2026"]);
+    // Weken 38 t/m 41 overlappen het venster; de eerste en de laatste zijn
+    // afgeknipt tot 6 dagen in plaats van 7.
+    expect(header.onder.map((s) => s.label)).toEqual(["38", "39", "40", "41"]);
+    expect(header.onder[0].leftPct).toBe(0);
+    expect(header.onder[0].widthPct).toBeCloseTo((6 / 26) * 100, 5);
+    expect(som(header.onder)).toBeCloseTo(100, 5);
+  });
+
+  it("toont bij zoom kwartalen kwartalen boven en maanden (kort) eronder", () => {
+    const header = timelineHeader(venster, "kwartalen");
+    expect(header.boven.map((s) => s.label)).toEqual(["Q3 2026", "Q4 2026"]);
+    expect(header.boven[0].leftPct).toBe(0);
+    expect(som(header.boven)).toBeCloseTo(100, 5);
+    expect(header.onder.map((s) => s.label)).toEqual(["SEP", "OKT"]);
+    expect(som(header.onder)).toBeCloseTo(100, 5);
+  });
+
+  it("dekt met de bovenrij precies het volledige venster, ook zonder afknippen", () => {
+    // Venster dat toevallig op een maandgrens begint en eindigt: hier valt er
+    // dus niets af te knippen, maar de percentages moeten nog steeds optellen.
+    const heleMaand = { start: new Date("2026-09-01"), end: new Date("2026-09-30") };
+    const header = timelineHeader(heleMaand, "maanden");
+    expect(header.boven).toEqual([{ key: "2026-8", label: "SEP 2026", leftPct: 0, widthPct: 100 }]);
   });
 });

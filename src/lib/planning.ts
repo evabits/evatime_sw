@@ -1,5 +1,10 @@
-import { addDays, differenceInCalendarDays, max, min } from "date-fns";
+import {
+  addDays, differenceInCalendarDays, max, min,
+  eachMonthOfInterval, eachWeekOfInterval, eachQuarterOfInterval,
+  endOfMonth, endOfQuarter, getISOWeek, getQuarter,
+} from "date-fns";
 import { ZONDER_KLANT } from "./project-picker";
+import { MAANDEN } from "./utils";
 
 /**
  * De rekenkunde achter de projecttijdlijn: welke balk een project krijgt, welk
@@ -204,4 +209,78 @@ export function swapOrder(
   const nieuw = [...gesorteerd];
   [nieuw[van], nieuw[naar]] = [nieuw[naar], nieuw[van]];
   return nieuw.map((t, index) => ({ id: t.id, sortOrder: index }));
+}
+
+export type TimelineSegment = { key: string; label: string; leftPct: number; widthPct: number };
+export type TimelineHeader = { boven: TimelineSegment[]; onder: TimelineSegment[] };
+
+/**
+ * Bouwt één kalenderrij (maanden, weken of kwartalen) van segmenten die samen
+ * het venster dekken, elk afgeknipt op de vensterranden zodat het eerste en
+ * laatste segment niet buiten de balken eronder uitsteken.
+ *
+ * `periodeStart`/`periodeEind` geven van een datum in de rij het volledige
+ * kalenderblok terug (bv. de hele maand); de geometrie knipt dat blok daarna
+ * op het venster af via dezelfde barGeometry als de balken gebruiken.
+ */
+function segmentRij(
+  data: Date[],
+  periodeEind: (d: Date) => Date,
+  label: (d: Date) => string,
+  key: (d: Date) => string,
+  venster: DateRange,
+): TimelineSegment[] {
+  return data.map((d) => {
+    const start = max([d, venster.start]);
+    const eind = min([periodeEind(d), venster.end]);
+    const geo = barGeometry(start, eind, venster);
+    return { key: key(d), label: label(d), leftPct: geo.leftPct, widthPct: geo.widthPct };
+  });
+}
+
+const maandLabelMetJaar = (d: Date) => `${MAANDEN[d.getMonth()]} ${d.getFullYear()}`;
+const maandKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
+
+/**
+ * De tijdas boven de balken: bij weken maanden met weeknummers eronder, bij
+ * maanden alleen maanden, bij kwartalen kwartalen met maanden eronder.
+ *
+ * Puur rekenwerk, geen React — zodat het zonder scherm te testen is, net als
+ * de rest van dit bestand.
+ */
+export function timelineHeader(venster: DateRange, zoom: "weken" | "maanden" | "kwartalen"): TimelineHeader {
+  const maanden = eachMonthOfInterval({ start: venster.start, end: venster.end });
+
+  if (zoom === "maanden") {
+    return {
+      boven: segmentRij(maanden, endOfMonth, maandLabelMetJaar, maandKey, venster),
+      onder: [],
+    };
+  }
+
+  if (zoom === "weken") {
+    const weken = eachWeekOfInterval({ start: venster.start, end: venster.end }, { weekStartsOn: 1 });
+    return {
+      boven: segmentRij(maanden, endOfMonth, maandLabelMetJaar, maandKey, venster),
+      onder: segmentRij(
+        weken,
+        (d) => addDays(d, 6),
+        (d) => `${getISOWeek(d)}`,
+        (d) => `w-${d.toISOString()}`,
+        venster,
+      ),
+    };
+  }
+
+  const kwartalen = eachQuarterOfInterval({ start: venster.start, end: venster.end });
+  return {
+    boven: segmentRij(
+      kwartalen,
+      endOfQuarter,
+      (d) => `Q${getQuarter(d)} ${d.getFullYear()}`,
+      (d) => `${d.getFullYear()}-Q${getQuarter(d)}`,
+      venster,
+    ),
+    onder: segmentRij(maanden, endOfMonth, (d) => MAANDEN[d.getMonth()], maandKey, venster),
+  };
 }

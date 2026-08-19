@@ -15,7 +15,9 @@ export function formatCurrency(amount: number | string | null | undefined): stri
   return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(num);
 }
 
-const MAANDEN = ["JAN", "FEB", "MRT", "APR", "MEI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
+// Geëxporteerd zodat de tijdas van de planningstijdlijn dezelfde maandnamen
+// toont als formatDate, in plaats van een eigen lijst te dupliceren.
+export const MAANDEN = ["JAN", "FEB", "MRT", "APR", "MEI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
 
 /**
  * De enige datumweergave in deze app: `01-JAN-2026`.
