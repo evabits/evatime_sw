@@ -1,4 +1,4 @@
-import { max, min } from "date-fns";
+import { addDays, differenceInCalendarDays, max, min } from "date-fns";
 import { ZONDER_KLANT } from "./project-picker";
 
 /**
@@ -100,4 +100,75 @@ export function groupByCustomer(projects: PlanningProject[]): PlanningGroup[] {
       customerName,
       projects: [...groep].sort((a, b) => a.name.localeCompare(b.name, "nl", { sensitivity: "base" })),
     }));
+}
+
+/** Lucht links en rechts van het geplande werk, zodat balken niet tegen de rand plakken. */
+const VENSTER_MARGE_DAGEN = 7;
+/** Het venster als er nog niets gepland is: genoeg verleden om te zien wat liep, genoeg toekomst om in te plannen. */
+const LEEG_VENSTER_TERUG = 30;
+const LEEG_VENSTER_VOORUIT = 90;
+
+/**
+ * Het venster dat de tijdlijn beslaat.
+ *
+ * Neemt projectbalken én taakdatums mee. Een taak mag buiten de datums van
+ * zijn eigen project vallen — dat is toegestaan en juist de waarschuwing dat de
+ * planning niet klopt — en dan moet die taak wel zichtbaar blijven.
+ */
+export function timelineWindow(projects: PlanningProject[], vandaag: Date): DateRange {
+  const datums: Date[] = [];
+  for (const project of projects) {
+    const bar = projectBar(project);
+    if (bar) datums.push(bar.start, bar.end);
+    for (const taak of project.tasks) {
+      datums.push(new Date(taak.startDate), new Date(taak.endDate));
+    }
+  }
+
+  if (datums.length === 0) {
+    return {
+      start: addDays(vandaag, -LEEG_VENSTER_TERUG),
+      end: addDays(vandaag, LEEG_VENSTER_VOORUIT),
+    };
+  }
+
+  return {
+    start: addDays(min(datums), -VENSTER_MARGE_DAGEN),
+    end: addDays(max(datums), VENSTER_MARGE_DAGEN),
+  };
+}
+
+/** Plek en breedte van een balk, als percentage van het venster. */
+export type BarGeometry = { leftPct: number; widthPct: number };
+
+/**
+ * Waar een balk in het venster staat.
+ *
+ * Alles telt in hele dagen en einddatums zijn inclusief, vandaar de `+ 1` op
+ * beide lengtes: zonder die op de duur krijgt een taak van één dag breedte nul
+ * en verdwijnt hij uit beeld.
+ */
+export function barGeometry(
+  start: string | Date,
+  end: string | Date,
+  venster: DateRange,
+): BarGeometry {
+  const vensterDagen = differenceInCalendarDays(venster.end, venster.start) + 1;
+  const vanaf = differenceInCalendarDays(new Date(start), venster.start);
+  const duur = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+  return {
+    leftPct: (vanaf / vensterDagen) * 100,
+    widthPct: (duur / vensterDagen) * 100,
+  };
+}
+
+/**
+ * De plek van de vandaag-streep, of `null` als vandaag buiten het venster valt.
+ * Dat gebeurt echt: plan je alleen werk voor volgend jaar, dan hoort er geen
+ * streep te staan in plaats van eentje tegen de rand geplakt.
+ */
+export function todayOffsetPct(vandaag: Date, venster: DateRange): number | null {
+  if (vandaag < venster.start || vandaag > venster.end) return null;
+  const vensterDagen = differenceInCalendarDays(venster.end, venster.start) + 1;
+  return (differenceInCalendarDays(vandaag, venster.start) / vensterDagen) * 100;
 }

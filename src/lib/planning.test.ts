@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectBar, unplannedProjects, validateDateRange, groupByCustomer } from "./planning";
+import { projectBar, unplannedProjects, validateDateRange, groupByCustomer, timelineWindow, barGeometry, todayOffsetPct } from "./planning";
 
 const taak = (id: string, start: string, eind: string, sortOrder = 0) => ({
   id, name: `taak ${id}`, startDate: start, endDate: eind, sortOrder,
@@ -115,5 +115,70 @@ describe("groupByCustomer", () => {
 
   it("gives an empty list for no projects instead of a group with nothing in it", () => {
     expect(groupByCustomer([])).toEqual([]);
+  });
+});
+
+const vandaag = new Date(2026, 8, 15); // 15-SEP-2026
+
+describe("timelineWindow", () => {
+  it("spans everything that gets drawn, with seven days of margin", () => {
+    const venster = timelineWindow([
+      { id: "p1", name: "A", plannedStart: "2026-09-01", plannedEnd: "2026-09-30", tasks: [] },
+    ], vandaag);
+    expect(venster.start).toEqual(new Date("2026-08-25"));
+    expect(venster.end).toEqual(new Date("2026-10-07"));
+  });
+
+  it("stretches for a task that falls outside its own project's dates", () => {
+    // Dat mag: het is juist de zichtbare waarschuwing dat de planning niet
+    // klopt. Dan moet die taak wel in beeld blijven.
+    const venster = timelineWindow([
+      {
+        id: "p1", name: "A", plannedStart: "2026-09-01", plannedEnd: "2026-09-30",
+        tasks: [{ id: "t1", name: "uitloop", startDate: "2026-10-20", endDate: "2026-11-05", sortOrder: 0 }],
+      },
+    ], vandaag);
+    expect(venster.end).toEqual(new Date("2026-11-12"));
+  });
+
+  it("falls back to a window around today when nothing is planned at all", () => {
+    const venster = timelineWindow([{ id: "p1", name: "Intern", tasks: [] }], vandaag);
+    expect(venster.start).toEqual(new Date(2026, 7, 16)); // 30 dagen terug
+    expect(venster.end).toEqual(new Date(2026, 11, 14)); // 90 dagen vooruit
+  });
+
+  it("does the same for no projects at all", () => {
+    expect(timelineWindow([], vandaag).start).toEqual(new Date(2026, 7, 16));
+  });
+});
+
+describe("barGeometry", () => {
+  const venster = { start: new Date("2026-09-01"), end: new Date("2026-09-10") }; // 10 dagen
+
+  it("puts a bar that fills the whole window at nought and a hundred percent", () => {
+    expect(barGeometry("2026-09-01", "2026-09-10", venster)).toEqual({ leftPct: 0, widthPct: 100 });
+  });
+
+  it("gives a one-day task a width of one day, not zero", () => {
+    // Dit is waarom de einddatum inclusief is: zonder de +1 verdwijnt een taak
+    // van één dag volledig uit beeld.
+    expect(barGeometry("2026-09-01", "2026-09-01", venster)).toEqual({ leftPct: 0, widthPct: 10 });
+  });
+
+  it("shifts a bar that starts later", () => {
+    expect(barGeometry("2026-09-06", "2026-09-10", venster)).toEqual({ leftPct: 50, widthPct: 50 });
+  });
+});
+
+describe("todayOffsetPct", () => {
+  it("gives the position of today inside the window", () => {
+    const venster = { start: new Date("2026-09-01"), end: new Date("2026-09-10") };
+    expect(todayOffsetPct(new Date("2026-09-06"), venster)).toBe(50);
+  });
+
+  it("gives null when today falls outside the window, so no line is drawn", () => {
+    const venster = { start: new Date("2026-09-01"), end: new Date("2026-09-10") };
+    expect(todayOffsetPct(new Date("2026-08-31"), venster)).toBeNull();
+    expect(todayOffsetPct(new Date("2026-09-11"), venster)).toBeNull();
   });
 });
