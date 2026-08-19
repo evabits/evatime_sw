@@ -253,5 +253,8 @@ van de nieuwe tabel.
   verwijderen en ordenen, en ziet het resultaat meteen.
 - Projecten zonder planning staan onderaan in plaats van nergens.
 - Niemand anders dan een beheerder komt bij het scherm of de routes.
-- De pure functies zijn gedekt door tests, inclusief de randgevallen hierboven,
-  en de merge-route heeft een test die bewijst dat taken meeverhuizen.
+- De pure functies zijn gedekt door tests, inclusief de randgevallen hierboven.
+- Dat taken meeverhuizen bij een samenvoeging is aangetoond. Niet met een
+  unittest: dit project test uitsluitend pure functies, en een transactie vraagt
+  een database. De verificatie is een wegwerpscript dat leest wat er vóór en na
+  een samenvoeging aan taken hangt.
