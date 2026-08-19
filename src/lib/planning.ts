@@ -172,3 +172,36 @@ export function todayOffsetPct(vandaag: Date, venster: DateRange): number | null
   const vensterDagen = differenceInCalendarDays(venster.end, venster.start) + 1;
   return (differenceInCalendarDays(vandaag, venster.start) / vensterDagen) * 100;
 }
+
+export type OrderedTask = { id: string; sortOrder: number };
+
+/**
+ * Wisselt een taak met zijn buur en nummert de hele lijst opnieuw van nul af.
+ *
+ * Hernummeren in plaats van alleen twee waarden omruilen, omdat de nummering
+ * niet te vertrouwen is: na een samenvoeging lopen twee reeksen door elkaar en
+ * kunnen taken dezelfde `sortOrder` delen. Omruilen zou dan niets doen.
+ *
+ * Een lege lijst betekent "er valt niets te verplaatsen" — de taak staat al
+ * boven- of onderaan, of bestaat niet.
+ */
+export function swapOrder(
+  taken: OrderedTask[],
+  id: string,
+  richting: "up" | "down",
+): OrderedTask[] {
+  // Op id als tweede sleutel, zodat gelijke nummers toch een vaste volgorde
+  // hebben en het resultaat voorspelbaar is.
+  const gesorteerd = [...taken].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
+  );
+
+  const van = gesorteerd.findIndex((t) => t.id === id);
+  if (van === -1) return [];
+  const naar = richting === "up" ? van - 1 : van + 1;
+  if (naar < 0 || naar >= gesorteerd.length) return [];
+
+  const nieuw = [...gesorteerd];
+  [nieuw[van], nieuw[naar]] = [nieuw[naar], nieuw[van]];
+  return nieuw.map((t, index) => ({ id: t.id, sortOrder: index }));
+}

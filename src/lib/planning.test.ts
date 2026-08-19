@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectBar, unplannedProjects, validateDateRange, groupByCustomer, timelineWindow, barGeometry, todayOffsetPct } from "./planning";
+import { projectBar, unplannedProjects, validateDateRange, groupByCustomer, timelineWindow, barGeometry, todayOffsetPct, swapOrder } from "./planning";
 
 const taak = (id: string, start: string, eind: string, sortOrder = 0) => ({
   id, name: `taak ${id}`, startDate: start, endDate: eind, sortOrder,
@@ -180,5 +180,53 @@ describe("todayOffsetPct", () => {
     const venster = { start: new Date("2026-09-01"), end: new Date("2026-09-10") };
     expect(todayOffsetPct(new Date("2026-08-31"), venster)).toBeNull();
     expect(todayOffsetPct(new Date("2026-09-11"), venster)).toBeNull();
+  });
+});
+
+describe("swapOrder", () => {
+  const taken = [
+    { id: "a", sortOrder: 0 },
+    { id: "b", sortOrder: 1 },
+    { id: "c", sortOrder: 2 },
+  ];
+
+  it("moves a task up and renumbers the whole list", () => {
+    expect(swapOrder(taken, "b", "up")).toEqual([
+      { id: "b", sortOrder: 0 },
+      { id: "a", sortOrder: 1 },
+      { id: "c", sortOrder: 2 },
+    ]);
+  });
+
+  it("moves a task down", () => {
+    expect(swapOrder(taken, "b", "down")).toEqual([
+      { id: "a", sortOrder: 0 },
+      { id: "c", sortOrder: 1 },
+      { id: "b", sortOrder: 2 },
+    ]);
+  });
+
+  it("does nothing at the edges instead of failing", () => {
+    expect(swapOrder(taken, "a", "up")).toEqual([]);
+    expect(swapOrder(taken, "c", "down")).toEqual([]);
+  });
+
+  it("does nothing for a task that is not in the list", () => {
+    expect(swapOrder(taken, "onbekend", "up")).toEqual([]);
+  });
+
+  it("still works when the order numbers collide or are all zero", () => {
+    // Dat gebeurt na een samenvoeging: twee reeksen sortOrder lopen door
+    // elkaar. Hernummeren van de hele lijst maakt dat vanzelf weer heel.
+    const rommelig = [
+      { id: "a", sortOrder: 0 },
+      { id: "b", sortOrder: 0 },
+      { id: "c", sortOrder: 0 },
+    ];
+    expect(swapOrder(rommelig, "c", "up")).toEqual([
+      { id: "a", sortOrder: 0 },
+      { id: "c", sortOrder: 1 },
+      { id: "b", sortOrder: 2 },
+    ]);
   });
 });
