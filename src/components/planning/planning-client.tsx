@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ChevronDown, ChevronRight, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { differenceInCalendarDays } from "date-fns";
 import { formatDate } from "@/lib/utils";
 import {
@@ -26,6 +30,97 @@ const NAAMKOLOM_PX = 224;
 export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [zoom, setZoom] = useState<ZoomStand>("maanden");
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const router = useRouter();
+  const [fout, setFout] = useState("");
+  const [bezig, setBezig] = useState(false);
+  // Welk venster openstaat. Eén stuk state, want er kan er maar één tegelijk open zijn.
+  const [venstertje, setVenstertje] = useState<
+    | { soort: "project"; project: PlanningProject }
+    | { soort: "taak-nieuw"; project: PlanningProject }
+    | { soort: "taak-bewerk"; project: PlanningProject; taak: PlanningProject["tasks"][number] }
+    | null
+  >(null);
+  const [formNaam, setFormNaam] = useState("");
+  const [formStart, setFormStart] = useState("");
+  const [formEind, setFormEind] = useState("");
+
+  /** ISO voor een <input type="date">; die accepteert niets anders. */
+  const isoVoorInvoer = (d: string | Date | null | undefined) =>
+    d ? new Date(d).toISOString().slice(0, 10) : "";
+
+  function openProject(project: PlanningProject) {
+    setFout("");
+    setFormStart(isoVoorInvoer(project.plannedStart));
+    setFormEind(isoVoorInvoer(project.plannedEnd));
+    setVenstertje({ soort: "project", project });
+  }
+
+  function openNieuweTaak(project: PlanningProject) {
+    setFout("");
+    setFormNaam("");
+    setFormStart("");
+    setFormEind("");
+    setVenstertje({ soort: "taak-nieuw", project });
+  }
+
+  function openTaak(project: PlanningProject, taak: PlanningProject["tasks"][number]) {
+    setFout("");
+    setFormNaam(taak.name);
+    setFormStart(isoVoorInvoer(taak.startDate));
+    setFormEind(isoVoorInvoer(taak.endDate));
+    setVenstertje({ soort: "taak-bewerk", project, taak });
+  }
+
+  /** Eén plek voor elke schrijfactie: verstuurt, meldt de fout, en ververst bij succes. */
+  async function verstuur(url: string, method: string, body?: unknown) {
+    setBezig(true);
+    setFout("");
+    const res = await fetch(url, {
+      method,
+      ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+    });
+    setBezig(false);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      setFout(payload.error ?? "Opslaan mislukt");
+      return false;
+    }
+    setVenstertje(null);
+    router.refresh();
+    return true;
+  }
+
+  async function bewaar() {
+    if (!venstertje) return;
+    if (venstertje.soort === "project") {
+      // De PUT van een project eist naam en status; die sturen we onveranderd mee.
+      await verstuur(`/api/projects/${venstertje.project.id}`, "PUT", {
+        name: venstertje.project.name,
+        status: "ACTIVE",
+        plannedStart: formStart || null,
+        plannedEnd: formEind || null,
+      });
+      return;
+    }
+    if (venstertje.soort === "taak-nieuw") {
+      await verstuur(`/api/projects/${venstertje.project.id}/tasks`, "POST", {
+        name: formNaam, startDate: formStart, endDate: formEind,
+      });
+      return;
+    }
+    await verstuur(`/api/project-tasks/${venstertje.taak.id}`, "PUT", {
+      name: formNaam, startDate: formStart, endDate: formEind,
+    });
+  }
+
+  async function verwijderTaak(taakId: string) {
+    if (!confirm("Weet u zeker dat u deze taak wilt verwijderen?")) return;
+    await verstuur(`/api/project-tasks/${taakId}`, "DELETE");
+  }
+
+  async function verplaats(taakId: string, move: "up" | "down") {
+    await verstuur(`/api/project-tasks/${taakId}`, "PATCH", { move });
+  }
 
   const vandaag = new Date();
   const venster = timelineWindow(projects, vandaag);
@@ -82,7 +177,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         <button
                           type="button"
                           className="flex items-center gap-1 shrink-0 px-3 py-2 text-sm text-left hover:bg-muted/50"
-                          style={{ width: NAAMKOLOM_PX }}
+                          style={{ width: NAAMKOLOM_PX - 28 }}
                           onClick={() => setOpen((o) => ({ ...o, [project.id]: !uitgeklapt }))}
                         >
                           {project.tasks.length > 0
@@ -90,11 +185,20 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                             : <span className="w-3.5" />}
                           <span className="truncate">{project.name}</span>
                         </button>
+                        <Button
+                          variant="ghost" size="icon" className="h-7 w-7 shrink-0 self-center"
+                          title="Taak toevoegen"
+                          onClick={() => openNieuweTaak(project)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
                         <div className="relative flex-1 py-2" style={{ width: breedte }}>
-                          <div
-                            className="absolute h-4 rounded bg-primary"
-                            style={{ left: `${geo.leftPct}%`, width: `${geo.widthPct}%` }}
-                            title={`${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)}`}
+                          <button
+                            type="button"
+                            className="absolute h-4 rounded bg-primary hover:bg-primary/80"
+                            style={{ left: `${geo.leftPct}%`, width: `${geo.widthPct}%`, minWidth: 4 }}
+                            title={`${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`}
+                            onClick={() => openProject(project)}
                           />
                         </div>
                       </div>
@@ -104,10 +208,26 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         return (
                           <div key={taak.id} className="flex items-stretch border-b bg-muted/20">
                             <div
-                              className="shrink-0 px-3 py-1.5 pl-8 text-sm text-muted-foreground truncate"
+                              className="shrink-0 flex items-center gap-0.5 px-3 pl-8 py-1.5 text-sm"
                               style={{ width: NAAMKOLOM_PX }}
                             >
-                              {taak.name}
+                              <button
+                                type="button"
+                                className="truncate text-muted-foreground hover:text-foreground text-left flex-1"
+                                onClick={() => openTaak(project, taak)}
+                                title="Taak bewerken"
+                              >
+                                {taak.name}
+                              </button>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omhoog" disabled={bezig} onClick={() => verplaats(taak.id, "up")}>
+                                <ChevronUp className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omlaag" disabled={bezig} onClick={() => verplaats(taak.id, "down")}>
+                                <ChevronDown className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Verwijderen" disabled={bezig} onClick={() => verwijderTaak(taak.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                             <div className="relative flex-1 py-1.5" style={{ width: breedte }}>
                               <div
@@ -139,11 +259,53 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
           <CardHeader><CardTitle className="text-base">Nog niet gepland</CardTitle></CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {ongepland.map((p) => (
-              <span key={p.id} className="rounded border px-2 py-1 text-sm">{p.name}</span>
+              <Button key={p.id} variant="outline" size="sm" onClick={() => openProject(p)}>
+                {p.name}
+              </Button>
             ))}
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={venstertje !== null} onOpenChange={(o) => { if (!o) setVenstertje(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {venstertje?.soort === "project" ? `Planning van ${venstertje.project.name}`
+                : venstertje?.soort === "taak-nieuw" ? "Nieuwe taak"
+                : "Taak bewerken"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {venstertje?.soort !== "project" && (
+              <div className="space-y-1">
+                <Label>Naam</Label>
+                <Input value={formNaam} onChange={(e) => setFormNaam(e.target.value)} autoFocus />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>Start</Label>
+              <Input type="date" value={formStart} onChange={(e) => setFormStart(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Eind</Label>
+              <Input type="date" value={formEind} onChange={(e) => setFormEind(e.target.value)} />
+            </div>
+            {venstertje?.soort === "project" && (
+              <p className="text-xs text-muted-foreground">
+                Laat allebei leeg om de balk de taken te laten volgen.
+              </p>
+            )}
+            {fout && <p className="text-sm text-destructive">{fout}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVenstertje(null)} disabled={bezig}>Annuleren</Button>
+            <Button onClick={bewaar} disabled={bezig}>{bezig ? "Opslaan..." : "Opslaan"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
