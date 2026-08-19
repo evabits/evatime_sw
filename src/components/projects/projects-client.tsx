@@ -285,7 +285,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
     if (
       !confirm(
         `"${mergeBron.name}" samenvoegen met "${doelNaam}"? ` +
-          `De uren, kilometers, km-sjablonen, uitgaven en deelnemers verhuizen mee en ` +
+          `De uren, kilometers, km-sjablonen, taken, uitgaven en deelnemers verhuizen mee en ` +
           `"${mergeBron.name}" wordt verwijderd.`,
       )
     ) {
@@ -692,7 +692,7 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              De uren, kilometers en uitgaven van &quot;{mergeBron?.name}&quot; verhuizen naar het
+              De uren, kilometers, taken en uitgaven van &quot;{mergeBron?.name}&quot; verhuizen naar het
               gekozen project, en de deelnemers krijgen daar boekrecht. &quot;{mergeBron?.name}&quot;
               wordt daarna verwijderd.
             </p>
