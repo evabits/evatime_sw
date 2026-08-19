@@ -18,7 +18,12 @@ export default async function PlanningPage() {
       plannedEnd: true,
       customer: { select: { name: true } },
       tasks: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        // id als tiebreaker en niet createdAt: swapOrder in lib/planning.ts
+        // hernummert de hele lijst op basis van diezelfde sortering, en na een
+        // projectsamenvoeging kunnen sortOrder-waarden dubbel voorkomen. Wijkt
+        // deze orderBy af van swapOrder, dan schudt de eerste pijltjesklik erna
+        // taken door elkaar die de beheerder niet aanraakte.
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
         select: { id: true, name: true, startDate: true, endDate: true, sortOrder: true },
       },
     },
