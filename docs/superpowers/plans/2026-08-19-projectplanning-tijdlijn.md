@@ -606,7 +606,7 @@ export function todayOffsetPct(vandaag: Date, venster: DateRange): number | null
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/planning.test.ts
 ```
 
-Verwacht: PASS, 24 tests.
+Verwacht: PASS, 23 tests (14 uit taak 2 plus 9 nieuwe).
 
 - [ ] **Step 5: Commit**
 
@@ -984,7 +984,7 @@ export function swapOrder(
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/planning.test.ts
 ```
 
-Verwacht: PASS, 29 tests.
+Verwacht: PASS, 28 tests (23 uit taken 2 en 3 plus 5 nieuwe).
 
 - [ ] **Step 5: Schrijf de route**
 
