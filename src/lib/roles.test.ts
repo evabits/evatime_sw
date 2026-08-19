@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canViewReports } from "./roles";
+import { canViewReports, canManagePlanning } from "./roles";
 
 describe("canViewReports", () => {
   it("allows ADMIN", () => {
@@ -13,5 +13,18 @@ describe("canViewReports", () => {
   });
   it("denies unknown roles", () => {
     expect(canViewReports("")).toBe(false);
+  });
+});
+
+describe("canManagePlanning", () => {
+  it("only lets an admin plan", () => {
+    expect(canManagePlanning("ADMIN")).toBe(true);
+    expect(canManagePlanning("FINANCE")).toBe(false);
+    expect(canManagePlanning("TEAMLEAD")).toBe(false);
+    expect(canManagePlanning("EMPLOYEE")).toBe(false);
+  });
+
+  it("says no to an unknown role instead of throwing", () => {
+    expect(canManagePlanning("ONBEKEND")).toBe(false);
   });
 });

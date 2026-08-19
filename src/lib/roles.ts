@@ -24,6 +24,7 @@ export const ROLES = {
       viewInvoices: "all" as const,      // DRAFT / SENT / PAID / CANCELLED
       viewReports: true,
       leadStandup: true,
+      managePlanning: true,
     },
   },
   FINANCE: {
@@ -44,6 +45,7 @@ export const ROLES = {
       viewInvoices: "sent_paid" as const,
       viewReports: true,
       leadStandup: false,
+      managePlanning: false,
     },
   },
   TEAMLEAD: {
@@ -68,6 +70,7 @@ export const ROLES = {
       viewInvoices: "none" as const,
       viewReports: false,
       leadStandup: true,
+      managePlanning: false,
     },
   },
   EMPLOYEE: {
@@ -87,6 +90,7 @@ export const ROLES = {
       viewInvoices: "none" as const,
       viewReports: false,
       leadStandup: false,
+      managePlanning: false,
     },
   },
 } as const;
@@ -133,4 +137,8 @@ export function getRoleLabel(role: string): string {
 
 export function canLeadStandup(role: string): boolean {
   return role === "ADMIN" || role === "TEAMLEAD";
+}
+
+export function canManagePlanning(role: string): boolean {
+  return role === "ADMIN";
 }
