@@ -11,7 +11,7 @@ import { differenceInCalendarDays } from "date-fns";
 import { formatDate } from "@/lib/utils";
 import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
-  barGeometry, todayOffsetPct, type PlanningProject,
+  barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
 
 /**
@@ -129,6 +129,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const dagen = differenceInCalendarDays(venster.end, venster.start) + 1;
   const breedte = dagen * ZOOM[zoom].pxPerDag;
   const vandaagPct = todayOffsetPct(vandaag, venster);
+  const kop = timelineHeader(venster, zoom);
 
   const groepen = groupByCustomer(projects.filter((p) => projectBar(p) !== null));
   const ongepland = unplannedProjects(projects);
@@ -162,9 +163,44 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
               />
             )}
 
+            {/* Tijdas: uitgelijnd met dezelfde NAAMKOLOM_PX-insprong en breedte als
+                de balken eronder, zodat een datum boven precies bij zijn dag staat. */}
+            <div className="border-b">
+              <div className="flex items-stretch">
+                <div className="sticky left-0 z-[1] shrink-0 bg-card" style={{ width: NAAMKOLOM_PX }} />
+                <div className="relative shrink-0 h-6" style={{ width: breedte }}>
+                  {kop.boven.map((seg) => (
+                    <div
+                      key={seg.key}
+                      className="absolute top-0 h-6 flex items-center justify-center border-l text-xs font-medium text-muted-foreground"
+                      style={{ left: `${seg.leftPct}%`, width: `${seg.widthPct}%` }}
+                    >
+                      {seg.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {kop.onder.length > 0 && (
+                <div className="flex items-stretch">
+                  <div className="sticky left-0 z-[1] shrink-0 bg-card" style={{ width: NAAMKOLOM_PX }} />
+                  <div className="relative shrink-0 h-5" style={{ width: breedte }}>
+                    {kop.onder.map((seg) => (
+                      <div
+                        key={seg.key}
+                        className="absolute top-0 h-5 flex items-center justify-center border-l text-[10px] text-muted-foreground"
+                        style={{ left: `${seg.leftPct}%`, width: `${seg.widthPct}%` }}
+                      >
+                        {seg.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {groepen.map((groep) => (
               <div key={groep.customerName}>
-                <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50">
+                <div className="sticky left-0 z-[1] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50">
                   {groep.customerName}
                 </div>
                 {groep.projects.map((project) => {
@@ -174,24 +210,32 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                   return (
                     <div key={project.id}>
                       <div className="flex items-stretch border-b">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 shrink-0 px-3 py-2 text-sm text-left hover:bg-muted/50"
-                          style={{ width: NAAMKOLOM_PX - 28 }}
-                          onClick={() => setOpen((o) => ({ ...o, [project.id]: !uitgeklapt }))}
+                        {/* Sticky naamkolom: blijft links staan bij horizontaal scrollen.
+                            bg-card (ondoorzichtig) zodat balken er straks niet doorheen
+                            schijnen als ze onder de kolom door scrollen. */}
+                        <div
+                          className="sticky left-0 z-[1] flex items-stretch shrink-0 bg-card"
+                          style={{ width: NAAMKOLOM_PX }}
                         >
-                          {project.tasks.length > 0
-                            ? (uitgeklapt ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)
-                            : <span className="w-3.5" />}
-                          <span className="truncate">{project.name}</span>
-                        </button>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7 shrink-0 self-center"
-                          title="Taak toevoegen"
-                          onClick={() => openNieuweTaak(project)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 shrink-0 px-3 py-2 text-sm text-left hover:bg-muted/50"
+                            style={{ width: NAAMKOLOM_PX - 28 }}
+                            onClick={() => setOpen((o) => ({ ...o, [project.id]: !uitgeklapt }))}
+                          >
+                            {project.tasks.length > 0
+                              ? (uitgeklapt ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)
+                              : <span className="w-3.5" />}
+                            <span className="truncate">{project.name}</span>
+                          </button>
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7 shrink-0 self-center"
+                            title="Taak toevoegen"
+                            onClick={() => openNieuweTaak(project)}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                         <div className="relative shrink-0 py-2" style={{ width: breedte }}>
                           <button
                             type="button"
@@ -208,7 +252,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         return (
                           <div key={taak.id} className="flex items-stretch border-b bg-muted/20">
                             <div
-                              className="shrink-0 flex items-center gap-0.5 px-3 pl-8 py-1.5 text-sm"
+                              className="sticky left-0 z-[1] shrink-0 flex items-center gap-0.5 px-3 pl-8 py-1.5 text-sm bg-card"
                               style={{ width: NAAMKOLOM_PX }}
                             >
                               <button
