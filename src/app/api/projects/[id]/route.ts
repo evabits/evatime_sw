@@ -5,6 +5,7 @@ import { z } from "zod";
 import { handleError, projectNameTakenError, resolveTagNames } from "@/lib/api";
 import { levelRatesField } from "@/lib/rates";
 import { isAdmin } from "@/lib/roles";
+import { validateDateRange } from "@/lib/planning";
 
 const schema = z.object({
   // Optioneel en nullable, gelijk aan POST /api/projects. Klantloze projecten
@@ -20,6 +21,10 @@ const schema = z.object({
   levelRates: levelRatesField,
   billable: z.boolean().optional(),
   memberIds: z.array(z.string().min(1)).optional(),
+  // Los van elkaar optioneel in het schema, maar samen gecontroleerd: één losse
+  // datum levert geen balk op de tijdlijn op. Zie validateDateRange.
+  plannedStart: z.string().optional().nullable(),
+  plannedEnd: z.string().optional().nullable(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,14 +61,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!isAdmin(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { id } = await params;
 
-    const { tags, levelRates, memberIds, ...rest } = schema.parse(await req.json());
+    const { tags, levelRates, memberIds, plannedStart, plannedEnd, ...rest } = schema.parse(await req.json());
     const nameError = await projectNameTakenError(rest.name, id);
     if (nameError) return nameError;
+    const datumFout = validateDateRange(plannedStart, plannedEnd);
+    if (datumFout) return NextResponse.json({ error: datumFout }, { status: 400 });
     const tagNamen = tags ? await resolveTagNames(tags) : undefined;
     const project = await prisma.project.update({
       where: { id },
       data: {
         ...rest,
+        // plannedStart/plannedEnd komen als string binnen maar zijn @db.Date
+        // kolommen, dus lichten we ze hierboven uit ...rest en zetten we ze hier
+        // apart om — undefined laat de kolom ongemoeid (het projectformulier op
+        // /projects stuurt deze velden niet mee), null wist hem bewust (dat doet
+        // het planningsscherm om de balk weer de taken te laten volgen).
+        ...(plannedStart !== undefined
+          ? { plannedStart: plannedStart ? new Date(plannedStart) : null }
+          : {}),
+        ...(plannedEnd !== undefined
+          ? { plannedEnd: plannedEnd ? new Date(plannedEnd) : null }
+          : {}),
         tags: {
           set: [],
           ...(tagNamen && tagNamen.length > 0
