@@ -132,7 +132,9 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const kop = timelineHeader(venster, zoom);
 
   const groepen = groupByCustomer(projects.filter((p) => projectBar(p) !== null));
-  const ongepland = unplannedProjects(projects);
+  // Ook per klant, en met dezelfde sortering als de tijdlijn erboven. De lijst
+  // kwam anders in de volgorde waarin de database hem toevallig teruggaf.
+  const ongepland = groupByCustomer(unplannedProjects(projects));
 
   return (
     <div className="space-y-6">
@@ -301,11 +303,20 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       {ongepland.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Nog niet gepland</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {ongepland.map((p) => (
-              <Button key={p.id} variant="outline" size="sm" onClick={() => openProject(p)}>
-                {p.name}
-              </Button>
+          <CardContent className="space-y-3">
+            {ongepland.map((groep) => (
+              <div key={groep.customerName}>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {groep.customerName}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {groep.projects.map((p) => (
+                    <Button key={p.id} variant="outline" size="sm" onClick={() => openProject(p)}>
+                      {p.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             ))}
           </CardContent>
         </Card>
