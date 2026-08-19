@@ -220,6 +220,8 @@ Alles wat rekent of oordeelt komt in `src/lib/planning.ts`, met tests in
 | `barGeometry(start, eind, venster)` | Plek en breedte als percentage van het venster. Einddatum inclusief; een taak van één dag heeft breedte. |
 | `timelineWindow(projecten, vandaag)` | Vroegste tot laatste datum die getekend wordt — **projectdatums én taakdatums**, want een taak mag buiten zijn project vallen en moet toch zichtbaar zijn — met zeven dagen marge aan beide kanten. Is er niets gepland, dan een venster van dertig dagen vóór tot negentig dagen ná vandaag. |
 | `projectBar(project)` | Eigen datums, anders afgeleid uit de taken, anders `null` — dat laatste is "nog niet gepland". |
+| `todayOffsetPct(vandaag, venster)` | De plek van de vandaag-streep, of `null` als vandaag buiten het venster valt — dan hoort er geen streep te staan. |
+| `groupByCustomer(projecten)` | Per klant gegroepeerd, in dezelfde volgorde als de projectkiezer. Zonder klant achteraan. |
 | `validateDateRange(start, eind)` | De weigeringen hieronder, als leesbare Nederlandse melding of `null`. |
 | `swapOrder(taken, id, richting)` | De nieuwe `sortOrder`-paren, ook aan de randen van de lijst. |
 
