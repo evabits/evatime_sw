@@ -192,7 +192,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
-                        <div className="relative flex-1 py-2" style={{ width: breedte }}>
+                        <div className="relative shrink-0 py-2" style={{ width: breedte }}>
                           <button
                             type="button"
                             className="absolute h-4 rounded bg-primary hover:bg-primary/80"
@@ -229,10 +229,10 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
-                            <div className="relative flex-1 py-1.5" style={{ width: breedte }}>
+                            <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
                               <div
                                 className="absolute h-3 rounded bg-primary/50"
-                                style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%` }}
+                                style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
                                 title={`${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`}
                               />
                             </div>
