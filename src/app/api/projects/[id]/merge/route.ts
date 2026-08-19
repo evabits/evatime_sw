@@ -59,9 +59,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     //
     // Dat zijn de vier registratiemodellen. ProjectMember wordt hieronder
     // eerst gekopieerd naar het doel en verdwijnt daarna vanzelf mee met het
-    // verwijderen van de bron (Cascade). Twee andere relaties op Project zijn
-    // ook Cascade en gaan bewust NIET mee: ProjectLevelRate en de tags-koppeling
-    // worden stilletjes verwijderd, niet verplaatst. Dat is geen gat maar het
+    // verwijderen van de bron (Cascade); ProjectTask wordt verplaatst, want
+    // planning hoort bij het werk en niet bij de prijsafspraken. Twee andere
+    // relaties op Project zijn ook Cascade en gaan bewust NIET mee:
+    // ProjectLevelRate en de tags-koppeling worden stilletjes verwijderd, niet
+    // verplaatst. Dat is geen gat maar het
     // ontwerp — een conceptproject kan tarieven en tags hebben (admin-only, zie
     // projects/route.ts), maar na het samenvoegen gelden gewoon de tarieven en
     // tags van het doelproject; verplaatste uren blijven geprijsd volgens de
@@ -84,6 +86,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: { projectId: targetId },
       });
       const sjablonen = await tx.kmTemplate.updateMany({ where: { projectId: id }, data: { projectId: targetId } });
+
+      // Taken zijn planning, geen prijsafspraak: ze horen bij de dingen die
+      // meeverhuizen (uren, ritten, sjablonen, deelnemers) en niet bij de
+      // dingen die stilletjes verdwijnen (tarieven, tags). Zonder deze regel
+      // neemt de cascade op het verwijderen van de bron ze mee het graf in.
+      //
+      // De sortOrder van bron en doel lopen daarna door elkaar. Dat is
+      // aanvaardbaar: alle taken staan er, en swapOrder hernummert de hele
+      // lijst zodra je er één verplaatst.
+      const taken = await tx.projectTask.updateMany({
+        where: { projectId: id },
+        data: { projectId: targetId },
+      });
       const uitgaven = await tx.expense.updateMany({
         where: { projectId: id, invoiced: false },
         data: { projectId: targetId },
@@ -112,6 +127,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         timeEntries: uren.count,
         kmEntries: km.count,
         kmTemplates: sjablonen.count,
+        tasks: taken.count,
         expenses: uitgaven.count,
         members: leden_toegevoegd,
       };
