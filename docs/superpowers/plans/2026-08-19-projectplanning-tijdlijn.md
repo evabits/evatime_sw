@@ -247,14 +247,37 @@ describe("groupByCustomer", () => {
   const projecten = [
     { id: "3", name: "Onderhoud", customer: { name: "Zonneplan" }, tasks: [] },
     { id: "1", name: "Juli 2026", customer: { name: "Acquaint" }, tasks: [] },
-    { id: "2", name: "April 2026", customer: { name: "acquaint" }, tasks: [] },
+    { id: "2", name: "April 2026", customer: { name: "Acquaint" }, tasks: [] },
     { id: "4", name: "Intern overleg", customer: null, tasks: [] },
   ];
 
-  it("groups per customer, sorted the Dutch way, projects alphabetical within", () => {
+  it("groups per customer and sorts the projects within a group by name", () => {
     const groepen = groupByCustomer(projecten);
     expect(groepen.map((g) => g.customerName)).toEqual(["Acquaint", "Zonneplan", "Zonder klant"]);
     expect(groepen[0].projects.map((p) => p.id)).toEqual(["2", "1"]);
+  });
+
+  it("sorts customers the Dutch way, so case does not decide the order", () => {
+    // "ekster" hoort tussen Aalscholver en Zwaluw, niet erachter omdat hij met
+    // een kleine letter begint.
+    const gemengd = [
+      { id: "a", name: "P", customer: { name: "Zwaluw" }, tasks: [] },
+      { id: "b", name: "P", customer: { name: "ekster" }, tasks: [] },
+      { id: "c", name: "P", customer: { name: "Aalscholver" }, tasks: [] },
+    ];
+    expect(groupByCustomer(gemengd).map((g) => g.customerName)).toEqual([
+      "Aalscholver", "ekster", "Zwaluw",
+    ]);
+  });
+
+  it("keeps two customers that differ only in case apart", () => {
+    // Dat zijn twee klantrijen in de database. Samenvoegen zou een echt
+    // verschil verbergen, dus dat doet deze functie bewust niet.
+    const bijnaGelijk = [
+      { id: "a", name: "P", customer: { name: "Acquaint" }, tasks: [] },
+      { id: "b", name: "Q", customer: { name: "acquaint" }, tasks: [] },
+    ];
+    expect(groupByCustomer(bijnaGelijk)).toHaveLength(2);
   });
 
   it("puts projects without a customer last, not first", () => {
@@ -389,9 +412,7 @@ export function groupByCustomer(projects: PlanningProject[]): PlanningGroup[] {
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/planning.test.ts
 ```
 
-Verwacht: PASS, 11 tests.
-
-Let op: `groupByCustomer` groepeert op de exacte klantnaam, dus "Acquaint" en "acquaint" worden twee groepen die daarna naast elkaar sorteren. De test verwacht `["Acquaint", "Zonneplan", "Zonder klant"]` omdat beide Acquaint-projecten uit dezelfde bron dezelfde schrijfwijze zouden hebben; in de test staan ze bewust verschillend om de sortering te controleren. **Faalt deze test op het aantal groepen, pas dan de test aan naar wat de functie doet — niet de functie.** Twee klanten met alleen een hoofdletterverschil zijn twee klanten in de database, en die samenvoegen zou een echt verschil verbergen.
+Verwacht: PASS, 14 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -585,7 +606,7 @@ export function todayOffsetPct(vandaag: Date, venster: DateRange): number | null
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/planning.test.ts
 ```
 
-Verwacht: PASS, 21 tests.
+Verwacht: PASS, 24 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -963,7 +984,7 @@ export function swapOrder(
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/planning.test.ts
 ```
 
-Verwacht: PASS, 26 tests.
+Verwacht: PASS, 29 tests.
 
 - [ ] **Step 5: Schrijf de route**
 
