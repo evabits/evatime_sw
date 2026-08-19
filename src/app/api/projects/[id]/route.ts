@@ -82,17 +82,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ...(plannedEnd !== undefined
           ? { plannedEnd: plannedEnd ? new Date(plannedEnd) : null }
           : {}),
-        tags: {
-          set: [],
-          ...(tagNamen && tagNamen.length > 0
-            ? {
-                connectOrCreate: tagNamen.map((name) => ({
-                  where: { name },
-                  create: { name },
-                })),
-              }
-            : {}),
-        },
+        // Net als levelRates/memberIds: een afwezige tags-sleutel laat de tags
+        // met rust (undefined), een meegestuurde lijst (ook leeg) vervangt ze
+        // volledig. Zonder deze guard wiste elke planningsopslag — die alleen
+        // name/status/plannedStart/plannedEnd meestuurt — stilletjes alle tags,
+        // en daarmee de WBSO-uren in payroll die op project.tags leunen.
+        ...(tags
+          ? {
+              tags: {
+                set: [],
+                ...(tagNamen && tagNamen.length > 0
+                  ? {
+                      connectOrCreate: tagNamen.map((name) => ({
+                        where: { name },
+                        create: { name },
+                      })),
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
       include: { tags: { select: { id: true, name: true } } },
     });
