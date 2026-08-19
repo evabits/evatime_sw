@@ -100,6 +100,11 @@ model Project {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   archivedAt        DateTime?
+  // Grof geplande doorlooptijd, ingevuld door een beheerder op /planning.
+  // Allebei of geen van beide: één losse datum levert geen balk op en wordt
+  // door de API geweigerd. Zijn ze leeg, dan spant de balk zich om de taken.
+  plannedStart      DateTime?             @db.Date
+  plannedEnd        DateTime?             @db.Date
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -107,6 +112,7 @@ model Project {
   members           ProjectMember[]
   expenses          Expense[]
   tags              Tag[]
+  tasks             ProjectTask[]
 }
 
 enum ProjectStatus {
@@ -114,6 +120,26 @@ enum ProjectStatus {
   ACTIVE
   INACTIVE
   COMPLETED
+}
+
+model ProjectTask {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  // Verplicht: een taak zonder datums kun je niet op een tijdlijn tekenen.
+  // Dat is een to-do en hoort niet in dit scherm.
+  startDate DateTime @db.Date
+  // Inclusief. Start en eind op dezelfde dag is een taak van één dag.
+  endDate   DateTime @db.Date
+  // De volgorde waarin het werk gebeurt, door de beheerder bepaald. Niet op
+  // createdAt sorteren: Postgres geeft alle rijen van één transactie dezelfde
+  // waarde, dus daarop sorteren zegt niets — zie InvoiceLine.sortOrder.
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
 }
 
 model Tag {
