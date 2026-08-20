@@ -143,8 +143,11 @@ Eén nieuw routebestand, `/api/km/commute`, met twee methodes:
 | `GET ?from=&to=` | Welke dagen in dat venster al een woon-werkrit hebben. |
 | `POST` | `{ date, present: boolean }` — zet die dag aan of uit. |
 
-Allebei uitsluitend voor de eigen dagen van de ingelogde gebruiker; de route
-leidt de eigenaar af uit de sessie en niet uit de aanvraag.
+`POST` is altijd voor de eigen dagen van de ingelogde gebruiker; de route
+leidt de eigenaar af uit de sessie en niet uit de aanvraag. `GET` honoreert
+daarnaast een optionele `userId` voor wie andermans registraties mag inzien —
+uitsluitend lezend: een beheerder ziet zo de vinkjes van een medewerker, maar
+zet ze niet (zie "Beheerder kijkt naar iemand anders" hierboven).
 
 `POST /api/km` krijgt een optioneel `templateId` erbij. Is dat het beheerde
 woon-werksjabloon van de aanvrager, dan zet de server zelf `commute: true`. De
@@ -158,7 +161,7 @@ Nieuw bestand `src/lib/commute.ts`, tests in `src/lib/commute.test.ts`.
 |---|---|
 | `pickCommuteTemplate(sjablonen)` | Het beheerde sjabloon van een medewerker, of `null`. Bij meerdere: de laatst gewijzigde. |
 | `commuteDates(ritten)` | Welke dagen aanstaan, als `yyyy-MM-dd`. |
-| `commuteEntryData(sjabloon, datum)` | Wat er weggeschreven wordt: het project en de kilometers van het sjabloon, en als omschrijving de omschrijving van het sjabloon, of anders de naam ervan. Zo staat er nooit een lege regel in de kilometerlijst. |
+| `commuteEntryData(sjabloon)` | Wat er weggeschreven wordt: het project en de kilometers van het sjabloon, en als omschrijving de omschrijving van het sjabloon, of anders de naam ervan. Zo staat er nooit een lege regel in de kilometerlijst. |
 | `commuteToggleDenial(...)` | De weigeringen uit de tabel hierboven, als Nederlandse melding of `null`. |
 
 ## Uitrol

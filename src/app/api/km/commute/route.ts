@@ -9,7 +9,11 @@ import {
 } from "@/lib/commute";
 
 const schema = z.object({
-  date: z.string().min(1),
+  // Een regex en niet alleen `.min(1)`: elke niet-lege string kwam anders
+  // ongezien bij `new Date(...)` en Prisma terecht, en een onparseerbare
+  // waarde daar levert een 500 "Internal server error" op in plaats van een
+  // nette 400. Zelfde patroon als src/lib/user-schema.ts.
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd"),
   present: z.boolean(),
 });
 

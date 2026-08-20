@@ -71,6 +71,11 @@ export async function POST(req: Request) {
       if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
     }
 
+    const memberError = await projectMembershipError(data.projectId, ownerId);
+    if (memberError) return memberError;
+
+    // Ná de membership-check: bij een ongeldig project is deze query
+    // overbodig, en zo blijft hij achterwege.
     // De client stuurt alleen wélk sjabloon hij gebruikte; of dat het beheerde
     // woon-werksjabloon is zoekt de server zelf op. Een `commute`-vlag van de
     // client zou betekenen dat iedereen zijn eigen ritten zo kan bestempelen.
@@ -79,9 +84,6 @@ export async function POST(req: Request) {
       const sjablonen = await prisma.kmTemplate.findMany({ where: { userId: ownerId } });
       commute = pickCommuteTemplate(sjablonen as any)?.id === templateId;
     }
-
-    const memberError = await projectMembershipError(data.projectId, ownerId);
-    if (memberError) return memberError;
 
     const entry = await prisma.kmEntry.create({
       data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, commute },

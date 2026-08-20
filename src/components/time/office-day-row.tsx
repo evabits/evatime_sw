@@ -27,9 +27,17 @@ export function OfficeDayRow({
   bezig: string | null;
   onToggle: (dayStr: string, present: boolean) => void;
 }) {
-  const uitleg = template
-    ? `${template.name} — ${template.km.toLocaleString("nl-NL")} km`
-    : "Er is nog geen woon-werksjabloon ingesteld. Vraag een beheerder dit onder Personeel in te stellen.";
+  // `template` is altijd dat van de ingelogde gebruiker (zie commuteTemplate
+  // in TimeEntriesClient), niet van de eventueel bekeken medewerker. Tooltip
+  // en bijschrift gaan dus alleen over de eigen dagen: bij andermans dagen
+  // (bewerkbaar = false) blijven de vinkjes zichtbaar, maar zonder tekst die
+  // over de verkeerde persoon zou gaan.
+  const redenGeenSjabloon = "Geen sjabloon — instellen bij Personeel";
+  const uitleg = !bewerkbaar
+    ? undefined
+    : template
+      ? `${template.name} — ${template.km.toLocaleString("nl-NL")} km`
+      : "Er is nog geen woon-werksjabloon ingesteld. Vraag een beheerder dit onder Personeel in te stellen.";
 
   return (
     <div className="overflow-x-auto border-b">
@@ -57,8 +65,20 @@ export function OfficeDayRow({
             </label>
           );
         })}
-        <div className="px-3 py-2 text-xs text-muted-foreground truncate" title={uitleg}>
-          {template ? `${template.km.toLocaleString("nl-NL")} km` : "geen sjabloon"}
+        {/* Eigen label ("Sjabloon") in plaats van alleen een getal: zonder
+            label staat deze cel direct onder de kolomkop "Totaal" van het
+            weekraster erboven en leest de sjabloonafstand als een
+            weektotaal. De sjabloonnaam (in plaats van alleen de afstand)
+            maakt meteen ook zichtbaar wélk sjabloon het vinkje gebruikt. */}
+        <div className="flex flex-col items-end px-3 py-2 text-xs" title={uitleg}>
+          {bewerkbaar && (
+            <>
+              <span className="font-semibold text-muted-foreground">Sjabloon</span>
+              <span className="text-muted-foreground mt-0.5 truncate max-w-full">
+                {template ? `${template.name} · ${template.km.toLocaleString("nl-NL")} km` : redenGeenSjabloon}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
