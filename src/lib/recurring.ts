@@ -67,6 +67,33 @@ export function recurringInvoiceIntro(opts: {
   );
 }
 
+/**
+ * Het kenmerk op een batchfactuur: `ZP-H3X-12AUG26`.
+ *
+ * Het vaste deel staat op het sjabloon, de opleverdatum komt eruit. Zo stond het
+ * met de hand al op de facturen 2026-0007 en 2026-0008, en een kenmerk dat de
+ * app zelf zet kan niet meer verkeerd worden overgetypt.
+ *
+ * De dag zonder voorloopnul, want zo schreef de klant het: `6AUG26`. Verder
+ * dezelfde maandafkortingen als elke andere datum in de app, en dezelfde lokale
+ * lezing als `formatDate` — een datum uit de database staat op UTC-middernacht
+ * en komt in Amsterdam op dezelfde dag uit.
+ */
+export function batchReference(
+  prefix: string | null | undefined,
+  opgeleverdOp: Date | string,
+): string | null {
+  // Een los streepje met een datum erachter is erger dan een leeg kenmerkveld,
+  // en leeg is precies wat elke andere factuur ook heeft.
+  const vast = (prefix ?? "").trim().replace(/-+$/, "");
+  if (!vast) return null;
+
+  const d = typeof opgeleverdOp === "string" ? new Date(opgeleverdOp) : opgeleverdOp;
+  if (isNaN(d.getTime())) return null;
+
+  return `${vast}-${d.getDate()}${MAANDEN[d.getMonth()]}${String(d.getFullYear()).slice(-2)}`;
+}
+
 export type RecurringTemplateData = {
   id: string;
   name: string;
@@ -78,6 +105,8 @@ export type RecurringTemplateData = {
   lineDescription: string;
   invoiceSubject: string | null;
   tracksQuality: boolean;
+  /** Het vaste deel van het kenmerk, bijvoorbeeld "ZP-H3X". */
+  referencePrefix?: string | null;
 };
 
 export type BatchData = {
@@ -90,6 +119,8 @@ export type BatchData = {
 /** Eén factuurregel plus de bijbehorende kopteksten. */
 export type RecurringDraft = {
   subject: string;
+  /** Het kenmerk, of null als het sjabloon er geen heeft. */
+  reference: string | null;
   intro: string;
   line: {
     description: string;
@@ -126,6 +157,7 @@ export function recurringInvoiceDraft(
     // Een factuur zonder onderwerp leest als een fout; de batchnaam is altijd
     // beter dan niets.
     subject: sjabloon.invoiceSubject?.trim() || batch.name,
+    reference: batchReference(sjabloon.referencePrefix, batch.deliveredAt),
     intro: recurringInvoiceIntro({
       batchnaam: batch.name,
       opgeleverdOp: batch.deliveredAt,

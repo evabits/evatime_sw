@@ -18,6 +18,7 @@ const schema = z.object({
   lineDescription: z.string().trim().min(1),
   invoiceSubject: z.string().trim().optional().nullable(),
   tracksQuality: z.boolean().optional(),
+  referencePrefix: z.string().trim().optional().nullable(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {

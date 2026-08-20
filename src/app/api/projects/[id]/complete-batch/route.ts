@@ -82,6 +82,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           dueDate: new Date(vandaag.getTime() + 30 * 24 * 60 * 60 * 1000),
           status: "DRAFT",
           subject: draft.subject,
+          reference: draft.reference,
           intro: draft.intro,
           notes: STANDAARD_BETALINGSTEKST,
           vatRate: btw,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial } from "./recurring";
+import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, batchReference } from "./recurring";
 
 describe("batchTotal", () => {
   it("adds up approved and rejected for test work — everything tested is billed", () => {
@@ -118,6 +118,15 @@ describe("recurringInvoiceDraft", () => {
     expect(d.subject).toBe("H3X testen AUG26");
   });
 
+  it("takes the reference from the template prefix and the delivery date", () => {
+    const d = recurringInvoiceDraft(sjabloon({ referencePrefix: "ZP-H3X" }), batch(), invoer);
+    expect(d.reference).toBe("ZP-H3X-20AUG26");
+  });
+
+  it("leaves the reference empty when the template has no prefix", () => {
+    expect(recurringInvoiceDraft(sjabloon(), batch(), invoer).reference).toBeNull();
+  });
+
   it("puts the counts in the intro", () => {
     const d = recurringInvoiceDraft(sjabloon(), batch(), invoer);
     expect(d.intro).toContain("118 goedgekeurd en 2 afgekeurd");
@@ -142,6 +151,42 @@ describe("recurringInvoiceDraft", () => {
     expect(d.line.total).toBe(750);
     expect(d.subtotal).toBe(750);
     expect(d.intro).toContain("118 goedgekeurd en 2 afgekeurd");
+  });
+});
+
+describe("batchReference", () => {
+  it("puts the delivery date behind the prefix", () => {
+    // Zo stond het met de hand op 2026-0008: ZP-H3X-12AUG26.
+    expect(batchReference("ZP-H3X", "2026-08-12")).toBe("ZP-H3X-12AUG26");
+  });
+
+  it("leaves out the leading zero on the day", () => {
+    // En zo op 2026-0007: 6AUG26, niet 06AUG26.
+    expect(batchReference("ZP-H3X", "2026-08-06")).toBe("ZP-H3X-6AUG26");
+  });
+
+  it("uses the same month abbreviations as every other date in the app", () => {
+    expect(batchReference("ZP-H3X", "2026-03-01")).toBe("ZP-H3X-1MRT26");
+    expect(batchReference("ZP-H3X", "2026-12-31")).toBe("ZP-H3X-31DEC26");
+  });
+
+  it("gives nothing when the template has no prefix", () => {
+    // Geen kenmerk is de bestaande toestand van elke andere factuur; een los
+    // streepje met een datum erachter zou erger zijn dan een leeg veld.
+    expect(batchReference(null, "2026-08-12")).toBeNull();
+    expect(batchReference("", "2026-08-12")).toBeNull();
+    expect(batchReference("   ", "2026-08-12")).toBeNull();
+  });
+
+  it("trims a prefix that was typed with a trailing space or dash", () => {
+    expect(batchReference(" ZP-H3X ", "2026-08-12")).toBe("ZP-H3X-12AUG26");
+    expect(batchReference("ZP-H3X-", "2026-08-12")).toBe("ZP-H3X-12AUG26");
+  });
+
+  it("reads a date from the database on the right day", () => {
+    // @db.Date komt binnen als UTC-middernacht; in Amsterdam is dat dezelfde
+    // dag, en dat moet zo blijven — hier is al drie keer een dagfout op gemaakt.
+    expect(batchReference("ZP-H3X", new Date("2026-08-12T00:00:00Z"))).toBe("ZP-H3X-12AUG26");
   });
 });
 
