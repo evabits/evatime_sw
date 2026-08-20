@@ -17,10 +17,12 @@ const createSchema = z.object({
   workLevel: workLevelField,
 });
 
+// Geen overtimeOpeningDate/overtimeOpeningHours hier: deze route vereist
+// alleen een sessie (elke ingelogde medewerker), en het urensaldo is
+// uitdrukkelijk iets dat alleen een beheerder op de medewerkerspagina ziet.
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
   vacationOpeningDate: true, vacationOpeningUsed: true,
-  overtimeOpeningDate: true, overtimeOpeningHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -32,10 +34,6 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
       ? u.vacationOpeningDate.toISOString().slice(0, 10)
       : null,
     vacationOpeningUsed: u.vacationOpeningUsed != null ? Number(u.vacationOpeningUsed) : null,
-    overtimeOpeningDate: u.overtimeOpeningDate
-      ? u.overtimeOpeningDate.toISOString().slice(0, 10)
-      : null,
-    overtimeOpeningHours: u.overtimeOpeningHours != null ? Number(u.overtimeOpeningHours) : null,
   };
 }
 

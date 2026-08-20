@@ -104,7 +104,12 @@ export function OvertimeClient({ user, lines, saldo, lopend }: Props) {
           email: user.email,
           role: user.role,
           overtimeOpeningDate: openingDate,
-          overtimeOpeningHours: openingHours,
+          // Uren mee-leegmaken zodra de datum leeg is: anders blijft er een
+          // beginstand-waarde in de database staan die nergens meer in beeld
+          // komt (de kaart toont de uren immers alleen mét peildatum) — dat
+          // zou het bijschrift "leeg wist de beginstand" tot een halve
+          // waarheid maken.
+          overtimeOpeningHours: openingDate ? openingHours : "",
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -120,6 +125,22 @@ export function OvertimeClient({ user, lines, saldo, lopend }: Props) {
   }
 
   async function saveAdjustment() {
+    // Vóór het versturen controleren: zonder dit komt een leeg verplicht veld
+    // terug als de generieke zod-fout "Validation failed" van handleError, in
+    // het Engels en zonder aan te wijzen welk veld het is.
+    if (!adjustDate) {
+      setAdjustError("Vul een datum in");
+      return;
+    }
+    if (!adjustReason.trim()) {
+      setAdjustError("Vul een reden in");
+      return;
+    }
+    if (!adjustHours || Number(adjustHours) === 0 || Number.isNaN(Number(adjustHours))) {
+      setAdjustError("Vul een aantal uren in");
+      return;
+    }
+
     setAdjustLoading(true);
     setAdjustError("");
     try {

@@ -8,7 +8,7 @@ import {
 // urensaldo-velden onderaan dit bestand: een scherm dat de sleutel niet
 // meestuurt (undefined) mag de kolom niet raken; alleen een expliciete "" of
 // null wist hem. Vóór die fix collapsete "" hier naar undefined, wat de guard
-// in /api/users/[id] onmogelijk maakte — zie task-6-report.md.
+// in /api/users/[id] onmogelijk maakte.
 describe("weeklyHoursField", () => {
   it("empty string => null (bewust gewist)", () => {
     expect(weeklyHoursField.parse("")).toBeNull();

@@ -23,6 +23,19 @@ function monthEnd(key: MonthKey): string {
   return new Date(Date.UTC(jaar, maand, 0)).toISOString().slice(0, 10);
 }
 
+/**
+ * Contracttarget voor een maand, of null zonder target.
+ *
+ * Het urenveld alléén volstaat niet: een nul-urencontract mag net als in de
+ * loonverwerking (payroll.ts) nooit een target opleveren, ook niet als er
+ * per ongeluk een aantal uren op zo'n contract staat ingevuld — het
+ * formulier laat dat toe, ook al hoort het er niet.
+ */
+function contractTarget(contracten: ReturnType<typeof serializeContract>[], refDate: string): number | null {
+  const c = getEffectiveContract(contracten, refDate);
+  return c && c.contractType !== "ZERO_HOURS" ? c.contractHours ?? null : null;
+}
+
 export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if ((session?.user as any)?.role !== "ADMIN") redirect("/");
@@ -65,12 +78,12 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
     });
 
     const months = monthsToSettle(peildatum, vandaag);
-    // bucketHoursByMonth rekent zelf Number() toe te passen op elk item, maar
-    // Prisma's Decimal-type staat niet in de signatuur die het accepteert.
+    // bucketHoursByMonth past zelf Number() toe op elk item, maar Prisma's
+    // Decimal-type staat niet in de signatuur die het accepteert.
     const hoursByMonth = bucketHoursByMonth(entries.map((e) => ({ date: e.date, hours: Number(e.hours) })));
     const contractHoursByMonth: Record<MonthKey, number | null> = {};
     for (const key of months) {
-      contractHoursByMonth[key] = getEffectiveContract(contracten, monthEnd(key))?.contractHours ?? null;
+      contractHoursByMonth[key] = contractTarget(contracten, monthEnd(key));
     }
     const lopendeKey: MonthKey = `${vandaag.getFullYear()}-${String(vandaag.getMonth() + 1).padStart(2, "0")}`;
 
@@ -87,7 +100,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       lopendeUren: hoursByMonth[lopendeKey] ?? 0,
       // Zelfde regel toegepast op de lopende maand: het contract dat aan het
       // eind ván die maand geldt, ook al is die maand nog niet voorbij.
-      lopendContract: getEffectiveContract(contracten, monthEnd(lopendeKey))?.contractHours ?? null,
+      lopendContract: contractTarget(contracten, monthEnd(lopendeKey)),
     });
   }
 
