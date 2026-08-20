@@ -149,7 +149,11 @@ export function PayrollClient({ userId }: { userId: string }) {
                   <TableCell className="text-right font-mono">
                     {row.overtime != null ? formatHoursDecimal(row.overtime) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{row.km.toLocaleString("nl-NL")} km</TableCell>
+                  {/* Afgerond op hele kilometers: het maandtotaal telt op uit
+                      ritten met een decimaal, en 1.398,4 km overtypen in een
+                      salarissysteem is precisie die niemand gebruikt. De
+                      registraties zelf houden hun decimalen. */}
+                  <TableCell className="text-right font-mono">{Math.round(row.km).toLocaleString("nl-NL")} km</TableCell>
                 </TableRow>
               ))}
             </TableBody>
