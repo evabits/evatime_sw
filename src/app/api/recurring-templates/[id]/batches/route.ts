@@ -37,12 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // verwarrende "Deze waarde is al in gebruik". Deze controle vooraf geeft
     // de melding die hier wél klopt.
     const conflict = await projectNameTakenError(naam);
-    if (conflict) {
-      return NextResponse.json(
-        { error: "Er bestaat al een project met deze naam" },
-        { status: 400 },
-      );
-    }
+    if (conflict) return conflict;
 
     const batch = await prisma.project.create({
       data: {

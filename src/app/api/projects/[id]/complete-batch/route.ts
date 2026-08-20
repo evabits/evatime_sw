@@ -56,6 +56,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // heeft @default(21) en het factuurscherm laat het per factuur aanpassen.
     const btw = 21;
     const btwBedrag = Math.round((draft.subtotal * btw) / 100 * 100) / 100;
+    // issueDate en dueDate zijn @db.Date-kolommen: Prisma bewaart daar alleen de
+    // datumcomponent, en die leidt hij af uit UTC. Een kale `new Date()` zou
+    // tussen middernacht en 02:00 Nederlandse tijd dus de vórige dag op de
+    // factuur zetten. Daarom eerst de Nederlandse kalenderdag bepalen en die
+    // vastpinnen op UTC-middernacht, zoals de rest van de app het doet.
+    const vandaag = new Date(
+      `${new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" })}T00:00:00Z`,
+    );
     const invoiceNumber = await nextInvoiceNumber();
 
     // Alles in één transactie: een halve uitvoering laat een voltooid project
@@ -65,8 +73,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           invoiceNumber,
           customerId: batch.template!.customerId,
-          issueDate: new Date(),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          issueDate: vandaag,
+          dueDate: new Date(vandaag.getTime() + 30 * 24 * 60 * 60 * 1000),
           status: "DRAFT",
           subject: draft.subject,
           intro: draft.intro,
