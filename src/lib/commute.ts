@@ -89,3 +89,41 @@ export function commuteToggleDenial(opts: {
   }
   return null;
 }
+
+/**
+ * Is dit een woon-werkrit? Bepaald op de **inhoud** en niet op de herkomst:
+ * komen project én kilometers overeen met het beheerde sjabloon, dan is het de
+ * woon-werkrit — of iemand hem nu via het sjabloonmenu invoerde of met de hand
+ * typte.
+ *
+ * Eerder keek de server alleen of het sjabloon in het menu gekozen was. Daardoor
+ * bleef het vinkje op het urenscherm leeg voor vrijwel de hele historie: van de
+ * 121 kilometerregistraties waren er 3 gemarkeerd terwijl er 107 exact op een
+ * sjabloon pasten.
+ */
+export function matchesCommuteTemplate(
+  sjabloon: CommuteTemplate | null,
+  rit: { projectId: string; km: number | string },
+): boolean {
+  if (!sjabloon) return false;
+  return rit.projectId === sjabloon.projectId && Number(rit.km) === Number(sjabloon.km);
+}
+
+/**
+ * Waarom deze rit niet mag, of `null` als het mag.
+ *
+ * Er hoort hoogstens één woon-werkrit per dag te staan. Een tweede rit die óók
+ * exact op het sjabloon past wordt daarom geweigerd. Die weigering is bewust
+ * nauw: een rit met een andere afstand of op een ander project raakt hem niet,
+ * dus twee klantbezoeken op één dag blijven gewoon te boeken.
+ */
+export function commuteDuplicateDenial(opts: {
+  sjabloon: CommuteTemplate | null;
+  rit: { projectId: string; km: number | string };
+  /** Staat er die dag al een gemarkeerde woon-werkrit van deze medewerker? */
+  bestaatAl: boolean;
+}): string | null {
+  if (!opts.bestaatAl) return null;
+  if (!matchesCommuteTemplate(opts.sjabloon, opts.rit)) return null;
+  return "Er staat op deze dag al een woon-werkrit. Pas die aan, of gebruik een ander project of een andere afstand.";
+}

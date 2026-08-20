@@ -142,6 +142,12 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
 
   // De dagen met een woon-werkrit, voor de rij onder het weekraster.
   const [kantoorDagen, setKantoorDagen] = useState<string[]>([]);
+  // Het woon-werksjabloon van de medewerker die je bekíjkt, niet van jezelf.
+  // Komt daarom uit dezelfde aanroep als de dagen: een beheerder die naar een
+  // ander kijkt hoort diens afstand te zien staan. De prop vanaf de pagina is
+  // de beginwaarde voor je eigen weergave, zodat de rij niet leeg oplicht.
+  const [kantoorSjabloon, setKantoorSjabloon] =
+    useState<{ name: string; km: number; projectId: string } | null>(commuteTemplate);
   // De dag die op dit moment verwerkt wordt: blokkeert een tweede klik terwijl
   // de aanroep loopt.
   const [kantoorBezig, setKantoorBezig] = useState<string | null>(null);
@@ -159,42 +165,21 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
    * de alert().
    */
   async function toggleKantoorDag(dayStr: string, present: boolean) {
-    // `kantoorBezig` gaat al aan vóórdat er iets wordt opgehaald: de dubbele
-    // controle hieronder haalt zelf al data op, en zonder dit zou een tweede
-    // klik tijdens die wachttijd een tweede POST kunnen starten.
     setKantoorBezig(dayStr);
     setKantoorMelding(null);
     try {
-      // Een woon-werkrit van vóór deze functie mist de commute-markering, dus
-      // het vinkje staat uit terwijl de rit er al is. Aanvinken zou dan een
-      // tweede rit maken. Vlak vóór de bevestigingsvraag ophalen — en niet uit
-      // een lijst die bij een week- of filterwissel niet wordt leeggemaakt —
-      // want anders mist de controle na een weekwissel alles (de vorige week
-      // staat er nog in) of waarschuwt hij bij een medewerkerswissel over
-      // andermans rit. `userId` gaat altijd mee: deze functie gaat alleen over
-      // eigen dagen (zie `bewerkbaar` bij OfficeDayRow), en zonder dat zou een
-      // beheerder hier de kilometers van het hele bedrijf ophalen.
-      if (present && commuteTemplate) {
-        const params = new URLSearchParams({ from: dayStr, to: dayStr, userId });
-        const res = await fetch(`/api/km?${params}`);
-        const dagRitten: { projectId: string; km: string | number; project?: { name?: string } }[] = res.ok
-          ? await res.json()
-          : [];
-        const bestaandeRit = dagRitten.find(
-          (e) => e.projectId === commuteTemplate.projectId && Number(e.km) === commuteTemplate.km,
-        );
-        if (bestaandeRit) {
-          const ok = confirm(
-            `Op deze dag staat al een kilometerregistratie van ${Number(bestaandeRit.km).toLocaleString("nl-NL")} km op ${bestaandeRit.project?.name ?? "dit project"}. Aanvinken voegt daar een aparte woon-werkrit aan toe. Doorgaan?`,
-          );
-          if (!ok) return;
-        }
-      }
-
+      // Geen dubbele-rit-waarschuwing meer: de server herkent een woon-werkrit
+      // inmiddels aan project en kilometers in plaats van aan de gebruikte
+      // sjabloonkeuze, en weigert zelf een tweede op dezelfde dag. Een
+      // ongemarkeerde rit die het vinkje zou verrassen bestaat daarmee niet meer.
+      //
+      // `userId` gaat mee zodat een beheerder een dag voor een medewerker kan
+      // zetten; de route negeert dat veld voor wie andermans registraties niet
+      // mag beheren.
       const res = await fetch("/api/km/commute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dayStr, present }),
+        body: JSON.stringify({ date: dayStr, present, userId: kantoorEigenaar }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -211,6 +196,11 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
       setKantoorBezig(null);
     }
   }
+
+  // Wiens kantoordagen er in beeld staan: die van jezelf, of van de medewerker
+  // waarop een beheerder heeft gefilterd. Bij "alle medewerkers" verschijnt de
+  // rij niet, dus dan doet deze waarde er niet toe.
+  const kantoorEigenaar = isAdmin && filterUser !== "all" ? filterUser : userId;
 
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
@@ -375,7 +365,11 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     fetch(`/api/km/commute?${params}`).then(async (res) => {
       if (!res.ok) return;
       const data = await res.json();
-      if (!genegeerd) setKantoorDagen(data.dates);
+      if (genegeerd) return;
+      setKantoorDagen(data.dates);
+      // Ook het sjabloon komt hiervandaan, zodat een beheerder de afstand van
+      // de bekeken medewerker ziet en niet die van zichzelf.
+      setKantoorSjabloon(data.template ?? null);
     });
     return () => {
       genegeerd = true;
@@ -893,8 +887,8 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 <OfficeDayRow
                   days={weekDays}
                   actief={kantoorDagen}
-                  template={commuteTemplate}
-                  bewerkbaar={!isAdmin || filterUser === userId}
+                  template={kantoorSjabloon}
+                  bewerkbaar
                   bezig={kantoorBezig}
                   onToggle={toggleKantoorDag}
                 />

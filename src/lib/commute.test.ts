@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   pickCommuteTemplate, commuteDates, commuteEntryData, commuteToggleDenial,
+  matchesCommuteTemplate, commuteDuplicateDenial,
   type CommuteTemplate,
 } from "./commute";
 
@@ -107,5 +108,54 @@ describe("commuteToggleDenial", () => {
     // Het sjabloon kan verwijderd zijn nadat de rit is aangemaakt; die rit moet
     // je dan nog steeds kwijt kunnen.
     expect(commuteToggleDenial({ template: null, bestaand: { invoiced: false }, present: false })).toBeNull();
+  });
+});
+
+describe("matchesCommuteTemplate", () => {
+  it("recognises a ride with the same project and distance", () => {
+    expect(matchesCommuteTemplate(sjabloon(), { projectId: "p-intern", km: 77.7 })).toBe(true);
+  });
+
+  it("copes with Decimal arriving as a string on either side", () => {
+    expect(matchesCommuteTemplate(sjabloon({ km: "77.70" }), { projectId: "p-intern", km: "77.7" })).toBe(true);
+  });
+
+  it("does not recognise another project, even at the same distance", () => {
+    expect(matchesCommuteTemplate(sjabloon(), { projectId: "p-klant", km: 77.7 })).toBe(false);
+  });
+
+  it("does not recognise another distance on the same project", () => {
+    expect(matchesCommuteTemplate(sjabloon(), { projectId: "p-intern", km: 40 })).toBe(false);
+  });
+
+  it("recognises nothing without a template", () => {
+    expect(matchesCommuteTemplate(null, { projectId: "p-intern", km: 77.7 })).toBe(false);
+  });
+});
+
+describe("commuteDuplicateDenial", () => {
+  const rit = { projectId: "p-intern", km: 77.7 };
+
+  it("allows the first commute ride of the day", () => {
+    expect(commuteDuplicateDenial({ sjabloon: sjabloon(), rit, bestaatAl: false })).toBeNull();
+  });
+
+  it("refuses a second ride that also matches the template", () => {
+    expect(commuteDuplicateDenial({ sjabloon: sjabloon(), rit, bestaatAl: true })).toBe(
+      "Er staat op deze dag al een woon-werkrit. Pas die aan, of gebruik een ander project of een andere afstand.",
+    );
+  });
+
+  it("leaves a ride with another distance alone, even on a day that already has one", () => {
+    // De weigering is bewust nauw: twee klantbezoeken op één dag moeten kunnen.
+    expect(commuteDuplicateDenial({ sjabloon: sjabloon(), rit: { projectId: "p-intern", km: 12 }, bestaatAl: true })).toBeNull();
+  });
+
+  it("leaves a ride on another project alone", () => {
+    expect(commuteDuplicateDenial({ sjabloon: sjabloon(), rit: { projectId: "p-klant", km: 77.7 }, bestaatAl: true })).toBeNull();
+  });
+
+  it("refuses nothing when the employee has no commute template", () => {
+    expect(commuteDuplicateDenial({ sjabloon: null, rit, bestaatAl: true })).toBeNull();
   });
 });

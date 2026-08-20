@@ -15,14 +15,18 @@ const schema = z.object({
   // nette 400. Zelfde patroon als src/lib/user-schema.ts.
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd"),
   present: z.boolean(),
+  // Voor wie de dag gezet wordt. Alleen gehonoreerd voor wie andermans
+  // registraties mag beheren; een medewerker die hier een ander id invult
+  // krijgt gewoon zijn eigen dag.
+  userId: z.string().optional().nullable(),
 });
 
 /**
  * Welke dagen in een venster al een woon-werkrit hebben.
  *
- * `userId` wordt alleen gehonoreerd voor wie andermans registraties mag zien,
- * en dan uitsluitend lezend: een beheerder ziet de vinkjes van een medewerker,
- * maar zet ze niet. Zo is er geen twijfel wie wat heeft aangezet.
+ * `userId` wordt alleen gehonoreerd voor wie andermans registraties mag zien.
+ * Het antwoord bevat ook het woon-werksjabloon van díé medewerker, zodat het
+ * scherm niet de afstand van de ingelogde beheerder toont.
  */
 export async function GET(req: Request) {
   try {
@@ -37,6 +41,9 @@ export async function GET(req: Request) {
     const gevraagd = searchParams.get("userId");
     const eigenaar = gevraagd && canViewAllEntries(role) ? gevraagd : userId;
 
+    const sjablonen = await prisma.kmTemplate.findMany({ where: { userId: eigenaar } });
+    const sjabloon = pickCommuteTemplate(sjablonen as any);
+
     const ritten = await prisma.kmEntry.findMany({
       where: {
         userId: eigenaar,
@@ -48,23 +55,38 @@ export async function GET(req: Request) {
       select: { date: true, commute: true },
     });
 
-    return NextResponse.json({ dates: commuteDates(ritten) });
+    // Het sjabloon hoort bij de bekeken medewerker en niet bij de ingelogde
+    // gebruiker: een beheerder die naar iemand anders kijkt moet diens afstand
+    // zien staan, niet die van zichzelf.
+    return NextResponse.json({
+      dates: commuteDates(ritten),
+      template: sjabloon ? { name: sjabloon.name, km: Number(sjabloon.km), projectId: sjabloon.projectId } : null,
+    });
   } catch (e) { return handleError(e); }
 }
 
-/** Zet één dag aan of uit. Altijd voor de ingelogde gebruiker zelf. */
+/**
+ * Zet één dag aan of uit.
+ *
+ * Standaard voor de ingelogde gebruiker; een beheerder mag het ook voor een
+ * medewerker doen. Dat was eerder bewust niet zo — de gedachte was dat er geen
+ * twijfel mocht bestaan over wie een kantoordag had aangezet — maar in de
+ * praktijk moet een beheerder een vergeten dag kunnen bijzetten.
+ */
 export async function POST(req: Request) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { date, present } = schema.parse(await req.json());
+    const { date, present, userId: gevraagd } = schema.parse(await req.json());
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    const eigenaar = gevraagd && canViewAllEntries(role) ? gevraagd : userId;
     const dag = new Date(date);
 
     const [sjablonen, bestaand] = await Promise.all([
-      prisma.kmTemplate.findMany({ where: { userId } }),
-      prisma.kmEntry.findFirst({ where: { userId, date: dag, commute: true } }),
+      prisma.kmTemplate.findMany({ where: { userId: eigenaar } }),
+      prisma.kmEntry.findFirst({ where: { userId: eigenaar, date: dag, commute: true } }),
     ]);
     const template = pickCommuteTemplate(sjablonen as any);
 
@@ -86,12 +108,12 @@ export async function POST(req: Request) {
     // Dezelfde grendel als de gewone km-route: op een project waar je geen
     // deelnemer van bent hoor je niet te kunnen boeken, ook niet via een
     // snelknop.
-    const lidFout = await projectMembershipError(gegevens.projectId, userId);
+    const lidFout = await projectMembershipError(gegevens.projectId, eigenaar);
     if (lidFout) return lidFout;
 
     await prisma.kmEntry.create({
       data: {
-        userId,
+        userId: eigenaar,
         projectId: gegevens.projectId,
         date: dag,
         km: gegevens.km,
