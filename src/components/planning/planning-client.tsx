@@ -72,9 +72,13 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [formStart, setFormStart] = useState("");
   const [formEind, setFormEind] = useState("");
   const [formWachtOp, setFormWachtOp] = useState<string[]>([]);
-  // Het voorgerekende overzicht, of null als er niets te verschuiven valt.
+  // Het voorgerekende overzicht, of null als er niets te verschuiven valt. De
+  // projectperiode staat er zelf bij: op het moment dat bewaar() dit vastlegt
+  // heeft hij het project nog in handen, en dat is betrouwbaarder dan hem later
+  // terugzoeken in `projects` — die prop is nog niet ververst, en bij een net
+  // aangemaakte taak staat diens id daar sowieso nog niet in.
   const [verschuiving, setVerschuiving] = useState<
-    { taakId: string; regels: ReturnType<typeof shiftPlan> } | null
+    { taakId: string; regels: ReturnType<typeof shiftPlan>; periode: { start: Date; eind: Date } | null } | null
   >(null);
 
   /** ISO voor een <input type="date">; die accepteert niets anders. */
@@ -141,9 +145,10 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     taakId: string,
     taken: Parameters<typeof shiftPlan>[0],
     koppelingen: Parameters<typeof shiftPlan>[1],
+    periode: { start: Date; eind: Date } | null,
   ) {
     const regels = shiftPlan(taken, koppelingen);
-    if (regels.length > 0) setVerschuiving({ taakId, regels });
+    if (regels.length > 0) setVerschuiving({ taakId, regels, periode });
   }
 
   async function bewaar() {
@@ -159,6 +164,12 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       return;
     }
     const project = venstertje.project;
+    // Nu vastleggen, terwijl we het project nog rechtstreeks in handen hebben —
+    // niet pas bij het tonen van het overzicht ergens anders naar terugzoeken.
+    const periode =
+      project.plannedStart && project.plannedEnd
+        ? { start: new Date(project.plannedStart), eind: new Date(project.plannedEnd) }
+        : null;
     if (venstertje.soort === "taak-nieuw") {
       const nieuw = await verstuur(`/api/projects/${project.id}/tasks`, "POST", {
         name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
@@ -174,7 +185,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       ];
       const koppelingen = alleKoppelingen(project)
         .concat(formWachtOp.map((dependsOnId) => ({ taskId: nieuw.id, dependsOnId })));
-      toonVerschuivingAlsNodig(nieuw.id, taken, koppelingen);
+      toonVerschuivingAlsNodig(nieuw.id, taken, koppelingen, periode);
       return;
     }
     const taak = venstertje.taak;
@@ -193,7 +204,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     const koppelingen = alleKoppelingen(project)
       .filter((k) => k.taskId !== taak.id)
       .concat(formWachtOp.map((dependsOnId) => ({ taskId: taak.id, dependsOnId })));
-    toonVerschuivingAlsNodig(taak.id, taken, koppelingen);
+    toonVerschuivingAlsNodig(taak.id, taken, koppelingen, periode);
   }
 
   /** "Alleen deze taak": het overzicht dicht, de keten blijft staan zoals hij stond. */
@@ -228,12 +239,6 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const breedte = dagen * ZOOM[zoom].pxPerDag;
   const vandaagPct = todayOffsetPct(vandaag, venster);
   const kop = timelineHeader(venster, zoom);
-
-  // Het venster is al dicht als het overzicht verschijnt, dus zoeken we het
-  // project via de taak op in plaats van het uit het venstertje te halen.
-  const projectVoorVerschuiving = verschuiving
-    ? projects.find((p) => p.tasks.some((t) => t.id === verschuiving.taakId))
-    : undefined;
 
   const groepen = groupByCustomer(projects.filter((p) => projectBar(p) !== null));
   // Ook per klant, en met dezelfde sortering als de tijdlijn erboven. De lijst
@@ -567,13 +572,9 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
             {verschuiving?.regels.map((regel) => {
               // Alleen relevant met een eigen projectperiode; zonder die spant
               // de balk zich toch om de taken, dus dan kan niets uitsteken.
-              const periode =
-                projectVoorVerschuiving?.plannedStart && projectVoorVerschuiving?.plannedEnd
-                  ? {
-                      start: new Date(projectVoorVerschuiving.plannedStart),
-                      eind: new Date(projectVoorVerschuiving.plannedEnd),
-                    }
-                  : null;
+              // De periode is al vastgelegd toen bewaar() het project nog in
+              // handen had (zie hierboven), niet hier achteraf teruggezocht.
+              const periode = verschuiving.periode;
               const buitenPeriode =
                 periode !== null && (regel.naarStart < periode.start || regel.naarEind > periode.eind);
               return (
