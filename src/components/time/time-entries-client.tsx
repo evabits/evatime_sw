@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeekGrid } from "@/components/shared/week-grid";
+import { OfficeDayRow } from "@/components/time/office-day-row";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { partitionProjectsByCustomer, isProjectOffered } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
@@ -63,9 +64,10 @@ interface Props {
   role: string;
   currentUserLevel: WorkLevel | null;
   workSchedule: WeekSchedule | null;
+  commuteTemplate: { name: string; km: number } | null;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule, commuteTemplate }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
@@ -137,6 +139,13 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const [viewMode, setViewMode] = useState<"week" | "list">("week");
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // De dagen met een woon-werkrit, voor de rij onder het weekraster.
+  const [kantoorDagen, setKantoorDagen] = useState<string[]>([]);
+  // Wordt in taak 6 gevuld: de dag die op dit moment verwerkt wordt.
+  const kantoorBezig: string | null = null;
+  // Wordt in taak 6 gevuld: aan- of uitzetten van een kantoordag.
+  function toggleKantoorDag(_dayStr: string, _present: boolean) {}
 
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
@@ -278,6 +287,22 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     if (res.ok) setEntries(await res.json());
     setFetching(false);
   }
+
+  // De route accepteert userId alleen van een beheerder; die stuurt hem dus
+  // mee zodra hij naar één medewerker kijkt. Een eigen effect in plaats van
+  // een aanroep bij elke fetchWeekEntries-call site: weekFrom/weekTo en
+  // filterUser vangen precies "de week of de gefilterde medewerker
+  // verandert" op, zonder elke plek die fetchWeekEntries aanroept te moeten
+  // aanpassen.
+  useEffect(() => {
+    if (viewMode !== "week") return;
+    const params = new URLSearchParams({ from: weekFrom, to: weekTo });
+    if (isAdmin && filterUser !== "all") params.set("userId", filterUser);
+    fetch(`/api/km/commute?${params}`).then(async (res) => {
+      if (res.ok) setKantoorDagen((await res.json()).dates);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, weekFrom, weekTo, filterUser]);
 
   function handleMonthChange(month: string) {
     setFilterMonth(month);
@@ -783,6 +808,17 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 return vrijeDag ? "vrij" : null;
               }}
             />
+
+            {viewMode === "week" && !(isAdmin && filterUser === "all") && (
+              <OfficeDayRow
+                days={weekDays}
+                actief={kantoorDagen}
+                template={commuteTemplate}
+                bewerkbaar={!isAdmin || filterUser === userId}
+                bezig={kantoorBezig}
+                onToggle={toggleKantoorDag}
+              />
+            )}
 
             {/* Entry list */}
             {fetching ? (

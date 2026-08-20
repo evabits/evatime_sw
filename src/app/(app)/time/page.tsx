@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { serialize } from "@/lib/utils";
 import { isAdmin } from "@/lib/roles";
 import { toWeekSchedule } from "@/lib/work-schedule";
+import { pickCommuteTemplate } from "@/lib/commute";
 import { TimeEntriesClient } from "@/components/time/time-entries-client";
 
 export default async function TimePage() {
@@ -78,6 +79,12 @@ export default async function TimePage() {
     ? await prisma.workSchedule.findUnique({ where: { userId } })
     : null;
 
+  // Alleen naam en afstand naar de browser: het sjabloon-id en het project
+  // doen daar niets, dus die lekken niet mee.
+  const commuteTemplate = userId
+    ? pickCommuteTemplate(await prisma.kmTemplate.findMany({ where: { userId } }) as any)
+    : null;
+
   return (
     <TimeEntriesClient
       projects={serialize(projects)}
@@ -88,6 +95,7 @@ export default async function TimePage() {
       role={role}
       currentUserLevel={currentUserLevel}
       workSchedule={toWeekSchedule(eigenRooster)}
+      commuteTemplate={commuteTemplate ? { name: commuteTemplate.name, km: Number(commuteTemplate.km) } : null}
     />
   );
 }
