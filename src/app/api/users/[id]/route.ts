@@ -74,22 +74,25 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (peilFout) return NextResponse.json({ error: peilFout }, { status: 400 });
 
       updateData.role = data.role;
-      updateData.weeklyHours = data.weeklyHours ?? null;
-      updateData.workLevel = data.workLevel ?? null;
+      // Alleen schrijven als de sleutel is meegestuurd: een scherm dat een
+      // van deze zes velden niet kent (zoals dit scherm straks een nieuw veld
+      // niet kent) stuurt hem helemaal niet mee, en dan is data.<veld>
+      // undefined. Zonder deze guard zou zo'n opslag (bijv. alleen een
+      // naamswijziging, of — sinds urensaldo — alleen de beginstand) de kolom
+      // stilzwijgend op null zetten en bestaande gegevens wissen. Zie
+      // overtimeOpeningDateField in user-schema.ts voor het
+      // undefined/null-onderscheid dat dit mogelijk maakt: undefined = sleutel
+      // ontbreekt = kolom blijft ongemoeid, null of "" = bewust leeggemaakt.
+      if (data.weeklyHours !== undefined) updateData.weeklyHours = data.weeklyHours;
+      if (data.workLevel !== undefined) updateData.workLevel = data.workLevel;
       // De datum als middernacht UTC, zodat een @db.Date-kolom precies de dag
       // bewaart die is ingevuld en niet die ervoor.
-      updateData.vacationOpeningDate = data.vacationOpeningDate
-        ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
-        : null;
-      updateData.vacationOpeningUsed = data.vacationOpeningUsed ?? null;
-      // Alleen schrijven als de sleutel is meegestuurd: schermen die deze
-      // twee urensaldo-velden niet kennen (zoals het huidige
-      // gebruikersformulier) sturen ze helemaal niet mee, en dan is
-      // data.overtimeOpeningDate/-Hours undefined. Zonder deze guard zou
-      // zo'n opslag (bijv. alleen een naamswijziging) de kolom stilzwijgend
-      // op null zetten en de beginstand wissen. Zie overtimeOpeningDateField
-      // in user-schema.ts voor het undefined/null-onderscheid dat dit
-      // mogelijk maakt.
+      if (data.vacationOpeningDate !== undefined) {
+        updateData.vacationOpeningDate = data.vacationOpeningDate
+          ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
+          : null;
+      }
+      if (data.vacationOpeningUsed !== undefined) updateData.vacationOpeningUsed = data.vacationOpeningUsed;
       if (data.overtimeOpeningDate !== undefined) {
         updateData.overtimeOpeningDate = data.overtimeOpeningDate
           ? new Date(`${data.overtimeOpeningDate}T00:00:00Z`)

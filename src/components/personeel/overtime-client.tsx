@@ -37,13 +37,11 @@ function lineKey(line: LedgerLine): string {
 
 interface OvertimeUser {
   id: string;
+  // Verplicht op de PUT-route, ongeacht welk veld dit scherm bewerkt — zie
+  // saveOpening() hieronder.
   name: string;
   email: string;
   role: "ADMIN" | "FINANCE" | "TEAMLEAD" | "EMPLOYEE";
-  weeklyHours: number | null;
-  workLevel: string | null;
-  vacationOpeningDate: string | null;
-  vacationOpeningUsed: number | null;
   overtimeOpeningDate: string | null;
   overtimeOpeningHours: number | null;
 }
@@ -96,16 +94,15 @@ export function OvertimeClient({ user, lines, saldo, lopend }: Props) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // name/email/role zijn verplichte velden op deze route, ook al
+          // wijzigt dit scherm ze niet. De overige velden (weeklyHours,
+          // workLevel, vacatie-beginstand) laten we weg: die worden alleen
+          // weggeschreven als de sleutel meekomt, dus ontbreken ze hier blijft
+          // de bestaande waarde ongemoeid — zie de `!== undefined`-guards in
+          // /api/users/[id].
           name: user.name,
           email: user.email,
           role: user.role,
-          // Deze route schrijft elk veld dat in het schema zit maar ontbreekt
-          // in het verzoek weg als leeg — dus alle bestaande velden gaan mee,
-          // ook al bewerkt dit scherm er zelf maar twee.
-          weeklyHours: user.weeklyHours ?? "",
-          workLevel: user.workLevel ?? "",
-          vacationOpeningDate: user.vacationOpeningDate ?? "",
-          vacationOpeningUsed: user.vacationOpeningUsed ?? "",
           overtimeOpeningDate: openingDate,
           overtimeOpeningHours: openingHours,
         }),

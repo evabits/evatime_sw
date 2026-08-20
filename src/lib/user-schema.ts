@@ -1,42 +1,39 @@
 import { z } from "zod";
 import { WORK_LEVEL_ORDER } from "./work-levels";
 
-// Empty input ("" / null / undefined) means "no target" -> undefined.
-// Any provided value must be > 0. Callers store `weeklyHours ?? null`.
+// Leeg ("" of null) betekent "geen target" -> de kolom wordt gewist.
+// Ontbreekt de sleutel helemaal (undefined), dan blijft de kolom ongemoeid —
+// zelfde onderscheid als bij overtimeOpeningDateField hieronder, en om
+// dezelfde reden: de PUT-route op /api/users/[id] schrijft elk veld hier
+// alleen weg als het `!== undefined` is, zodat een toekomstig scherm dat dit
+// veld niet kent het niet stilzwijgend leegmaakt bij het opslaan van iets
+// anders. Any provided value must be > 0.
 export const weeklyHoursField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.coerce.number().positive("Moet groter zijn dan 0").optional(),
-) as z.ZodType<number | undefined>;
+  (v) => (v === "" ? null : v),
+  z.coerce.number().positive("Moet groter zijn dan 0").optional().nullable(),
+) as z.ZodType<number | null | undefined>;
 
 // Peildatum van het opgenomen-totaal, als YYYY-MM-DD. Leeg betekent "geen
-// peildatum" en laat het saldo op het lopende jaar staan.
+// peildatum" en laat het saldo op het lopende jaar staan. Zelfde
+// undefined-versus-null-onderscheid als hierboven.
 export const vacationOpeningDateField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd").optional(),
-) as z.ZodType<string | undefined>;
+  (v) => (v === "" ? null : v),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd").optional().nullable(),
+) as z.ZodType<string | null | undefined>;
 
 // Het totaal aantal vakantie-uren dat tot de peildatum is opgenomen. Nooit
-// negatief: je kunt geen uren terugkrijgen.
+// negatief: je kunt geen uren terugkrijgen. Zelfde onderscheid als hierboven.
 export const vacationOpeningUsedField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.coerce.number().min(0, "Kan niet negatief zijn").optional(),
-) as z.ZodType<number | undefined>;
+  (v) => (v === "" ? null : v),
+  z.coerce.number().min(0, "Kan niet negatief zijn").optional().nullable(),
+) as z.ZodType<number | null | undefined>;
 
 // Peildatum van het urensaldo, als YYYY-MM-DD. Dat de datum op de eerste van
 // een maand moet liggen wordt niet hier gecontroleerd maar met
 // validateOpeningDate — die melding hoort bij de rekenkunde en niet bij het
-// formaat.
-//
-// Anders dan de velden hierboven zet dit veld "" NIET gelijk aan undefined,
-// maar aan null. Dat onderscheid is dragend: de PUT-route schrijft dit veld
-// alleen weg als het `!== undefined` is, zodat een scherm dat deze twee
-// urensaldo-velden niet kent (zoals het huidige gebruikersformulier) de
-// beginstand niet stilzwijgend wist bij het opslaan van bijvoorbeeld een
-// naamswijziging. undefined = sleutel ontbreekt in de aanvraag = kolom blijft
-// ongemoeid. null of "" = bewust leeggemaakt = kolom wordt gewist. Zou "" hier
-// ook naar undefined gaan, dan kon een scherm dat dit veld wél kent de
-// beginstand nooit meer wissen: een lege invoer zou onzichtbaar worden voor
-// de `!== undefined`-check.
+// formaat. Zelfde undefined-versus-null-onderscheid als de velden hierboven:
+// undefined = sleutel ontbreekt in de aanvraag = kolom blijft ongemoeid. null
+// of "" = bewust leeggemaakt = kolom wordt gewist.
 export const overtimeOpeningDateField = z.preprocess(
   (v) => (v === "" ? null : v),
   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd").optional().nullable(),
@@ -51,9 +48,9 @@ export const overtimeOpeningHoursField = z.preprocess(
   z.coerce.number().optional().nullable(),
 ) as z.ZodType<number | null | undefined>;
 
-// Empty input ("" / null / undefined) means "not set" -> undefined.
-// Callers store `workLevel ?? null`.
+// Leeg ("" of null) betekent "niet ingesteld" -> de kolom wordt gewist.
+// Zelfde undefined-versus-null-onderscheid als hierboven.
 export const workLevelField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.enum(WORK_LEVEL_ORDER as [string, ...string[]]).optional(),
-) as z.ZodType<string | undefined>;
+  (v) => (v === "" ? null : v),
+  z.enum(WORK_LEVEL_ORDER as [string, ...string[]]).optional().nullable(),
+) as z.ZodType<string | null | undefined>;

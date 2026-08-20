@@ -31,8 +31,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
-      id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true, workSchedule: true,
-      vacationOpeningDate: true, vacationOpeningUsed: true,
+      id: true, name: true, email: true, role: true, weeklyHours: true, workSchedule: true,
       overtimeOpeningDate: true, overtimeOpeningHours: true,
       contracts: { orderBy: [{ startDate: "desc" }, { createdAt: "desc" }], select: contractSelect },
       reviews: { orderBy: { createdAt: "desc" }, select: reviewSelect },
@@ -107,10 +106,6 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       <OvertimeClient
         user={{
           id: user.id, name: user.name, email: user.email, role: user.role,
-          weeklyHours: user.weeklyHours != null ? Number(user.weeklyHours) : null,
-          workLevel: user.workLevel,
-          vacationOpeningDate: user.vacationOpeningDate ? user.vacationOpeningDate.toISOString().slice(0, 10) : null,
-          vacationOpeningUsed: user.vacationOpeningUsed != null ? Number(user.vacationOpeningUsed) : null,
           overtimeOpeningDate: user.overtimeOpeningDate ? user.overtimeOpeningDate.toISOString().slice(0, 10) : null,
           overtimeOpeningHours: user.overtimeOpeningHours != null ? Number(user.overtimeOpeningHours) : null,
         }}
