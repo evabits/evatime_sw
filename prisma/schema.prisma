@@ -190,6 +190,10 @@ model RecurringTemplate {
   invoiceSubject  String?
   /// Testwerk telt goedkeur en afkeur; een vast bedrag niet.
   tracksQuality   Boolean     @default(false)
+  /// Het vaste deel van het kenmerk op de factuur: "ZP-H3X". De opleverdatum
+  /// komt er bij het voltooien achter, dus "ZP-H3X-12AUG26". Leeg betekent geen
+  /// kenmerk, zoals bij elke andere factuur.
+  referencePrefix String?
   archivedAt      DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

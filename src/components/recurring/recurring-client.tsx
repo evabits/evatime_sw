@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Repeat } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { batchTotal, recurringInvoiceDraft, suggestBatchName } from "@/lib/recurring";
+import { batchReference, batchTotal, recurringInvoiceDraft, suggestBatchName } from "@/lib/recurring";
 
 // HOURS staat wel in het schema (BillingMode), maar de voltooiroute weigert
 // hem nog. Het aanmaakvenster biedt hem daarom niet aan — niets aanbieden
@@ -26,6 +26,7 @@ const EMPTY_TEMPLATE_FORM = {
   defaultQuantity: "",
   lineDescription: "",
   invoiceSubject: "",
+  referencePrefix: "",
   tracksQuality: false,
 };
 
@@ -76,6 +77,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       defaultQuantity: t.defaultQuantity != null ? String(t.defaultQuantity) : "",
       lineDescription: t.lineDescription,
       invoiceSubject: t.invoiceSubject ?? "",
+      referencePrefix: t.referencePrefix ?? "",
       tracksQuality: t.tracksQuality,
     });
     setEditingTemplate(t);
@@ -104,6 +106,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
           defaultQuantity: templateForm.defaultQuantity ? Number(templateForm.defaultQuantity) : null,
           lineDescription: templateForm.lineDescription.trim(),
           invoiceSubject: templateForm.invoiceSubject.trim() || null,
+          referencePrefix: templateForm.referencePrefix.trim() || null,
           tracksQuality: templateForm.tracksQuality,
         }),
       });
@@ -413,6 +416,16 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
               <Input value={templateForm.invoiceSubject} placeholder="bijv. Factuur H3X testen"
                 onChange={(e) => setTemplateForm((f) => ({ ...f, invoiceSubject: e.target.value }))} />
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Kenmerk <span className="text-muted-foreground font-normal">(de opleverdatum komt er zelf achter)</span></Label>
+              <Input value={templateForm.referencePrefix} placeholder="bijv. ZP-H3X"
+                onChange={(e) => setTemplateForm((f) => ({ ...f, referencePrefix: e.target.value }))} />
+              {templateForm.referencePrefix.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Op een factuur van vandaag: {batchReference(templateForm.referencePrefix, vandaagIso())}
+                </p>
+              )}
+            </div>
             <div className="sm:col-span-2">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
@@ -507,6 +520,9 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                       ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`
                       : `${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`}
                 </p>
+              )}
+              {draft?.reference && (
+                <p className="text-sm text-muted-foreground">Kenmerk: {draft.reference}</p>
               )}
               {completeError && <p className="text-sm text-destructive">{completeError}</p>}
               <DialogFooter>

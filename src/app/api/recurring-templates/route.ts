@@ -14,6 +14,7 @@ const schema = z.object({
   lineDescription: z.string().trim().min(1),
   invoiceSubject: z.string().trim().optional().nullable(),
   tracksQuality: z.boolean().default(false),
+  referencePrefix: z.string().trim().optional().nullable(),
 });
 
 export async function GET() {
