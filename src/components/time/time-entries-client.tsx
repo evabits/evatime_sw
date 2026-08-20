@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeekGrid } from "@/components/shared/week-grid";
 import { OfficeDayRow } from "@/components/time/office-day-row";
-import { pickCommuteTemplate } from "@/lib/commute";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { partitionProjectsByCustomer, isProjectOffered } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
@@ -65,7 +64,7 @@ interface Props {
   role: string;
   currentUserLevel: WorkLevel | null;
   workSchedule: WeekSchedule | null;
-  commuteTemplate: { name: string; km: number } | null;
+  commuteTemplate: { name: string; km: number; projectId: string } | null;
 }
 
 export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule, commuteTemplate }: Props) {
@@ -153,21 +152,6 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const [kantoorMelding, setKantoorMelding] = useState<string | null>(null);
   // De kilometerregistraties van de week, voor de dubbel-controle hieronder.
   const [weekKmEntries, setWeekKmEntries] = useState<any[]>([]);
-  // Het project-id van het beheerde woon-werksjabloon. `commuteTemplate` komt
-  // via de server-pagina binnen zonder project-id (die lekte tot nu toe
-  // bewust niet mee, zie de toelichting in page.tsx) — voor de dubbel-controle
-  // is dat wél nodig, dus eenmalig opgehaald via het bestaande
-  // sjabloon-endpoint in plaats van page.tsx aan te passen.
-  const [commuteProjectId, setCommuteProjectId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!commuteTemplate) return;
-    fetch("/api/km/templates").then(async (res) => {
-      if (!res.ok) return;
-      setCommuteProjectId(pickCommuteTemplate(await res.json())?.projectId ?? null);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   /**
    * Zet een dag aan of uit door `{ date, present }` naar `POST
@@ -186,7 +170,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
       const bestaandeRit = weekKmEntries.find(
         (e: any) =>
           format(new Date(e.date), "yyyy-MM-dd") === dayStr &&
-          e.projectId === commuteProjectId &&
+          e.projectId === commuteTemplate.projectId &&
           Number(e.km) === commuteTemplate.km,
       );
       if (bestaandeRit) {

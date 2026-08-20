@@ -79,8 +79,11 @@ export default async function TimePage() {
     ? await prisma.workSchedule.findUnique({ where: { userId } })
     : null;
 
-  // Alleen naam en afstand naar de browser: het sjabloon-id en het project
-  // doen daar niets, dus die lekken niet mee.
+  // Sjabloon-id lekt niet mee — dat doet in de browser niets — maar het
+  // project wel: het scherm heeft dat net zo hard nodig als naam en
+  // kilometers, om vóór het aanvinken een niet-gemarkeerde, vooraf bestaande
+  // woon-werkrit op hetzelfde project te herkennen (zie toggleKantoorDag in
+  // TimeEntriesClient).
   const commuteTemplate = userId
     ? pickCommuteTemplate(await prisma.kmTemplate.findMany({ where: { userId } }) as any)
     : null;
@@ -95,7 +98,7 @@ export default async function TimePage() {
       role={role}
       currentUserLevel={currentUserLevel}
       workSchedule={toWeekSchedule(eigenRooster)}
-      commuteTemplate={commuteTemplate ? { name: commuteTemplate.name, km: Number(commuteTemplate.km) } : null}
+      commuteTemplate={commuteTemplate ? { name: commuteTemplate.name, km: Number(commuteTemplate.km), projectId: commuteTemplate.projectId } : null}
     />
   );
 }
