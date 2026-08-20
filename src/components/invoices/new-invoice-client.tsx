@@ -17,22 +17,13 @@ import { expenseInvoiceLines, hourInvoiceLines, kmInvoiceLines } from "@/lib/inv
 import { kmRate } from "@/lib/report-totals";
 import { resolvePeriod } from "@/lib/periods";
 import { splitInvoicePeriod } from "@/lib/invoice-period";
+import { STANDAARD_BETALINGSTEKST } from "@/lib/invoice-defaults";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
   customers: { id: string; name: string }[];
 }
-
-/**
- * Wat er standaard onder een nieuwe factuur staat. Je kunt het per factuur
- * aanpassen; dit is alleen de beginwaarde.
- *
- * De dertig dagen hier en de vervaldatum hierboven horen bij elkaar — die
- * staat ook op vandaag plus dertig.
- */
-const STANDAARD_NOTITIE =
-  "Wij verzoeken u vriendelijk het totaalbedrag binnen 30 dagen over te maken op onze IBAN rekening NL90 INGB 0008 9967 99 t.n.v. EVAbits onder vermelding van het factuurnummer.";
 
 interface InvoiceLine {
   description: string;
@@ -102,7 +93,7 @@ export function NewInvoiceClient({ customers }: Props) {
   const [periodeVan, setPeriodeVan] = useState(() => resolvePeriod("last-month", new Date())!.from);
   const [periodeTot, setPeriodeTot] = useState(() => resolvePeriod("last-month", new Date())!.to);
   const [vatRate, setVatRate] = useState(21);
-  const [notes, setNotes] = useState(STANDAARD_NOTITIE);
+  const [notes, setNotes] = useState(STANDAARD_BETALINGSTEKST);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [unbilledTime, setUnbilledTime] = useState<any[]>([]);
   const [unbilledKm, setUnbilledKm] = useState<any[]>([]);

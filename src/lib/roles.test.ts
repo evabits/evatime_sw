@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { canViewReports, canManagePlanning } from "./roles";
+import {
+  canViewReports,
+  canManagePlanning,
+  canManageRecurringTemplates,
+  canCompleteRecurringBatch,
+} from "./roles";
 
 describe("canViewReports", () => {
   it("allows ADMIN", () => {
@@ -26,5 +31,27 @@ describe("canManagePlanning", () => {
 
   it("says no to an unknown role instead of throwing", () => {
     expect(canManagePlanning("ONBEKEND")).toBe(false);
+  });
+});
+
+describe("canManageRecurringTemplates", () => {
+  it("only lets an admin manage the templates", () => {
+    expect(canManageRecurringTemplates("ADMIN")).toBe(true);
+    expect(canManageRecurringTemplates("FINANCE")).toBe(false);
+    expect(canManageRecurringTemplates("TEAMLEAD")).toBe(false);
+    expect(canManageRecurringTemplates("EMPLOYEE")).toBe(false);
+  });
+});
+
+describe("canCompleteRecurringBatch", () => {
+  it("lets an admin and a team lead finish a batch", () => {
+    expect(canCompleteRecurringBatch("ADMIN")).toBe(true);
+    expect(canCompleteRecurringBatch("TEAMLEAD")).toBe(true);
+  });
+
+  it("keeps everyone else out", () => {
+    expect(canCompleteRecurringBatch("FINANCE")).toBe(false);
+    expect(canCompleteRecurringBatch("EMPLOYEE")).toBe(false);
+    expect(canCompleteRecurringBatch("ONBEKEND")).toBe(false);
   });
 });
