@@ -274,6 +274,11 @@ model KmEntry {
   date           DateTime      @db.Date
   km             Decimal       @db.Decimal(8, 2)
   description    String?
+  // Deze rit is de woon-werkrit van die dag, aangemaakt vanuit het beheerde
+  // woon-werksjabloon. Nodig omdat het vinkje op het urenscherm moet weten
+  // wélke rit de zijne is: herkennen op project en afstand breekt zodra iemand
+  // zijn rit aanpast of een tweede rit naar dezelfde plek maakt.
+  commute        Boolean       @default(false)
   rateOverride   Decimal?      @db.Decimal(10, 2)
   invoiced       Boolean       @default(false)
   invoiceLineId  String?

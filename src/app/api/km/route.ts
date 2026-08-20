@@ -5,6 +5,7 @@ import { z } from "zod";
 import { handleError, projectMembershipError } from "@/lib/api";
 import { canViewAllEntries, isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
+import { pickCommuteTemplate } from "@/lib/commute";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -13,6 +14,9 @@ const schema = z.object({
   description: z.string().optional(),
   rateOverride: z.number().positive().optional().nullable(),
   userId: z.string().optional().nullable(),
+  // Welk sjabloon het scherm gebruikte om de velden te vullen. Alleen om te
+  // bepalen of dit de woon-werkrit is; de waarden zelf komen uit het formulier.
+  templateId: z.string().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
     let { rateOverride } = data;
     if (!isAdmin(role)) rateOverride = null;
 
-    const { userId: requestedUserId, ...entryData } = data;
+    const { userId: requestedUserId, templateId, ...entryData } = data;
     const ownerId = resolveEntryUserId(role, userId, requestedUserId);
     if (ownerId !== userId) {
       const target = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
@@ -70,8 +74,19 @@ export async function POST(req: Request) {
     const memberError = await projectMembershipError(data.projectId, ownerId);
     if (memberError) return memberError;
 
+    // Ná de membership-check: bij een ongeldig project is deze query
+    // overbodig, en zo blijft hij achterwege.
+    // De client stuurt alleen wélk sjabloon hij gebruikte; of dat het beheerde
+    // woon-werksjabloon is zoekt de server zelf op. Een `commute`-vlag van de
+    // client zou betekenen dat iedereen zijn eigen ritten zo kan bestempelen.
+    let commute = false;
+    if (templateId) {
+      const sjablonen = await prisma.kmTemplate.findMany({ where: { userId: ownerId } });
+      commute = pickCommuteTemplate(sjablonen as any)?.id === templateId;
+    }
+
     const entry = await prisma.kmEntry.create({
-      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, commute },
       include: {
         project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },

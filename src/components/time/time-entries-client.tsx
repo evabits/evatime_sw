@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeekGrid } from "@/components/shared/week-grid";
+import { OfficeDayRow } from "@/components/time/office-day-row";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { partitionProjectsByCustomer, isProjectOffered } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
@@ -63,9 +64,10 @@ interface Props {
   role: string;
   currentUserLevel: WorkLevel | null;
   workSchedule: WeekSchedule | null;
+  commuteTemplate: { name: string; km: number; projectId: string } | null;
 }
 
-export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule }: Props) {
+export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule, commuteTemplate }: Props) {
   const isAdmin = role === "ADMIN";
 
   const [projects, setProjects] = useState(projectsProp);
@@ -137,6 +139,78 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   const [viewMode, setViewMode] = useState<"week" | "list">("week");
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // De dagen met een woon-werkrit, voor de rij onder het weekraster.
+  const [kantoorDagen, setKantoorDagen] = useState<string[]>([]);
+  // De dag die op dit moment verwerkt wordt: blokkeert een tweede klik terwijl
+  // de aanroep loopt.
+  const [kantoorBezig, setKantoorBezig] = useState<string | null>(null);
+  // Terugkoppeling bij een geslaagde aan/uit-zet, als regel tekst naast de rij
+  // — dit scherm heeft geen meldingenbalk en een alert() bij elk vinkje zou
+  // onuitstaanbaar zijn. Verdwijnt weer bij de volgende weekwissel (zie het
+  // effect dat kantoorDagen ophaalt).
+  const [kantoorMelding, setKantoorMelding] = useState<string | null>(null);
+
+  /**
+   * Zet een dag aan of uit door `{ date, present }` naar `POST
+   * /api/km/commute` te sturen. De route is idempotent en weigert zelf wat
+   * niet mag (geen sjabloon, een gefactureerde rit) — die controles worden
+   * hier niet overgedaan; de foutmelding van de server gaat rechtstreeks in
+   * de alert().
+   */
+  async function toggleKantoorDag(dayStr: string, present: boolean) {
+    // `kantoorBezig` gaat al aan vóórdat er iets wordt opgehaald: de dubbele
+    // controle hieronder haalt zelf al data op, en zonder dit zou een tweede
+    // klik tijdens die wachttijd een tweede POST kunnen starten.
+    setKantoorBezig(dayStr);
+    setKantoorMelding(null);
+    try {
+      // Een woon-werkrit van vóór deze functie mist de commute-markering, dus
+      // het vinkje staat uit terwijl de rit er al is. Aanvinken zou dan een
+      // tweede rit maken. Vlak vóór de bevestigingsvraag ophalen — en niet uit
+      // een lijst die bij een week- of filterwissel niet wordt leeggemaakt —
+      // want anders mist de controle na een weekwissel alles (de vorige week
+      // staat er nog in) of waarschuwt hij bij een medewerkerswissel over
+      // andermans rit. `userId` gaat altijd mee: deze functie gaat alleen over
+      // eigen dagen (zie `bewerkbaar` bij OfficeDayRow), en zonder dat zou een
+      // beheerder hier de kilometers van het hele bedrijf ophalen.
+      if (present && commuteTemplate) {
+        const params = new URLSearchParams({ from: dayStr, to: dayStr, userId });
+        const res = await fetch(`/api/km?${params}`);
+        const dagRitten: { projectId: string; km: string | number; project?: { name?: string } }[] = res.ok
+          ? await res.json()
+          : [];
+        const bestaandeRit = dagRitten.find(
+          (e) => e.projectId === commuteTemplate.projectId && Number(e.km) === commuteTemplate.km,
+        );
+        if (bestaandeRit) {
+          const ok = confirm(
+            `Op deze dag staat al een kilometerregistratie van ${Number(bestaandeRit.km).toLocaleString("nl-NL")} km op ${bestaandeRit.project?.name ?? "dit project"}. Aanvinken voegt daar een aparte woon-werkrit aan toe. Doorgaan?`,
+          );
+          if (!ok) return;
+        }
+      }
+
+      const res = await fetch("/api/km/commute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dayStr, present }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(body.error ?? "Aanmaken mislukt");
+        return;
+      }
+      setKantoorDagen((prev) => (present ? [...prev, dayStr] : prev.filter((d) => d !== dayStr)));
+      setKantoorMelding(
+        present
+          ? `WoonWerk ${Number(body.km).toLocaleString("nl-NL")} km toegevoegd`
+          : "Woon-werkrit verwijderd",
+      );
+    } finally {
+      setKantoorBezig(null);
+    }
+  }
 
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
@@ -278,6 +352,36 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     if (res.ok) setEntries(await res.json());
     setFetching(false);
   }
+
+  // De route accepteert userId alleen van een beheerder; die stuurt hem dus
+  // mee zodra hij naar één medewerker kijkt. Een eigen effect in plaats van
+  // een aanroep bij elke fetchWeekEntries-call site: weekFrom/weekTo en
+  // filterUser vangen precies "de week of de gefilterde medewerker
+  // verandert" op, zonder elke plek die fetchWeekEntries aanroept te moeten
+  // aanpassen.
+  //
+  // `genegeerd` is het standaardpatroon tegen een verouderd antwoord: twee
+  // keer snel op de weekpijl klikken kan het eerste, tragere antwoord als
+  // laatste laten binnenkomen. Zonder deze vlag zou dat de vinkjes van de
+  // vórige week tonen totdat de volgende wissel het weer rechtzet.
+  useEffect(() => {
+    if (viewMode !== "week") return;
+    // De melding hoort bij een handeling in déze week; bij een weekwissel is
+    // ze niet meer van toepassing.
+    setKantoorMelding(null);
+    let genegeerd = false;
+    const params = new URLSearchParams({ from: weekFrom, to: weekTo });
+    if (isAdmin && filterUser !== "all") params.set("userId", filterUser);
+    fetch(`/api/km/commute?${params}`).then(async (res) => {
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!genegeerd) setKantoorDagen(data.dates);
+    });
+    return () => {
+      genegeerd = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, weekFrom, weekTo, filterUser]);
 
   function handleMonthChange(month: string) {
     setFilterMonth(month);
@@ -783,6 +887,25 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
                 return vrijeDag ? "vrij" : null;
               }}
             />
+
+            {!(isAdmin && filterUser === "all") && (
+              <>
+                <OfficeDayRow
+                  days={weekDays}
+                  actief={kantoorDagen}
+                  template={commuteTemplate}
+                  bewerkbaar={!isAdmin || filterUser === userId}
+                  bezig={kantoorBezig}
+                  onToggle={toggleKantoorDag}
+                />
+                {/* Terugkoppeling van een geslaagde aan/uit-zet. Alleen tekst
+                    naast de rij: er is geen meldingenbalk in dit scherm, en
+                    een alert() bij elk vinkje zou onuitstaanbaar zijn. */}
+                {kantoorMelding && (
+                  <p className="px-4 py-1.5 text-xs text-muted-foreground border-b">{kantoorMelding}</p>
+                )}
+              </>
+            )}
 
             {/* Entry list */}
             {fetching ? (
