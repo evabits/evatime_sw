@@ -98,3 +98,86 @@ export function validateOpeningDate(datum: string | null | undefined): string | 
   if (!datum.endsWith("-01")) return "De peildatum moet op de eerste van een maand liggen";
   return null;
 }
+
+export type OvertimeAdjustmentLine = {
+  id: string;
+  date: string;
+  hours: number;
+  reason: string;
+};
+
+/** Eén regel uit de opsomming. `hours` is telkens wat die regel bij het saldo optelt. */
+export type LedgerLine =
+  | { kind: "opening"; date: string; hours: number }
+  | { kind: "month"; key: MonthKey; geboekt: number; target: number | null; hours: number }
+  | { kind: "adjustment"; id: string; date: string; hours: number; reason: string };
+
+/** Waarop een regel chronologisch sorteert. */
+function sorteerDatum(line: LedgerLine): string {
+  // Een maandregel sorteert op de éérste van die maand, zodat een mutatie
+  // halverwege oktober ná de oktoberregel komt te staan en niet ervóór.
+  if (line.kind === "month") return `${line.key}-01`;
+  return line.date;
+}
+
+/**
+ * De opsomming en het saldo.
+ *
+ * De lopende maand komt apart terug in `lopend` en telt niet mee in `saldo` —
+ * hij is nog niet af, en meerekenen zou iedereen tot de laatste dag van de maand
+ * in de min zetten.
+ */
+export function overtimeLedger(opts: {
+  openingDate: string | null;
+  openingHours: number;
+  months: MonthKey[];
+  hoursByMonth: Record<MonthKey, number>;
+  contractHoursByMonth: Record<MonthKey, number | null>;
+  adjustments: OvertimeAdjustmentLine[];
+  vandaag: Date;
+  lopendeUren: number;
+  lopendContract: number | null;
+}): {
+  lines: LedgerLine[];
+  saldo: number;
+  lopend: { key: MonthKey; geboekt: number; target: number | null } | null;
+} {
+  if (!opts.openingDate) return { lines: [], saldo: 0, lopend: null };
+
+  const lines: LedgerLine[] = [
+    { kind: "opening", date: opts.openingDate, hours: opts.openingHours },
+  ];
+
+  for (const key of opts.months) {
+    const geboekt = opts.hoursByMonth[key] ?? 0;
+    const target = monthTarget(opts.contractHoursByMonth[key] ?? null, key);
+    lines.push({
+      kind: "month",
+      key,
+      geboekt,
+      target,
+      // Zonder target telt de maand als niets. Vóór indiensttreding of ná
+      // vertrek is er geen doel om tegen af te rekenen.
+      hours: target == null ? 0 : Math.round((geboekt - target) * 10) / 10,
+    });
+  }
+
+  for (const m of opts.adjustments) {
+    lines.push({ kind: "adjustment", id: m.id, date: m.date, hours: m.hours, reason: m.reason });
+  }
+
+  lines.sort((a, b) => sorteerDatum(a).localeCompare(sorteerDatum(b)));
+
+  const saldo = Math.round(lines.reduce((som, l) => som + l.hours, 0) * 10) / 10;
+
+  const lopendeKey = toKey(opts.vandaag.getFullYear(), opts.vandaag.getMonth() + 1);
+  return {
+    lines,
+    saldo,
+    lopend: {
+      key: lopendeKey,
+      geboekt: opts.lopendeUren,
+      target: monthTarget(opts.lopendContract, lopendeKey),
+    },
+  };
+}
