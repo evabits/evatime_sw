@@ -99,7 +99,12 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     setVenstertje({ soort: "taak-bewerk", project, taak });
   }
 
-  /** Eén plek voor elke schrijfactie: verstuurt, meldt de fout, en ververst bij succes. */
+  /**
+   * Eén plek voor elke schrijfactie: verstuurt, meldt de fout, en ververst bij
+   * succes. Geeft bij succes de json-respons terug (elke route antwoordt met
+   * json) zodat een aanroeper — zoals het aanmaken van een taak — bij het
+   * aangemaakte record kan; bij een fout is het `false`.
+   */
   async function verstuur(url: string, method: string, body?: unknown) {
     setBezig(true);
     setFout("");
@@ -115,7 +120,23 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     }
     setVenstertje(null);
     router.refresh();
-    return true;
+    return await res.json().catch(() => true);
+  }
+
+  /**
+   * Rekent voor of het net opgeslagene iets verderop in de keten laat
+   * verschuiven, en toont het overzicht alleen als dat daadwerkelijk zo is.
+   * Gedeeld door aanmaken én bewerken, want de rekenkunde erachter — shiftPlan
+   * over de eigen net-verstuurde gegevens heen, niet over wat er nog op het
+   * scherm staat — is voor allebei hetzelfde.
+   */
+  function toonVerschuivingAlsNodig(
+    taakId: string,
+    taken: Parameters<typeof shiftPlan>[0],
+    koppelingen: Parameters<typeof shiftPlan>[1],
+  ) {
+    const regels = shiftPlan(taken, koppelingen);
+    if (regels.length > 0) setVerschuiving({ taakId, regels });
   }
 
   async function bewaar() {
@@ -130,18 +151,30 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       });
       return;
     }
+    const project = venstertje.project;
     if (venstertje.soort === "taak-nieuw") {
-      await verstuur(`/api/projects/${venstertje.project.id}/tasks`, "POST", {
+      const nieuw = await verstuur(`/api/projects/${project.id}/tasks`, "POST", {
         name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
       });
+      if (!nieuw) return;
+
+      // Dezelfde redenering als bij bewerken: de POST is al geslaagd, dus we
+      // rekenen door met de taken zoals ze op het scherm stonden, aangevuld met
+      // de nieuwe taak — met het echte id uit de respons, niet ervoor gegokt.
+      const taken = [
+        ...project.tasks,
+        { id: nieuw.id, name: formNaam, startDate: formStart, endDate: formEind },
+      ];
+      const koppelingen = alleKoppelingen(project)
+        .concat(formWachtOp.map((dependsOnId) => ({ taskId: nieuw.id, dependsOnId })));
+      toonVerschuivingAlsNodig(nieuw.id, taken, koppelingen);
       return;
     }
     const taak = venstertje.taak;
-    const project = venstertje.project;
-    const ok = await verstuur(`/api/project-tasks/${taak.id}`, "PUT", {
+    const opgeslagen = await verstuur(`/api/project-tasks/${taak.id}`, "PUT", {
       name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
     });
-    if (!ok) return;
+    if (!opgeslagen) return;
 
     // router.refresh() (in verstuur) haalt de verse gegevens pas later op; het
     // scherm heeft ze nu nog niet. Reken het voorbeeld daarom door met wat we
@@ -153,8 +186,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     const koppelingen = alleKoppelingen(project)
       .filter((k) => k.taskId !== taak.id)
       .concat(formWachtOp.map((dependsOnId) => ({ taskId: taak.id, dependsOnId })));
-    const regels = shiftPlan(taken, koppelingen);
-    if (regels.length > 0) setVerschuiving({ taakId: taak.id, regels });
+    toonVerschuivingAlsNodig(taak.id, taken, koppelingen);
   }
 
   /** "Alleen deze taak": het overzicht dicht, de keten blijft staan zoals hij stond. */
