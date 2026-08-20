@@ -6,6 +6,7 @@ import { handleError, entryMutationError, projectMembershipError } from "@/lib/a
 import { isAdmin } from "@/lib/roles";
 import { checkEntryMutation, resolveEntryUserId } from "@/lib/entry-owner";
 import { membershipCheckNeeded } from "@/lib/project-members";
+import { commuteVerdict } from "@/lib/commute-rules";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -48,9 +49,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (memberError) return memberError;
     }
 
+    // Ook bij het wijzigen opnieuw beoordelen: wie een gewone rit bijwerkt tot
+    // de afstand van zijn woon-werksjabloon heeft daarmee een woon-werkrit, en
+    // wie er juist vanaf wijkt niet meer. De rit mag zichzelf daarbij niet als
+    // duplicaat tegenkomen.
+    const { commute, denial } = await commuteVerdict({
+      ownerId,
+      date: new Date(data.date),
+      projectId: data.projectId,
+      km: data.km,
+      negeerRitId: id,
+    });
+    if (denial) return NextResponse.json({ error: denial }, { status: 400 });
+
     const entry = await prisma.kmEntry.update({
       where: { id },
-      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId },
+      data: { ...entryData, rateOverride, date: new Date(data.date), userId: ownerId, commute },
       include: {
         project: { select: { name: true, billable: true, customer: { select: { id: true, name: true } } } },
         user: { select: { id: true, name: true } },

@@ -57,10 +57,9 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
   const [entries, setEntries] = useState(initialEntries);
   const [templates, setTemplates] = useState(initialTemplates);
-  // Welk sjabloon het formulier heeft ingevuld. Gaat als `templateId` mee met
-  // de POST, zodat de server kan zien of dit de woon-werkrit is. Wordt leeg
-  // zodra project, km of omschrijving met de hand wijzigt: dan klopt de
-  // koppeling niet meer en zou meesturen de vlag laten liegen.
+  // Welk sjabloon het formulier heeft ingevuld — puur om de keuzelijst de
+  // juiste selectie te laten tonen. Of een rit de woon-werkrit is beslist de
+  // server zelf, op project en kilometers; dat hoeft de client niet te melden.
   const [appliedTemplate, setAppliedTemplate] = useState("");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -205,9 +204,6 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
-      // Alleen bij een nieuwe rit meesturen: de server bepaalt hiermee of dit
-      // de woon-werkrit is. Bij bewerken (editing) is er geen sjabloonkeuze.
-      templateId: !editing && appliedTemplate ? appliedTemplate : undefined,
     };
     try {
       if (editing) {
