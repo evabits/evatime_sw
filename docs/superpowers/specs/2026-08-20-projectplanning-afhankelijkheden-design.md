@@ -163,11 +163,16 @@ Het scherm draait de functie dus na élke opslag — datums, koppelingen of alle
 De uitkomst is de lijst taken die zouden verschuiven, met oude en nieuwe datums,
 en per taak of hij daardoor buiten de datums van zijn project valt.
 
-### Drie knoppen
+### Twee knoppen
 
-Het overzicht toont: annuleren, **alleen deze taak** verplaatsen, of **alles
-verschuiven**. Die middelste is er met opzet — soms wil je de tegenspraak
-bewust, en dan licht hij daarna op als "taak begint te vroeg".
+De taak zelf is al opgeslagen op het moment dat het overzicht verschijnt; wat
+nog openstaat is alleen of de keten meeschuift. Het overzicht toont daarom
+**alleen deze taak** of **alles verschuiven** — geen derde knop "annuleren",
+want er valt op dat moment niets meer te annuleren en een knop die iets anders
+belooft dan hij doet is erger dan geen knop.
+
+"Alleen deze taak" is er met opzet: soms wil je de tegenspraak bewust, en dan
+licht hij daarna op als "taak begint te vroeg".
 
 ## Bewaking
 
@@ -243,7 +248,7 @@ Tests in `src/lib/task-dependencies.test.ts`.
 | Taak met koppelingen verwijderd | Koppelingen verdwijnen mee, in beide richtingen. |
 | Taak naar vroeger geschoven | Niets schuift mee; opvolgers krijgen lucht. |
 | Taak naar later geschoven zonder opvolgers | Geen overzicht, gewoon opslaan. |
-| "Alleen deze taak" gekozen | Alleen die taak verschuift; de schending licht daarna rood op. |
+| "Alleen deze taak" gekozen | De keten blijft staan; de schending licht daarna rood op. |
 | Verschoven taak valt buiten de projectdatums | Verschuiven mag; het overzicht waarschuwt vooraf en de taak licht daarna op. |
 | Project dichtgeklapt | Geen taken en dus geen pijlen in beeld. |
 | Taak zonder koppelingen | Precies zoals in A; niets verandert. |
@@ -263,7 +268,8 @@ van de nieuwe tabel.
   en ziet de pijlen tussen de balken van een uitgeklapt project.
 - Een kringloop wordt geweigerd met de keten in de melding.
 - Een taak naar later verschuiven toont wat er mee zou schuiven, met een
-  waarschuwing bij wat buiten de projectdatums valt, en drie knoppen.
+  waarschuwing bij wat buiten de projectdatums valt, en de keuze tussen alleen
+  deze taak en de hele keten.
 - De vier signalen lichten op zoals in de tabel, met een uitleg bij hover.
 - De pure functies zijn gedekt door tests, inclusief de randgevallen hierboven.
 - `npx tsc --noEmit` is schoon, `npm run build` geeft exitcode 0 en de volledige
