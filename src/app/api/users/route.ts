@@ -17,6 +17,9 @@ const createSchema = z.object({
   workLevel: workLevelField,
 });
 
+// Geen overtimeOpeningDate/overtimeOpeningHours hier: deze route vereist
+// alleen een sessie (elke ingelogde medewerker), en het urensaldo is
+// uitdrukkelijk iets dat alleen een beheerder op de medewerkerspagina ziet.
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
   vacationOpeningDate: true, vacationOpeningUsed: true,

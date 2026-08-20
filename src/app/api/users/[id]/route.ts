@@ -6,7 +6,9 @@ import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
 import {
   vacationOpeningDateField, vacationOpeningUsedField, weeklyHoursField, workLevelField,
+  overtimeOpeningDateField, overtimeOpeningHoursField,
 } from "@/lib/user-schema";
+import { validateOpeningDate } from "@/lib/overtime";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -17,8 +19,14 @@ const updateSchema = z.object({
   workLevel: workLevelField,
   vacationOpeningDate: vacationOpeningDateField,
   vacationOpeningUsed: vacationOpeningUsedField,
+  overtimeOpeningDate: overtimeOpeningDateField,
+  overtimeOpeningHours: overtimeOpeningHoursField,
 });
 
+// Geen overtimeOpeningDate/overtimeOpeningHours in de respons: deze route is
+// ook bereikbaar voor de ingelogde gebruiker zelf (isSelf), en het urensaldo
+// is uitdrukkelijk iets dat alleen een beheerder op de medewerkerspagina
+// ziet — het opslaan hieronder blijft wel werken, dat gaat via updateData.
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
   vacationOpeningDate: true, vacationOpeningUsed: true,
@@ -57,15 +65,41 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const updateData: any = { name: data.name, email: data.email };
     if (isAdmin) {
+      // Alleen hier gecontroleerd (en niet vóór de isAdmin-tak): het veld
+      // wordt toch alleen door een beheerder weggeschreven, dus een gewone
+      // medewerker die zijn eigen naam wijzigt mag hier geen 400 op krijgen
+      // voor een peildatum die hij niet eens kan zetten.
+      const peilFout = validateOpeningDate(data.overtimeOpeningDate);
+      if (peilFout) return NextResponse.json({ error: peilFout }, { status: 400 });
+
       updateData.role = data.role;
-      updateData.weeklyHours = data.weeklyHours ?? null;
-      updateData.workLevel = data.workLevel ?? null;
+      // Alleen schrijven als de sleutel is meegestuurd: een scherm dat een
+      // van deze zes velden niet kent (zoals dit scherm straks een nieuw veld
+      // niet kent) stuurt hem helemaal niet mee, en dan is data.<veld>
+      // undefined. Zonder deze guard zou zo'n opslag (bijv. alleen een
+      // naamswijziging, of — sinds urensaldo — alleen de beginstand) de kolom
+      // stilzwijgend op null zetten en bestaande gegevens wissen. Zie
+      // overtimeOpeningDateField in user-schema.ts voor het
+      // undefined/null-onderscheid dat dit mogelijk maakt: undefined = sleutel
+      // ontbreekt = kolom blijft ongemoeid, null of "" = bewust leeggemaakt.
+      if (data.weeklyHours !== undefined) updateData.weeklyHours = data.weeklyHours;
+      if (data.workLevel !== undefined) updateData.workLevel = data.workLevel;
       // De datum als middernacht UTC, zodat een @db.Date-kolom precies de dag
       // bewaart die is ingevuld en niet die ervoor.
-      updateData.vacationOpeningDate = data.vacationOpeningDate
-        ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
-        : null;
-      updateData.vacationOpeningUsed = data.vacationOpeningUsed ?? null;
+      if (data.vacationOpeningDate !== undefined) {
+        updateData.vacationOpeningDate = data.vacationOpeningDate
+          ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
+          : null;
+      }
+      if (data.vacationOpeningUsed !== undefined) updateData.vacationOpeningUsed = data.vacationOpeningUsed;
+      if (data.overtimeOpeningDate !== undefined) {
+        updateData.overtimeOpeningDate = data.overtimeOpeningDate
+          ? new Date(`${data.overtimeOpeningDate}T00:00:00Z`)
+          : null;
+      }
+      if (data.overtimeOpeningHours !== undefined) {
+        updateData.overtimeOpeningHours = data.overtimeOpeningHours;
+      }
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 
