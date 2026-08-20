@@ -252,7 +252,14 @@ export function planningWarnings(
       }
     }
 
-    if (eind < vandaag) {
+    // Kalenderdagen vergelijken, geen tijdstippen: endDate is een @db.Date en komt
+    // via serialize() binnen als UTC-middernacht, wat lokaal (Amsterdam) 01:00 of
+    // 02:00 is. Vergelijk je dat met de kloktijd van nu, dan slaat "verlopen" al
+    // aan vanaf dat vroege uur op de eigen einddag — terwijl einddatums inclusief
+    // zijn en de taak de hele dag nog mag lopen. Niet oplossen door `vandaag` in
+    // het component af te kappen naar middernacht: diezelfde `vandaag` voedt ook
+    // `todayOffsetPct`, die tegen vensterranden op lokale 01:00/02:00 vergelijkt.
+    if (differenceInCalendarDays(vandaag, eind) > 0) {
       signalen.push({ soort: "verlopen", uitleg: "De einddatum is voorbij" });
     }
 

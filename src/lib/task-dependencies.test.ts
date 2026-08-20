@@ -189,6 +189,23 @@ describe("planningWarnings", () => {
     expect((perTaak.A ?? []).map((s) => s.soort)).not.toContain("verlopen");
   });
 
+  it("does not call a task expired mid-afternoon on its own end day", () => {
+    // endDate komt binnen als UTC-middernacht (dus lokaal 01:00/02:00). Een
+    // `vandaag` die zelf een tijdstip heeft — hier 09:30 — mag dat niet als "al
+    // voorbij" lezen: op kalenderdagen is dit dezelfde dag.
+    const vandaagMetTijdstip = new Date("2026-09-15T09:30:00");
+    const taken = [taak("A", "2026-09-01", "2026-09-15")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaagMetTijdstip);
+    expect((perTaak.A ?? []).map((s) => s.soort)).not.toContain("verlopen");
+  });
+
+  it("still calls a task expired the day after it ended, even with a time-of-day vandaag", () => {
+    const vandaagMetTijdstip = new Date("2026-09-16T09:30:00");
+    const taken = [taak("A", "2026-09-01", "2026-09-15")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaagMetTijdstip);
+    expect(perTaak.A.map((s) => s.soort)).toContain("verlopen");
+  });
+
   it("can give one task several signals at once", () => {
     const taken = [taak("A", "2026-08-01", "2026-08-20"), taak("B", "2026-08-10", "2026-08-25")];
     const { perTaak } = planningWarnings(project, taken, [wacht("B", "A")], vandaag);

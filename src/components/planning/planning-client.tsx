@@ -128,7 +128,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
    * json) zodat een aanroeper — zoals het aanmaken van een taak — bij het
    * aangemaakte record kan; bij een fout is het `false`.
    */
-  async function verstuur(url: string, method: string, body?: unknown) {
+  async function verstuur(url: string, method: string, body?: unknown): Promise<false | Record<string, unknown>> {
     setBezig(true);
     setFout("");
     const res = await fetch(url, {
@@ -143,7 +143,9 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     }
     setVenstertje(null);
     router.refresh();
-    return await res.json().catch(() => true);
+    // Leeg object i.p.v. `true` bij een respons zonder json: zo blijft het
+    // returntype één vorm en hoeft een aanroeper niet ook nog `true` te verstaan.
+    return await res.json().catch(() => ({}));
   }
 
   /**
@@ -186,18 +188,21 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       const nieuw = await verstuur(`/api/projects/${project.id}/tasks`, "POST", {
         name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
       });
-      if (!nieuw) return;
+      // Geen taak zonder id om mee door te rekenen — ook niet als de route ooit
+      // een body zonder id teruggeeft.
+      const nieuwId = nieuw && typeof nieuw.id === "string" ? nieuw.id : null;
+      if (!nieuwId) return;
 
       // Dezelfde redenering als bij bewerken: de POST is al geslaagd, dus we
       // rekenen door met de taken zoals ze op het scherm stonden, aangevuld met
       // de nieuwe taak — met het echte id uit de respons, niet ervoor gegokt.
       const taken = [
         ...project.tasks,
-        { id: nieuw.id, name: formNaam, startDate: formStart, endDate: formEind },
+        { id: nieuwId, name: formNaam, startDate: formStart, endDate: formEind },
       ];
       const koppelingen = alleKoppelingen(project)
-        .concat(formWachtOp.map((dependsOnId) => ({ taskId: nieuw.id, dependsOnId })));
-      toonVerschuivingAlsNodig(nieuw.id, taken, koppelingen, periode);
+        .concat(formWachtOp.map((dependsOnId) => ({ taskId: nieuwId, dependsOnId })));
+      toonVerschuivingAlsNodig(nieuwId, taken, koppelingen, periode);
       return;
     }
     const taak = venstertje.taak;
