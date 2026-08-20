@@ -205,7 +205,7 @@ export function planningWarnings(
   taken: SchedulableTask[],
   links: DependencyLink[],
   vandaag: Date,
-): { perTaak: Record<string, TaakSignaal[]>; projectLooptUit: boolean } {
+): { perTaak: Record<string, TaakSignaal[]>; projectLooptUit: boolean; projectUitleg: string | null } {
   const opNaam = new Map(taken.map((t) => [t.id, t]));
   const wachtOp = wachtOpTabel(links);
 
@@ -215,6 +215,10 @@ export function planningWarnings(
 
   const perTaak: Record<string, TaakSignaal[]> = {};
   let projectLooptUit = false;
+  // Net als bij de taaksignalen: de tekst hoort bij de berekening en niet bij
+  // het scherm, anders verzint een aanroeper zijn eigen woorden voor hetzelfde
+  // boolean en lopen de twee uiteen.
+  let projectUitleg: string | null = null;
 
   for (const t of taken) {
     const start = new Date(t.startDate);
@@ -242,7 +246,10 @@ export function planningWarnings(
           uitleg: `Valt buiten de projectperiode (${formatDate(periodeStart)} t/m ${formatDate(periodeEind)})`,
         });
       }
-      if (eind > periodeEind) projectLooptUit = true;
+      if (eind > periodeEind) {
+        projectLooptUit = true;
+        projectUitleg = `Loopt door na de geplande einddatum van het project (${formatDate(periodeEind)})`;
+      }
     }
 
     if (eind < vandaag) {
@@ -252,7 +259,7 @@ export function planningWarnings(
     if (signalen.length > 0) perTaak[t.id] = signalen;
   }
 
-  return { perTaak, projectLooptUit };
+  return { perTaak, projectLooptUit, projectUitleg };
 }
 
 /** Een knikpunt van een pijl, in pixels binnen de tijdlijnstrook. */

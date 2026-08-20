@@ -154,13 +154,26 @@ describe("planningWarnings", () => {
     expect(planningWarnings(project, [taak("A", "2026-09-01", "2026-09-10")], [], vandaag).projectLooptUit).toBe(false);
   });
 
+  it("explains in plain Dutch why a project runs over, with the planned end date", () => {
+    const taken = [taak("A", "2026-09-20", "2026-10-15")];
+    const { projectUitleg } = planningWarnings(project, taken, [], vandaag);
+    expect(projectUitleg).toBe("Loopt door na de geplande einddatum van het project (30-SEP-2026)");
+  });
+
+  it("gives no explanation when the project does not run over", () => {
+    const taken = [taak("A", "2026-09-01", "2026-09-10")];
+    const { projectUitleg } = planningWarnings(project, taken, [], vandaag);
+    expect(projectUitleg).toBeNull();
+  });
+
   it("cannot judge a project without dates of its own", () => {
     // Dan spant de balk zich om de taken en kan er per definitie niets uitsteken.
     const los = { plannedStart: null, plannedEnd: null };
     const taken = [taak("A", "2026-01-01", "2026-12-31")];
-    const { perTaak, projectLooptUit } = planningWarnings(los, taken, [], vandaag);
+    const { perTaak, projectLooptUit, projectUitleg } = planningWarnings(los, taken, [], vandaag);
     expect(perTaak.A ?? []).toEqual([]);
     expect(projectLooptUit).toBe(false);
+    expect(projectUitleg).toBeNull();
   });
 
   it("marks a task whose end date has passed, quietly", () => {

@@ -332,7 +332,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                   const uitgeklapt = open[project.id] ?? false;
                   // Ook als het project is ingeklapt uitrekenen: de projectbalk zelf
                   // moet altijd kunnen oplichten, niet pas na uitklappen.
-                  const { perTaak: signalen, projectLooptUit } = planningWarnings(
+                  const { perTaak: signalen, projectLooptUit, projectUitleg } = planningWarnings(
                     project, project.tasks, alleKoppelingen(project), vandaag,
                   );
                   return (
@@ -369,7 +369,10 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                             type="button"
                             className={`absolute h-4 rounded ${projectLooptUit ? "bg-destructive hover:bg-destructive/80" : "bg-primary hover:bg-primary/80"}`}
                             style={{ left: `${geo.leftPct}%`, width: `${geo.widthPct}%`, minWidth: 4 }}
-                            title={`${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`}
+                            title={[
+                              `${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`,
+                              ...(projectUitleg ? [projectUitleg] : []),
+                            ].join("\n")}
                             onClick={() => openProject(project)}
                           />
                         </div>
