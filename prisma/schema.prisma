@@ -139,7 +139,30 @@ model ProjectTask {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Waar deze taak op wacht, en wat er op deze taak wacht. Twee relaties naar
+  // dezelfde tabel, dus Prisma eist een naam per kant.
+  waitsOn   TaskDependency[] @relation("TaskWaitsOn")
+  blocks    TaskDependency[] @relation("TaskBlocks")
+
   @@index([projectId])
+}
+
+model TaskDependency {
+  id          String      @id @default(cuid())
+  // De taak die moet wachten.
+  taskId      String
+  task        ProjectTask @relation("TaskWaitsOn", fields: [taskId], references: [id], onDelete: Cascade)
+  // De taak waarop gewacht wordt.
+  dependsOnId String
+  dependsOn   ProjectTask @relation("TaskBlocks", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+
+  // Dezelfde koppeling twee keer leggen is geen nieuwe koppeling. handleError
+  // vertaalt de botsing (P2002) al naar een 409.
+  @@unique([taskId, dependsOnId])
+  // Voor het opzoeken van "wat wacht er op deze taak", bij het verwijderen en
+  // bij het doorrekenen.
+  @@index([dependsOnId])
 }
 
 model Tag {
