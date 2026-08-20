@@ -8,12 +8,16 @@ import { canManageRecurringTemplates } from "@/lib/roles";
 const schema = z.object({
   name: z.string().trim().min(1),
   customerId: z.string().min(1),
-  billing: z.enum(["PER_UNIT", "FIXED", "HOURS"]).default("PER_UNIT"),
+  // Geen .default() zoals bij het aanmaken: bij een wijziging zou een veld dat
+  // het scherm niet meestuurt stilzwijgend terugvallen op de standaard, en dan
+  // verliest een sjabloon zijn facturatiemanier zodra iemand alleen het tarief
+  // aanpast. Ontbrekend moet hier "laat staan" betekenen.
+  billing: z.enum(["PER_UNIT", "FIXED", "HOURS"]).optional(),
   unitPrice: z.number().positive().optional().nullable(),
   defaultQuantity: z.number().positive().optional().nullable(),
   lineDescription: z.string().trim().min(1),
   invoiceSubject: z.string().trim().optional().nullable(),
-  tracksQuality: z.boolean().default(false),
+  tracksQuality: z.boolean().optional(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,9 +30,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     const { id } = await params;
 
-    // Velden die het scherm niet meestuurt blijven undefined na schema.parse
-    // (zod vult ze niet aan met null), en Prisma slaat undefined-velden bij
-    // een update over — dus alleen wat expliciet wordt meegestuurd verandert.
+    // Elk optioneel veld is hier .optional() zonder default, dus wat het scherm
+    // niet meestuurt blijft undefined na schema.parse. Prisma slaat undefined
+    // over bij een update: alleen wat expliciet meekomt verandert. Een
+    // meegestuurde null wist wel, en dat is de bedoeling.
     const data = schema.parse(await req.json());
     const template = await prisma.recurringTemplate.update({ where: { id }, data });
     return NextResponse.json(template);
