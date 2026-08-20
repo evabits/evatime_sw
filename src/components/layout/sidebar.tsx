@@ -27,6 +27,7 @@ import {
   Wallet,
   BookMarked,
   GanttChartSquare,
+  Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,13 @@ const navGroups: NavGroup[] = [
     roles: ["ADMIN"],
     items: [
       { href: "/planning", label: "Tijdlijn", icon: GanttChartSquare },
+    ],
+  },
+  {
+    label: "Herhaalprojecten",
+    roles: ["ADMIN", "TEAMLEAD"],
+    items: [
+      { href: "/herhaalprojecten", label: "Batches", icon: Repeat },
     ],
   },
   {
