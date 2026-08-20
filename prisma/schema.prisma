@@ -113,6 +113,7 @@ model Customer {
   invoices   Invoice[]
   quotes     Quote[]
   levelRates CustomerLevelRate[]
+  recurringTemplates RecurringTemplate[]
 }
 
 model Project {
@@ -132,6 +133,22 @@ model Project {
   // door de API geweigerd. Zijn ze leeg, dan spant de balk zich om de taken.
   plannedStart      DateTime?             @db.Date
   plannedEnd        DateTime?             @db.Date
+  /// Uit welk sjabloon deze batch komt. Leeg voor een gewoon project: een batch
+  /// is een project, want dan houdt hij vanzelf zijn eigen uren en planning.
+  templateId      String?
+  template        RecurringTemplate? @relation(fields: [templateId], references: [id])
+  /// Het gefactureerde aantal. Altijd gevuld bij een voltooide batch, ook als
+  /// er geen goed- en afkeur wordt bijgehouden — dit is wat op de factuur komt.
+  quantity        Decimal?           @db.Decimal(10, 2)
+  /// De uitsplitsing, alleen bij testwerk. Samen zijn ze gelijk aan quantity;
+  /// de route rekent quantity daaruit en gelooft geen totaal van de client.
+  approvedCount   Decimal?           @db.Decimal(10, 2)
+  rejectedCount   Decimal?           @db.Decimal(10, 2)
+  deliveredAt     DateTime?          @db.Date
+  /// De conceptfactuur die uit deze batch is voortgekomen. Uniek: één batch
+  /// levert er hoogstens één op.
+  generatedInvoiceId String?         @unique
+  generatedInvoice   Invoice?        @relation("BatchInvoice", fields: [generatedInvoiceId], references: [id])
   timeEntries       TimeEntry[]
   kmEntries         KmEntry[]
   kmTemplates       KmTemplate[]
@@ -147,6 +164,36 @@ enum ProjectStatus {
   ACTIVE
   INACTIVE
   COMPLETED
+}
+
+enum BillingMode {
+  PER_UNIT
+  FIXED
+  /// Nog niet gebouwd; staat er zodat de derde manier later past zonder het
+  /// model om te gooien. De voltooiroute weigert hem met een melding.
+  HOURS
+}
+
+model RecurringTemplate {
+  id              String      @id @default(cuid())
+  name            String
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  billing         BillingMode @default(PER_UNIT)
+  /// Prijs per stuk, of het vaste bedrag bij FIXED.
+  unitPrice       Decimal?    @db.Decimal(10, 2)
+  /// Voorgesteld aantal bij een nieuwe batch. Voor H3X: 120.
+  defaultQuantity Decimal?    @db.Decimal(10, 2)
+  /// De omschrijving van de factuurregel: "Testen H3X batterij omvormers".
+  lineDescription String
+  /// Het onderwerp van de factuur: "Factuur H3X testen".
+  invoiceSubject  String?
+  /// Testwerk telt goedkeur en afkeur; een vast bedrag niet.
+  tracksQuality   Boolean     @default(false)
+  archivedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  projects        Project[]
 }
 
 model ProjectTask {
@@ -353,6 +400,9 @@ model Invoice {
   updatedAt       DateTime            @updatedAt
   lines           InvoiceLine[]
   attachments     InvoiceAttachment[]
+  /// Tegenveld van Project.generatedInvoice. Wordt nergens gelezen; Prisma
+  /// eist hem voor de een-op-een-relatie.
+  batch       Project?            @relation("BatchInvoice")
 }
 
 model InvoiceAttachment {
