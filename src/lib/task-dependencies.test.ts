@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cycleThrough, shiftPlan, type DependencyLink, type SchedulableTask } from "./task-dependencies";
+import { cycleThrough, shiftPlan, planningWarnings, arrowPath, type DependencyLink, type SchedulableTask } from "./task-dependencies";
 
 // "A wacht op B" schrijven we als { taskId: "A", dependsOnId: "B" }.
 const wacht = (taskId: string, dependsOnId: string): DependencyLink => ({ taskId, dependsOnId });
@@ -113,5 +113,120 @@ describe("shiftPlan", () => {
   it("ignores links that point at a task it does not know", () => {
     const taken = [taak("A", "2026-09-01", "2026-09-05")];
     expect(shiftPlan(taken, [wacht("A", "ONBEKEND")])).toEqual([]);
+  });
+});
+
+const vandaag = new Date("2026-09-15");
+
+describe("planningWarnings", () => {
+  const project = { plannedStart: "2026-09-01", plannedEnd: "2026-09-30" };
+
+  it("flags a task that starts before its predecessor is done, naming the predecessor", () => {
+    const taken = [taak("A", "2026-09-01", "2026-09-10"), taak("B", "2026-09-05", "2026-09-20")];
+    const { perTaak } = planningWarnings(project, taken, [wacht("B", "A")], vandaag);
+    expect(perTaak.B).toHaveLength(1);
+    expect(perTaak.B[0].soort).toBe("te-vroeg");
+    expect(perTaak.B[0].uitleg).toBe("Begint voordat 'taak A' klaar is");
+  });
+
+  it("does not flag a successor that starts the day after", () => {
+    const taken = [taak("A", "2026-09-01", "2026-09-10"), taak("B", "2026-09-11", "2026-09-20")];
+    const { perTaak } = planningWarnings(project, taken, [wacht("B", "A")], vandaag);
+    expect(perTaak.B ?? []).toEqual([]);
+  });
+
+  it("flags a task that sticks out of the project period, with the period in the text", () => {
+    const taken = [taak("A", "2026-09-20", "2026-10-15")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaag);
+    expect(perTaak.A[0].soort).toBe("buiten-project");
+    expect(perTaak.A[0].uitleg).toBe("Valt buiten de projectperiode (01-SEP-2026 t/m 30-SEP-2026)");
+  });
+
+  it("flags a task that started before the project did", () => {
+    const taken = [taak("A", "2026-08-20", "2026-09-05")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaag);
+    expect(perTaak.A.map((s) => s.soort)).toContain("buiten-project");
+  });
+
+  it("says a project runs over when its tasks end after its planned end", () => {
+    const taken = [taak("A", "2026-09-20", "2026-10-15")];
+    expect(planningWarnings(project, taken, [], vandaag).projectLooptUit).toBe(true);
+    expect(planningWarnings(project, [taak("A", "2026-09-01", "2026-09-10")], [], vandaag).projectLooptUit).toBe(false);
+  });
+
+  it("cannot judge a project without dates of its own", () => {
+    // Dan spant de balk zich om de taken en kan er per definitie niets uitsteken.
+    const los = { plannedStart: null, plannedEnd: null };
+    const taken = [taak("A", "2026-01-01", "2026-12-31")];
+    const { perTaak, projectLooptUit } = planningWarnings(los, taken, [], vandaag);
+    expect(perTaak.A ?? []).toEqual([]);
+    expect(projectLooptUit).toBe(false);
+  });
+
+  it("marks a task whose end date has passed, quietly", () => {
+    const taken = [taak("A", "2026-09-01", "2026-09-10")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaag);
+    expect(perTaak.A[0].soort).toBe("verlopen");
+    expect(perTaak.A[0].uitleg).toBe("De einddatum is voorbij");
+  });
+
+  it("does not call a task that ends today expired", () => {
+    const taken = [taak("A", "2026-09-01", "2026-09-15")];
+    const { perTaak } = planningWarnings(project, taken, [], vandaag);
+    expect((perTaak.A ?? []).map((s) => s.soort)).not.toContain("verlopen");
+  });
+
+  it("can give one task several signals at once", () => {
+    const taken = [taak("A", "2026-08-01", "2026-08-20"), taak("B", "2026-08-10", "2026-08-25")];
+    const { perTaak } = planningWarnings(project, taken, [wacht("B", "A")], vandaag);
+    expect(perTaak.B.map((s) => s.soort).sort()).toEqual(["buiten-project", "te-vroeg", "verlopen"]);
+  });
+});
+
+describe("arrowPath", () => {
+  const opties = { breedte: 1000, rijHoogte: 24, stub: 8 };
+
+  it("leaves the right edge of the predecessor and arrives at the left edge of the successor", () => {
+    const punten = arrowPath(
+      { leftPct: 10, widthPct: 20, rij: 0 },
+      { leftPct: 40, widthPct: 20, rij: 1 },
+      opties,
+    );
+    expect(punten).toEqual([
+      { x: 300, y: 12 },
+      { x: 308, y: 12 },
+      { x: 308, y: 36 },
+      { x: 400, y: 36 },
+    ]);
+  });
+
+  it("keeps its elbow when the successor sits on the same row", () => {
+    const punten = arrowPath(
+      { leftPct: 0, widthPct: 10, rij: 2 },
+      { leftPct: 20, widthPct: 10, rij: 2 },
+      opties,
+    );
+    expect(punten.map((p) => p.y)).toEqual([60, 60, 60, 60]);
+    expect(punten.at(-1)?.x).toBe(200);
+  });
+
+  it("still draws when the successor starts too early, running backwards", () => {
+    // Dat is precies het geval dat rood oplicht; verbergen zou de fout verhullen.
+    const punten = arrowPath(
+      { leftPct: 50, widthPct: 20, rij: 0 },
+      { leftPct: 10, widthPct: 10, rij: 1 },
+      opties,
+    );
+    expect(punten.at(-1)?.x).toBe(100);
+    expect(punten[1].x).toBe(708);
+  });
+
+  it("uses a default stub when none is given", () => {
+    const punten = arrowPath(
+      { leftPct: 0, widthPct: 10, rij: 0 },
+      { leftPct: 20, widthPct: 10, rij: 1 },
+      { breedte: 1000, rijHoogte: 24 },
+    );
+    expect(punten[1].x).toBe(108);
   });
 });

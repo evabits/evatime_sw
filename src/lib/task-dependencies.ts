@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
+import { formatDate } from "./utils";
 
 /**
  * Afhankelijkheden tussen taken van hetzelfde project: welke koppeling een
@@ -170,4 +171,122 @@ export function shiftPlan(taken: SchedulableTask[], links: DependencyLink[]): Sh
   }
 
   return verschoven;
+}
+
+/**
+ * Eén markering op een taak, met de uitleg die bij hover verschijnt.
+ *
+ * De uitleg staat in gewone taal en niet als code: een kleur die je moet
+ * onthouden is geen signaal maar een raadsel.
+ */
+export type TaakSignaal = {
+  soort: "te-vroeg" | "buiten-project" | "verlopen";
+  uitleg: string;
+};
+
+export type ProjectPeriode = {
+  plannedStart?: string | Date | null;
+  plannedEnd?: string | Date | null;
+};
+
+/**
+ * Welke markeringen elke taak krijgt, en of de projectbalk zelf oplicht.
+ *
+ * "verlopen" is met opzet het stille signaal. Zonder "gereed" — dat komt pas in
+ * deelproject C — is een afgelopen taak meestal gewoon afgerond werk, en een
+ * scherm vol rood ga je negeren; dan is de rode markering die er wél toe doet
+ * ook niets meer waard.
+ *
+ * Een project zonder eigen datums kan niets uitsteken: daar spant de balk zich
+ * om de taken. Dan vervallen "buiten-project" en het uitlopen van het project.
+ */
+export function planningWarnings(
+  project: ProjectPeriode,
+  taken: SchedulableTask[],
+  links: DependencyLink[],
+  vandaag: Date,
+): { perTaak: Record<string, TaakSignaal[]>; projectLooptUit: boolean } {
+  const opNaam = new Map(taken.map((t) => [t.id, t]));
+  const wachtOp = wachtOpTabel(links);
+
+  const heeftPeriode = Boolean(project.plannedStart && project.plannedEnd);
+  const periodeStart = heeftPeriode ? new Date(project.plannedStart as string) : null;
+  const periodeEind = heeftPeriode ? new Date(project.plannedEnd as string) : null;
+
+  const perTaak: Record<string, TaakSignaal[]> = {};
+  let projectLooptUit = false;
+
+  for (const t of taken) {
+    const start = new Date(t.startDate);
+    const eind = new Date(t.endDate);
+    const signalen: TaakSignaal[] = [];
+
+    // Een voorganger die op of ná de startdag van deze taak eindigt, is nog
+    // bezig — einddatums zijn inclusief.
+    for (const voorgangerId of wachtOp.get(t.id) ?? []) {
+      const voorganger = opNaam.get(voorgangerId);
+      if (!voorganger) continue;
+      if (start <= new Date(voorganger.endDate)) {
+        signalen.push({
+          soort: "te-vroeg",
+          uitleg: `Begint voordat '${voorganger.name}' klaar is`,
+        });
+        break;
+      }
+    }
+
+    if (periodeStart && periodeEind) {
+      if (start < periodeStart || eind > periodeEind) {
+        signalen.push({
+          soort: "buiten-project",
+          uitleg: `Valt buiten de projectperiode (${formatDate(periodeStart)} t/m ${formatDate(periodeEind)})`,
+        });
+      }
+      if (eind > periodeEind) projectLooptUit = true;
+    }
+
+    if (eind < vandaag) {
+      signalen.push({ soort: "verlopen", uitleg: "De einddatum is voorbij" });
+    }
+
+    if (signalen.length > 0) perTaak[t.id] = signalen;
+  }
+
+  return { perTaak, projectLooptUit };
+}
+
+/** Een knikpunt van een pijl, in pixels binnen de tijdlijnstrook. */
+export type ArrowPoint = { x: number; y: number };
+
+export type ArrowEnd = { leftPct: number; widthPct: number; rij: number };
+
+/** Hoever de pijl rechtdoor gaat voordat hij afbuigt. */
+const STUB_PX = 8;
+
+/**
+ * De knikpunten van de pijl tussen twee taakbalken: uit de rechterrand van de
+ * voorganger, een stukje rechtdoor, dan verticaal naar de rij van de opvolger,
+ * en zo naar diens linkerrand.
+ *
+ * Hier en niet in het component, omdat dit rekenwerk is en dus te testen hoort
+ * te zijn. Loopt de opvolger te vroeg, dan wijst het laatste stuk naar links —
+ * dat is precies het geval dat rood oplicht, en verbergen zou de fout verhullen.
+ */
+export function arrowPath(
+  van: ArrowEnd,
+  naar: ArrowEnd,
+  opties: { breedte: number; rijHoogte: number; stub?: number },
+): ArrowPoint[] {
+  const stub = opties.stub ?? STUB_PX;
+  const vanX = ((van.leftPct + van.widthPct) / 100) * opties.breedte;
+  const vanY = (van.rij + 0.5) * opties.rijHoogte;
+  const naarX = (naar.leftPct / 100) * opties.breedte;
+  const naarY = (naar.rij + 0.5) * opties.rijHoogte;
+
+  return [
+    { x: vanX, y: vanY },
+    { x: vanX + stub, y: vanY },
+    { x: vanX + stub, y: naarY },
+    { x: naarX, y: naarY },
+  ];
 }
