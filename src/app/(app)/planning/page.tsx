@@ -24,7 +24,12 @@ export default async function PlanningPage() {
         // deze orderBy af van swapOrder, dan schudt de eerste pijltjesklik erna
         // taken door elkaar die de beheerder niet aanraakte.
         orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-        select: { id: true, name: true, startDate: true, endDate: true, sortOrder: true },
+        select: {
+          id: true, name: true, startDate: true, endDate: true, sortOrder: true,
+          // Waar deze taak op wacht. De andere kant (`blocks`) is hieruit af
+          // te leiden en zou alleen maar dubbel over de lijn gaan.
+          waitsOn: { select: { dependsOnId: true } },
+        },
       },
     },
   });

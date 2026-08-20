@@ -13,6 +13,27 @@ import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
   barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
+import { cycleThrough } from "@/lib/task-dependencies";
+
+/**
+ * De taken waar deze taak op zou kunnen wachten: die van hetzelfde project,
+ * zichzelf niet meegerekend. Een aparte functie omdat TypeScript de soort van
+ * het venster anders niet meeneemt in de filter.
+ */
+function andereTaken(
+  venstertje: { soort: "taak-nieuw"; project: PlanningProject } | { soort: "taak-bewerk"; project: PlanningProject; taak: PlanningProject["tasks"][number] },
+) {
+  return venstertje.soort === "taak-bewerk"
+    ? venstertje.project.tasks.filter((t) => t.id !== venstertje.taak.id)
+    : venstertje.project.tasks;
+}
+
+/** Alle koppelingen van een project, in de vorm die task-dependencies verwacht. */
+function alleKoppelingen(project: PlanningProject) {
+  return project.tasks.flatMap((t) =>
+    (t.waitsOn ?? []).map((w) => ({ taskId: t.id, dependsOnId: w.dependsOnId })),
+  );
+}
 
 /**
  * Pixels per dag per zoomstand. Alleen de totale breedte verandert; de plaatsing
@@ -43,6 +64,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [formNaam, setFormNaam] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEind, setFormEind] = useState("");
+  const [formWachtOp, setFormWachtOp] = useState<string[]>([]);
 
   /** ISO voor een <input type="date">; die accepteert niets anders. */
   const isoVoorInvoer = (d: string | Date | null | undefined) =>
@@ -60,6 +82,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     setFormNaam("");
     setFormStart("");
     setFormEind("");
+    setFormWachtOp([]);
     setVenstertje({ soort: "taak-nieuw", project });
   }
 
@@ -68,6 +91,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     setFormNaam(taak.name);
     setFormStart(isoVoorInvoer(taak.startDate));
     setFormEind(isoVoorInvoer(taak.endDate));
+    setFormWachtOp(taak.waitsOn?.map((w) => w.dependsOnId) ?? []);
     setVenstertje({ soort: "taak-bewerk", project, taak });
   }
 
@@ -104,12 +128,12 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     }
     if (venstertje.soort === "taak-nieuw") {
       await verstuur(`/api/projects/${venstertje.project.id}/tasks`, "POST", {
-        name: formNaam, startDate: formStart, endDate: formEind,
+        name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
       });
       return;
     }
     await verstuur(`/api/project-tasks/${venstertje.taak.id}`, "PUT", {
-      name: formNaam, startDate: formStart, endDate: formEind,
+      name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
     });
   }
 
@@ -351,6 +375,45 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
               <p className="text-xs text-muted-foreground">
                 Laat allebei leeg om de balk de taken te laten volgen.
               </p>
+            )}
+            {venstertje && venstertje.soort !== "project" && andereTaken(venstertje).length > 0 && (
+              <div className="space-y-1">
+                <Label>Wacht op</Label>
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+                  {andereTaken(venstertje).map((t) => {
+                      // Een keuze die een kringloop zou sluiten laten we zien maar
+                      // niet aanklikken, met de reden erbij — anders zoek je je
+                      // wezenloos naar waarom iets niet kan.
+                      const keten =
+                        venstertje.soort === "taak-bewerk"
+                          ? cycleThrough(alleKoppelingen(venstertje.project), venstertje.taak.id, t.id)
+                          : null;
+                      const naam = (id: string) =>
+                        venstertje.project.tasks.find((x) => x.id === id)?.name ?? "?";
+                      return (
+                        <label
+                          key={t.id}
+                          className={`flex items-center gap-2 text-sm ${keten ? "text-muted-foreground" : ""}`}
+                          title={keten ? `Zou een kringloop sluiten: ${keten.map(naam).join(" → ")}` : undefined}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-input accent-primary"
+                            disabled={Boolean(keten)}
+                            checked={formWachtOp.includes(t.id)}
+                            onChange={(e) =>
+                              setFormWachtOp((huidig) =>
+                                e.target.checked ? [...huidig, t.id] : huidig.filter((x) => x !== t.id),
+                              )
+                            }
+                          />
+                          <span className="truncate">{t.name}</span>
+                          {keten && <span className="text-xs">(kringloop)</span>}
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
             )}
             {fout && <p className="text-sm text-destructive">{fout}</p>}
           </div>
