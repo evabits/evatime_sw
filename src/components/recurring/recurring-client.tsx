@@ -494,9 +494,11 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
               </div>
               {draft && (
                 <p className="text-sm font-mono bg-muted rounded-md px-3 py-2">
-                  {tracksQuality
-                    ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`
-                    : `${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`}
+                  {isFixed
+                    ? `Vast bedrag: ${formatCurrency(draft.subtotal)}`
+                    : tracksQuality
+                      ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`
+                      : `${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`}
                 </p>
               )}
               {completeError && <p className="text-sm text-destructive">{completeError}</p>}

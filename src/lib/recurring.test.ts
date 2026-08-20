@@ -130,6 +130,19 @@ describe("recurringInvoiceDraft", () => {
     expect(d.line.quantity).toBe(1);
     expect(d.line.total).toBe(750);
   });
+
+  it("does not multiply a fixed amount by the number of items tested", () => {
+    // Een sjabloon mag een vast bedrag hebben én goed- en afkeur bijhouden. Het
+    // scherm liet dan twee aantallen invullen en het vaste bedrag werd met de
+    // som vermenigvuldigd: 120 x EUR 750,00. De aantallen horen in de
+    // inleiding, niet in de rekensom.
+    const vast = sjabloon({ billing: "FIXED", tracksQuality: true, unitPrice: "750.00" });
+    const d = recurringInvoiceDraft(vast, batch(), { approved: 118, rejected: 2 });
+    expect(d.line.quantity).toBe(1);
+    expect(d.line.total).toBe(750);
+    expect(d.subtotal).toBe(750);
+    expect(d.intro).toContain("118 goedgekeurd en 2 afgekeurd");
+  });
 });
 
 describe("completeBatchDenial", () => {

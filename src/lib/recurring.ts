@@ -114,7 +114,13 @@ export function recurringInvoiceDraft(
 ): RecurringDraft {
   const totaal = batchTotal(invoer, sjabloon.tracksQuality);
   const prijs = Number(sjabloon.unitPrice ?? 0);
-  const bedrag = Math.round(totaal * prijs * 100) / 100;
+  // Bij een vast bedrag is het gefactureerde aantal altijd 1: het tarief is dan
+  // de prijs voor de hele batch en niet per stuk. Zonder deze regel zou een
+  // sjabloon dat óók goed- en afkeur bijhoudt dat vaste bedrag met het aantal
+  // stuks vermenigvuldigen. Het aantal geteste exemplaren blijft wel in de
+  // inleiding staan; dat is het verhaal, niet de rekensom.
+  const aantal = sjabloon.billing === "FIXED" ? 1 : totaal;
+  const bedrag = Math.round(aantal * prijs * 100) / 100;
 
   return {
     // Een factuur zonder onderwerp leest als een fout; de batchnaam is altijd
@@ -130,7 +136,7 @@ export function recurringInvoiceDraft(
     }),
     line: {
       description: sjabloon.lineDescription,
-      quantity: totaal,
+      quantity: aantal,
       unitPrice: prijs,
       total: bedrag,
       lineType: "OTHER",
