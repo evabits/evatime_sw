@@ -15,6 +15,9 @@ const schema = z.object({
   rejected: z.number().optional().nullable(),
 });
 
+/** Sein dat de grendel dichtsloeg; alleen bedoeld om de transactie terug te draaien. */
+const INGEHAALD = "batch-al-gefactureerd";
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -68,7 +71,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Alles in één transactie: een halve uitvoering laat een voltooid project
     // achter zonder factuur, of een factuur die aan niets hangt.
-    const factuur = await prisma.$transaction(async (tx) => {
+    let factuur;
+    try {
+      factuur = await prisma.$transaction(async (tx) => {
       const inv = await tx.invoice.create({
         data: {
           invoiceNumber,
@@ -87,8 +92,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       });
 
-      await tx.project.update({
-        where: { id: batch.id },
+      // updateMany met generatedInvoiceId: null in de voorwaarde, en niet een
+      // gewone update: het lezen van de batch gebeurde buiten deze transactie,
+      // dus twee mensen die tegelijk op Voltooien drukken zagen allebei nog
+      // "niet gefactureerd". Zonder deze grendel maakten ze allebei een factuur
+      // en bleef die van de verliezer als wees in de factuurlijst achter.
+      const bijgewerkt = await tx.project.updateMany({
+        where: { id: batch.id, generatedInvoiceId: null },
         data: {
           status: "COMPLETED",
           deliveredAt: opgeleverd,
@@ -98,9 +108,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           generatedInvoiceId: inv.id,
         },
       });
+      if (bijgewerkt.count === 0) throw new Error(INGEHAALD);
 
       return inv;
-    });
+      });
+    } catch (e) {
+      // De grendel hierboven; als eigen tak zodat er een leesbare melding
+      // uitkomt in plaats van "Internal server error".
+      if (e instanceof Error && e.message === INGEHAALD) {
+        return NextResponse.json(
+          { error: "Deze batch is inmiddels door iemand anders gefactureerd." },
+          { status: 409 },
+        );
+      }
+      throw e;
+    }
 
     return NextResponse.json({ invoiceId: factuur.id, invoiceNumber: factuur.invoiceNumber }, { status: 201 });
   } catch (e) { return handleError(e); }

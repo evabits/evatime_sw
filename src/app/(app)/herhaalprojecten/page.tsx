@@ -23,7 +23,10 @@ export default async function HerhaalprojectenPage() {
       where: { templateId: { not: null } },
       include: {
         customer: { select: { id: true, name: true } },
-        template: true,
+        // Inclusief de klant van het sjabloon: dáár gaat de factuur naartoe, en
+        // die kan afwijken van de klant die bij het starten op het project is
+        // gezet zodra iemand het sjabloon aanpast.
+        template: { include: { customer: { select: { id: true, name: true } } } },
         generatedInvoice: { select: { id: true, invoiceNumber: true } },
       },
       orderBy: { createdAt: "desc" },

@@ -76,7 +76,13 @@ export function isProjectOffered<T extends ProjectLike & { id: string }>(
   return matched.some((p) => p.id === projectId) || customerless.some((p) => p.id === projectId);
 }
 
-export type MergeProject = { id: string; status: string; archivedAt: Date | null };
+export type MergeProject = {
+  id: string;
+  status: string;
+  archivedAt: Date | null;
+  /** Gezet als dit project een batch uit een herhaalsjabloon is. */
+  templateId?: string | null;
+};
 
 export type InvoicedCounts = { timeEntries: number; kmEntries: number; expenses: number };
 
@@ -103,6 +109,10 @@ export function projectMergeDenialReason(
   if (!target) return "Het doelproject bestaat niet";
   if (source.id === target.id) return "Een project kan niet met zichzelf worden samengevoegd";
   if (source.status !== "CONCEPT") return "Alleen een conceptproject kan worden samengevoegd";
+  // Samenvoegen verwijdert het bronproject, en met een batch verdwijnen dan ook
+  // het aantal, de goed- en afkeur en de verwijzing naar de conceptfactuur —
+  // terwijl die factuur gewoon blijft bestaan, zonder dat er nog iets naar wijst.
+  if (source.templateId) return "Een batch uit een herhaalsjabloon kan niet worden samengevoegd";
   if (source.archivedAt) return "Een gearchiveerd project kan niet worden samengevoegd";
   if (target.archivedAt) return "Het doelproject is gearchiveerd";
   if (invoiced.timeEntries > 0) return "Er staan gefactureerde uren op dit project";

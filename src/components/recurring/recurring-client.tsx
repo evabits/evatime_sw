@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +29,11 @@ const EMPTY_TEMPLATE_FORM = {
   tracksQuality: false,
 };
 
+// Lokale dag, niet UTC: toISOString() zou tussen middernacht en 02:00 zomertijd
+// de vorige dag opleveren, en die datum belandt als opleverdatum op de factuur.
+// Zo doet elk ander scherm in deze app het ook.
 function vandaagIso() {
-  return new Date().toISOString().slice(0, 10);
+  return format(new Date(), "yyyy-MM-dd");
 }
 
 interface Props {
@@ -312,7 +316,10 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
               {activeBatches.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell>{b.customer?.name}</TableCell>
+                  {/* De klant van het sjabloon, niet die van het project: de
+                      factuur gaat naar de klant van het sjabloon, en die twee
+                      lopen uiteen zodra iemand het sjabloon aanpast. */}
+                  <TableCell>{b.template?.customer?.name ?? b.customer?.name}</TableCell>
                   <TableCell>{formatDate(b.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" onClick={() => openComplete(b)}>Voltooien</Button>
