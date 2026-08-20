@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeekGrid } from "@/components/shared/week-grid";
 import { OfficeDayRow } from "@/components/time/office-day-row";
+import { pickCommuteTemplate } from "@/lib/commute";
 import { formatDate, formatHours, formatCurrency } from "@/lib/utils";
 import { partitionProjectsByCustomer, isProjectOffered } from "@/lib/projects";
 import { resolveHourRate } from "@/lib/rates";
@@ -142,10 +143,87 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
 
   // De dagen met een woon-werkrit, voor de rij onder het weekraster.
   const [kantoorDagen, setKantoorDagen] = useState<string[]>([]);
-  // Wordt in taak 6 gevuld: de dag die op dit moment verwerkt wordt.
-  const kantoorBezig: string | null = null;
-  // Wordt in taak 6 gevuld: aan- of uitzetten van een kantoordag.
-  function toggleKantoorDag(_dayStr: string, _present: boolean) {}
+  // De dag die op dit moment verwerkt wordt: blokkeert een tweede klik terwijl
+  // de aanroep loopt.
+  const [kantoorBezig, setKantoorBezig] = useState<string | null>(null);
+  // Terugkoppeling bij een geslaagde aan/uit-zet, als regel tekst naast de rij
+  // — dit scherm heeft geen meldingenbalk en een alert() bij elk vinkje zou
+  // onuitstaanbaar zijn. Verdwijnt weer bij de volgende weekwissel (zie het
+  // effect dat kantoorDagen ophaalt).
+  const [kantoorMelding, setKantoorMelding] = useState<string | null>(null);
+  // De kilometerregistraties van de week, voor de dubbel-controle hieronder.
+  const [weekKmEntries, setWeekKmEntries] = useState<any[]>([]);
+  // Het project-id van het beheerde woon-werksjabloon. `commuteTemplate` komt
+  // via de server-pagina binnen zonder project-id (die lekte tot nu toe
+  // bewust niet mee, zie de toelichting in page.tsx) — voor de dubbel-controle
+  // is dat wél nodig, dus eenmalig opgehaald via het bestaande
+  // sjabloon-endpoint in plaats van page.tsx aan te passen.
+  const [commuteProjectId, setCommuteProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!commuteTemplate) return;
+    fetch("/api/km/templates").then(async (res) => {
+      if (!res.ok) return;
+      setCommuteProjectId(pickCommuteTemplate(await res.json())?.projectId ?? null);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Zet een dag aan of uit door `{ date, present }` naar `POST
+   * /api/km/commute` te sturen. De route is idempotent en weigert zelf wat
+   * niet mag (geen sjabloon, een gefactureerde rit) — die controles worden
+   * hier niet overgedaan; de foutmelding van de server gaat rechtstreeks in
+   * de alert().
+   */
+  async function toggleKantoorDag(dayStr: string, present: boolean) {
+    // Een woon-werkrit van vóór deze functie mist de commute-markering, dus
+    // het vinkje staat uit terwijl de rit er al is. Aanvinken zou dan een
+    // tweede rit maken. Staat er die dag al een registratie van dezelfde
+    // omvang op hetzelfde project als het sjabloon, vraag dan eerst
+    // bevestiging.
+    if (present && commuteTemplate) {
+      const bestaandeRit = weekKmEntries.find(
+        (e: any) =>
+          format(new Date(e.date), "yyyy-MM-dd") === dayStr &&
+          e.projectId === commuteProjectId &&
+          Number(e.km) === commuteTemplate.km,
+      );
+      if (bestaandeRit) {
+        const ok = confirm(
+          `Op deze dag staat al een kilometerregistratie van ${Number(bestaandeRit.km).toLocaleString("nl-NL")} km op ${bestaandeRit.project?.name ?? "dit project"}. Aanvinken voegt daar een aparte woon-werkrit aan toe. Doorgaan?`,
+        );
+        if (!ok) return;
+      }
+    }
+
+    setKantoorBezig(dayStr);
+    setKantoorMelding(null);
+    try {
+      const res = await fetch("/api/km/commute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dayStr, present }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(body.error ?? "Aanmaken mislukt");
+        return;
+      }
+      setKantoorDagen((prev) => (present ? [...prev, dayStr] : prev.filter((d) => d !== dayStr)));
+      setKantoorMelding(
+        present
+          ? `WoonWerk ${Number(body.km).toLocaleString("nl-NL")} km toegevoegd`
+          : "Woon-werkrit verwijderd",
+      );
+      // Ververst de week-kilometers: zonder dit blijft de dubbel-controle
+      // hierboven werken met de stand van vóór dit vinkje, en zou een
+      // verwijderde rit daar nog even als "bestaand" doorgelden.
+      await fetchWeekKmEntries();
+    } finally {
+      setKantoorBezig(null);
+    }
+  }
 
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
@@ -288,6 +366,18 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     setFetching(false);
   }
 
+  // Aparte aanroep naar /api/km met hetzelfde weekvenster als de
+  // kantoordagen, in plaats van meeliften op die aanroep: /api/km/commute
+  // geeft alleen de al gemarkeerde dagen terug, niet de projecten en
+  // kilometers die de dubbel-controle in toggleKantoorDag nodig heeft om een
+  // niet-gemarkeerde, vooraf bestaande woon-werkrit te herkennen.
+  async function fetchWeekKmEntries() {
+    const params = new URLSearchParams({ from: weekFrom, to: weekTo });
+    if (isAdmin && filterUser !== "all") params.set("userId", filterUser);
+    const res = await fetch(`/api/km?${params}`);
+    if (res.ok) setWeekKmEntries(await res.json());
+  }
+
   // De route accepteert userId alleen van een beheerder; die stuurt hem dus
   // mee zodra hij naar één medewerker kijkt. Een eigen effect in plaats van
   // een aanroep bij elke fetchWeekEntries-call site: weekFrom/weekTo en
@@ -296,11 +386,15 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   // aanpassen.
   useEffect(() => {
     if (viewMode !== "week") return;
+    // De melding hoort bij een handeling in déze week; bij een weekwissel is
+    // ze niet meer van toepassing.
+    setKantoorMelding(null);
     const params = new URLSearchParams({ from: weekFrom, to: weekTo });
     if (isAdmin && filterUser !== "all") params.set("userId", filterUser);
     fetch(`/api/km/commute?${params}`).then(async (res) => {
       if (res.ok) setKantoorDagen((await res.json()).dates);
     });
+    fetchWeekKmEntries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, weekFrom, weekTo, filterUser]);
 
@@ -810,14 +904,22 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
             />
 
             {viewMode === "week" && !(isAdmin && filterUser === "all") && (
-              <OfficeDayRow
-                days={weekDays}
-                actief={kantoorDagen}
-                template={commuteTemplate}
-                bewerkbaar={!isAdmin || filterUser === userId}
-                bezig={kantoorBezig}
-                onToggle={toggleKantoorDag}
-              />
+              <>
+                <OfficeDayRow
+                  days={weekDays}
+                  actief={kantoorDagen}
+                  template={commuteTemplate}
+                  bewerkbaar={!isAdmin || filterUser === userId}
+                  bezig={kantoorBezig}
+                  onToggle={toggleKantoorDag}
+                />
+                {/* Terugkoppeling van een geslaagde aan/uit-zet. Alleen tekst
+                    naast de rij: er is geen meldingenbalk in dit scherm, en
+                    een alert() bij elk vinkje zou onuitstaanbaar zijn. */}
+                {kantoorMelding && (
+                  <p className="px-4 py-1.5 text-xs text-muted-foreground border-b">{kantoorMelding}</p>
+                )}
+              </>
             )}
 
             {/* Entry list */}
