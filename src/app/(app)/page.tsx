@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate, formatHours, formatWeekday } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen } from "lucide-react";
+import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen, FileCheck } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth, format } from "date-fns";
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
     project: { select: { customer: { select: { id: true, name: true } } } },
   } as const;
 
-  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudgets, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten, eigenGebruiker, openUren, openKm, openUitgaven] = await Promise.all([
+  const [timeStats, kmStats, projectStats, recentTime, recentKm, vacationBudgets, vacationApproved, upcomingVacations, pendingVacations, customerlessProjects, missendeUren, eigenContracten, eigenGebruiker, concepten, openUren, openKm, openUitgaven] = await Promise.all([
     prisma.timeEntry.aggregate({
       where: { date: { gte: monthStart, lte: monthEnd }, ...ownerFilter },
       _sum: { hours: true },
@@ -125,6 +125,15 @@ export default async function DashboardPage() {
       where: { id: userId },
       select: { vacationOpeningDate: true, vacationOpeningUsed: true },
     }),
+    // Conceptfacturen die op goedkeuring wachten. Alleen voor een beheerder;
+    // een medewerker mag de omzet en factuurbedragen niet zien.
+    isAdmin
+      ? prisma.invoice.aggregate({
+          where: { status: "DRAFT" },
+          _count: true,
+          _sum: { total: true },
+        })
+      : Promise.resolve({ _count: 0, _sum: { total: null } } as const),
     // Wat er nog te factureren staat van vóór deze maand. Alleen voor een
     // beheerder; een medewerker kan er niets mee en het zou hem de omzet van
     // het hele bedrijf tonen.
@@ -376,6 +385,25 @@ export default async function DashboardPage() {
               </Link>
             </CardContent>
           </Card>
+        )}
+
+        {isAdmin && concepten._count > 0 && (
+          <Link href="/invoices" className="block">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Conceptfacturen</CardTitle>
+                <FileCheck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {concepten._count} {concepten._count === 1 ? "concept" : "concepten"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Totaal: {formatCurrency(Number(concepten._sum.total ?? 0))}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         )}
 
         {isAdmin && (
