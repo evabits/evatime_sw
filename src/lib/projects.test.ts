@@ -162,6 +162,15 @@ describe("projectMergeDenialReason", () => {
     );
   });
 
+  it("refuses a batch from a recurring template", () => {
+    // Samenvoegen verwijdert de bron. Bij een batch verdwijnen dan het aantal,
+    // de goed- en afkeur en de verwijzing naar de conceptfactuur, terwijl die
+    // factuur blijft bestaan zonder dat er nog iets naar wijst.
+    expect(projectMergeDenialReason({ ...concept, templateId: "t1" }, doel, schoon)).toBe(
+      "Een batch uit een herhaalsjabloon kan niet worden samengevoegd",
+    );
+  });
+
   it("refuses an archived source", () => {
     expect(
       projectMergeDenialReason({ ...concept, archivedAt: new Date("2026-01-01") }, doel, schoon),

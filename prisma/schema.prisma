@@ -8,43 +8,43 @@ datasource db {
 }
 
 model User {
-  id                  String            @id @default(cuid())
-  name                String
-  email               String            @unique
-  password            String?
-  role                Role              @default(EMPLOYEE)
-  weeklyHours         Decimal?          @db.Decimal(5, 2)
-  workLevel           WorkLevel?
+  id                   String               @id @default(cuid())
+  name                 String
+  email                String               @unique
+  password             String?
+  role                 Role                 @default(EMPLOYEE)
+  weeklyHours          Decimal?             @db.Decimal(5, 2)
+  workLevel            WorkLevel?
   // De peildatum en het totaal aantal vakantie-uren dat deze medewerker tot
   // die datum had opgenomen. Zo ver gaat de registratie in EVAtime niet terug;
   // vanaf de peildatum telt ze zelf. Het opgebouwde recht komt altijd uit de
   // contracten. Geen peildatum betekent: alleen het lopende jaar, zoals het
   // altijd was.
-  vacationOpeningDate DateTime?         @db.Date
-  vacationOpeningUsed Decimal?          @db.Decimal(7, 2)
+  vacationOpeningDate  DateTime?            @db.Date
+  vacationOpeningUsed  Decimal?             @db.Decimal(7, 2)
   // Beginstand van het urensaldo: vanaf welke datum de app zelf doortelt, en
   // wat er op dat moment al stond. Allebei leeg betekent: geen saldo voor deze
   // medewerker. Zelfde patroon als vacationOpeningDate hierboven, omdat de app
   // pas in mei 2026 in gebruik is genomen en de eerste maanden onvolledig zijn.
   overtimeOpeningDate  DateTime?            @db.Date
   overtimeOpeningHours Decimal?             @db.Decimal(7, 2)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  archivedAt          DateTime?
-  timeEntries         TimeEntry[]
-  kmEntries           KmEntry[]
-  kmTemplates         KmTemplate[]
-  expenses            Expense[]
-  vacationBudgets     VacationBudget[]
-  absenceRequests     AbsenceRequest[] @relation("AbsenceRequests")
-  absenceReviews      AbsenceRequest[] @relation("AbsenceReviewer")
-  contracts           Contract[]
-  reviews             PerformanceReview[] @relation("ReviewSubject")
-  reviewsGiven        PerformanceReview[] @relation("ReviewReviewer")
-  projectMemberships  ProjectMember[]
-  standupsLed         Standup[]           @relation("StandupLeader")
-  standupNotes        StandupNote[]       @relation("StandupSubject")
-  workSchedule        WorkSchedule?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  archivedAt           DateTime?
+  timeEntries          TimeEntry[]
+  kmEntries            KmEntry[]
+  kmTemplates          KmTemplate[]
+  expenses             Expense[]
+  vacationBudgets      VacationBudget[]
+  absenceRequests      AbsenceRequest[]     @relation("AbsenceRequests")
+  absenceReviews       AbsenceRequest[]     @relation("AbsenceReviewer")
+  contracts            Contract[]
+  reviews              PerformanceReview[]  @relation("ReviewSubject")
+  reviewsGiven         PerformanceReview[]  @relation("ReviewReviewer")
+  projectMemberships   ProjectMember[]
+  standupsLed          Standup[]            @relation("StandupLeader")
+  standupNotes         StandupNote[]        @relation("StandupSubject")
+  workSchedule         WorkSchedule?
   overtimeAdjustments  OvertimeAdjustment[]
 }
 
@@ -89,57 +89,74 @@ enum ContractType {
 }
 
 model Customer {
-  id         String    @id @default(cuid())
-  name       String
+  id                 String              @id @default(cuid())
+  name               String
   // Het nummer dat jij de klant geeft, vrij van vorm. Uniek, want twee klanten
   // met hetzelfde nummer is geen nummer meer; leeg mag wel vaker voorkomen,
   // want in Postgres botsen NULL-waarden niet met elkaar.
-  customerNumber String? @unique
-  email      String?
-  phone      String?
+  customerNumber     String?             @unique
+  email              String?
+  phone              String?
   // De persoon of afdeling waar post aan gericht moet worden. Komt op factuur
   // en offerte achter "T.a.v." te staan, boven het adres.
-  attention  String?
-  address    String?
-  city       String?
-  postalCode String?
-  country    String?
-  vatNumber  String?
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  archivedAt DateTime?
-  projects   Project[]
-  invoices   Invoice[]
-  quotes     Quote[]
-  levelRates CustomerLevelRate[]
+  attention          String?
+  address            String?
+  city               String?
+  postalCode         String?
+  country            String?
+  vatNumber          String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  archivedAt         DateTime?
+  projects           Project[]
+  invoices           Invoice[]
+  quotes             Quote[]
+  levelRates         CustomerLevelRate[]
+  recurringTemplates RecurringTemplate[]
 }
 
 model Project {
-  id                String                @id @default(cuid())
-  customerId        String?
-  customer          Customer?             @relation(fields: [customerId], references: [id])
-  name              String                @unique
-  description       String?
-  status            ProjectStatus         @default(ACTIVE)
-  billable          Boolean               @default(true)
-  defaultKmRate     Decimal?              @db.Decimal(10, 2)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  archivedAt        DateTime?
+  id                 String             @id @default(cuid())
+  customerId         String?
+  customer           Customer?          @relation(fields: [customerId], references: [id])
+  name               String             @unique
+  description        String?
+  status             ProjectStatus      @default(ACTIVE)
+  billable           Boolean            @default(true)
+  defaultKmRate      Decimal?           @db.Decimal(10, 2)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  archivedAt         DateTime?
   // Grof geplande doorlooptijd, ingevuld door een beheerder op /planning.
   // Allebei of geen van beide: één losse datum levert geen balk op en wordt
   // door de API geweigerd. Zijn ze leeg, dan spant de balk zich om de taken.
-  plannedStart      DateTime?             @db.Date
-  plannedEnd        DateTime?             @db.Date
-  timeEntries       TimeEntry[]
-  kmEntries         KmEntry[]
-  kmTemplates       KmTemplate[]
-  levelRates        ProjectLevelRate[]
-  members           ProjectMember[]
-  expenses          Expense[]
-  tags              Tag[]
-  tasks             ProjectTask[]
+  plannedStart       DateTime?          @db.Date
+  plannedEnd         DateTime?          @db.Date
+  /// Uit welk sjabloon deze batch komt. Leeg voor een gewoon project: een batch
+  /// is een project, want dan houdt hij vanzelf zijn eigen uren en planning.
+  templateId         String?
+  template           RecurringTemplate? @relation(fields: [templateId], references: [id])
+  /// Het gefactureerde aantal. Altijd gevuld bij een voltooide batch, ook als
+  /// er geen goed- en afkeur wordt bijgehouden — dit is wat op de factuur komt.
+  quantity           Decimal?           @db.Decimal(10, 2)
+  /// De uitsplitsing, alleen bij testwerk. Samen zijn ze gelijk aan quantity;
+  /// de route rekent quantity daaruit en gelooft geen totaal van de client.
+  approvedCount      Decimal?           @db.Decimal(10, 2)
+  rejectedCount      Decimal?           @db.Decimal(10, 2)
+  deliveredAt        DateTime?          @db.Date
+  /// De conceptfactuur die uit deze batch is voortgekomen. Uniek: één batch
+  /// levert er hoogstens één op.
+  generatedInvoiceId String?            @unique
+  generatedInvoice   Invoice?           @relation("BatchInvoice", fields: [generatedInvoiceId], references: [id])
+  timeEntries        TimeEntry[]
+  kmEntries          KmEntry[]
+  kmTemplates        KmTemplate[]
+  levelRates         ProjectLevelRate[]
+  members            ProjectMember[]
+  expenses           Expense[]
+  tags               Tag[]
+  tasks              ProjectTask[]
 }
 
 enum ProjectStatus {
@@ -147,6 +164,36 @@ enum ProjectStatus {
   ACTIVE
   INACTIVE
   COMPLETED
+}
+
+enum BillingMode {
+  PER_UNIT
+  FIXED
+  /// Nog niet gebouwd; staat er zodat de derde manier later past zonder het
+  /// model om te gooien. De voltooiroute weigert hem met een melding.
+  HOURS
+}
+
+model RecurringTemplate {
+  id              String      @id @default(cuid())
+  name            String
+  customerId      String
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  billing         BillingMode @default(PER_UNIT)
+  /// Prijs per stuk, of het vaste bedrag bij FIXED.
+  unitPrice       Decimal?    @db.Decimal(10, 2)
+  /// Voorgesteld aantal bij een nieuwe batch. Voor H3X: 120.
+  defaultQuantity Decimal?    @db.Decimal(10, 2)
+  /// De omschrijving van de factuurregel: "Testen H3X batterij omvormers".
+  lineDescription String
+  /// Het onderwerp van de factuur: "Factuur H3X testen".
+  invoiceSubject  String?
+  /// Testwerk telt goedkeur en afkeur; een vast bedrag niet.
+  tracksQuality   Boolean     @default(false)
+  archivedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  projects        Project[]
 }
 
 model ProjectTask {
@@ -168,8 +215,8 @@ model ProjectTask {
 
   // Waar deze taak op wacht, en wat er op deze taak wacht. Twee relaties naar
   // dezelfde tabel, dus Prisma eist een naam per kant.
-  waitsOn   TaskDependency[] @relation("TaskWaitsOn")
-  blocks    TaskDependency[] @relation("TaskBlocks")
+  waitsOn TaskDependency[] @relation("TaskWaitsOn")
+  blocks  TaskDependency[] @relation("TaskBlocks")
 
   @@index([projectId])
 }
@@ -260,99 +307,102 @@ model ProjectMember {
 }
 
 model TimeEntry {
-  id             String        @id @default(cuid())
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  projectId      String
-  project        Project       @relation(fields: [projectId], references: [id])
-  date           DateTime      @db.Date
-  hours          Decimal       @db.Decimal(5, 2)
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id])
+  projectId        String
+  project          Project         @relation(fields: [projectId], references: [id])
+  date             DateTime        @db.Date
+  hours            Decimal         @db.Decimal(5, 2)
   // Het tijdvak waarop deze uren zijn geboekt, als kloktijd `HH:MM`. Tekst en
   // geen DateTime: een kloktijd is een aanduiding op een dag, geen moment op
   // een tijdlijn, en tekst houdt het buiten elk tijdzonegedoe. Leeg bij wie
   // rechtstreeks een aantal uren invult, en bij alles van vóór dit veld.
-  startTime      String?
-  endTime        String?
+  startTime        String?
+  endTime          String?
   // De pauze binnen dat tijdvak. Zonder dit getal is 09:00–17:00 naast 7:30 uur
   // niet te verklaren.
-  breakMinutes   Int?
-  description    String?
-  rateOverride   Decimal?      @db.Decimal(10, 2)
-  workLevel      WorkLevel?
-  invoiced       Boolean       @default(false)
-  invoiceLineId  String?
-  invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
+  breakMinutes     Int?
+  description      String?
+  rateOverride     Decimal?        @db.Decimal(10, 2)
+  workLevel        WorkLevel?
+  invoiced         Boolean         @default(false)
+  invoiceLineId    String?
+  invoiceLine      InvoiceLine?    @relation(fields: [invoiceLineId], references: [id])
   // Gezet op regels die uit een goedgekeurde afwezigheidsaanvraag zijn ontstaan.
   // `absenceRequestId !== null` is precies de definitie van "dit is een
   // verlofregel": daarop weigeren de bewerk- en verwijderroutes, en daarop
   // vindt de goedkeuring terug wat hij eerder maakte.
   absenceRequestId String?
   absenceRequest   AbsenceRequest? @relation(fields: [absenceRequestId], references: [id], onDelete: Cascade)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model KmEntry {
-  id             String        @id @default(cuid())
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  projectId      String
-  project        Project       @relation(fields: [projectId], references: [id])
-  date           DateTime      @db.Date
-  km             Decimal       @db.Decimal(8, 2)
-  description    String?
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id])
+  date          DateTime     @db.Date
+  km            Decimal      @db.Decimal(8, 2)
+  description   String?
   // Deze rit is de woon-werkrit van die dag, aangemaakt vanuit het beheerde
   // woon-werksjabloon. Nodig omdat het vinkje op het urenscherm moet weten
   // wélke rit de zijne is: herkennen op project en afstand breekt zodra iemand
   // zijn rit aanpast of een tweede rit naar dezelfde plek maakt.
-  commute        Boolean       @default(false)
-  rateOverride   Decimal?      @db.Decimal(10, 2)
-  invoiced       Boolean       @default(false)
-  invoiceLineId  String?
-  invoiceLine    InvoiceLine?  @relation(fields: [invoiceLineId], references: [id])
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  commute       Boolean      @default(false)
+  rateOverride  Decimal?     @db.Decimal(10, 2)
+  invoiced      Boolean      @default(false)
+  invoiceLineId String?
+  invoiceLine   InvoiceLine? @relation(fields: [invoiceLineId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model KmTemplate {
-  id             String        @id @default(cuid())
+  id             String   @id @default(cuid())
   userId         String
-  user           User          @relation(fields: [userId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
   name           String
   projectId      String
-  project        Project       @relation(fields: [projectId], references: [id])
-  km             Decimal       @db.Decimal(8, 2)
+  project        Project  @relation(fields: [projectId], references: [id])
+  km             Decimal  @db.Decimal(8, 2)
   description    String?
-  managedByAdmin Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  managedByAdmin Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([userId, name])
 }
 
 model Invoice {
-  id              String              @id @default(cuid())
-  invoiceNumber   String              @unique
-  customerId      String
-  customer        Customer            @relation(fields: [customerId], references: [id])
-  issueDate       DateTime            @db.Date
-  dueDate         DateTime            @db.Date
-  status          InvoiceStatus       @default(DRAFT)
-  reference       String?
-  subject         String?
-  intro           String?
-  notes           String?
-  subtotal        Decimal             @db.Decimal(10, 2)
-  vatRate         Decimal             @db.Decimal(5, 2) @default(21)
-  vatAmount       Decimal             @db.Decimal(10, 2)
-  total           Decimal             @db.Decimal(10, 2)
-  viewToken       String              @unique @default(dbgenerated("gen_random_uuid()"))
-  sentAt          DateTime?
-  reminderSentAt  DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  lines           InvoiceLine[]
-  attachments     InvoiceAttachment[]
+  id             String              @id @default(cuid())
+  invoiceNumber  String              @unique
+  customerId     String
+  customer       Customer            @relation(fields: [customerId], references: [id])
+  issueDate      DateTime            @db.Date
+  dueDate        DateTime            @db.Date
+  status         InvoiceStatus       @default(DRAFT)
+  reference      String?
+  subject        String?
+  intro          String?
+  notes          String?
+  subtotal       Decimal             @db.Decimal(10, 2)
+  vatRate        Decimal             @default(21) @db.Decimal(5, 2)
+  vatAmount      Decimal             @db.Decimal(10, 2)
+  total          Decimal             @db.Decimal(10, 2)
+  viewToken      String              @unique @default(dbgenerated("gen_random_uuid()"))
+  sentAt         DateTime?
+  reminderSentAt DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  lines          InvoiceLine[]
+  attachments    InvoiceAttachment[]
+  /// Tegenveld van Project.generatedInvoice. Wordt nergens gelezen; Prisma
+  /// eist hem voor de een-op-een-relatie.
+  batch          Project?            @relation("BatchInvoice")
 }
 
 model InvoiceAttachment {
@@ -408,24 +458,24 @@ model ExpenseCategory {
 }
 
 model Expense {
-  id            String           @id @default(cuid())
+  id            String          @id @default(cuid())
   userId        String
-  user          User             @relation(fields: [userId], references: [id])
+  user          User            @relation(fields: [userId], references: [id])
   categoryId    String
-  category      ExpenseCategory  @relation(fields: [categoryId], references: [id])
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
   projectId     String?
-  project       Project?         @relation(fields: [projectId], references: [id])
-  date          DateTime         @db.Date
+  project       Project?        @relation(fields: [projectId], references: [id])
+  date          DateTime        @db.Date
   description   String?
-  amount        Decimal          @db.Decimal(10, 2)
-  vatRate       Decimal          @db.Decimal(5, 2) @default(21)
+  amount        Decimal         @db.Decimal(10, 2)
+  vatRate       Decimal         @default(21) @db.Decimal(5, 2)
   receiptUrl    String?
-  reimbursable  Boolean          @default(false)
-  invoiced      Boolean          @default(false)
+  reimbursable  Boolean         @default(false)
+  invoiced      Boolean         @default(false)
   invoiceLineId String?
-  invoiceLine   InvoiceLine?     @relation(fields: [invoiceLineId], references: [id])
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  invoiceLine   InvoiceLine?    @relation(fields: [invoiceLineId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model CompanySettings {
@@ -464,7 +514,7 @@ model Quote {
   subject     String?
   notes       String?
   subtotal    Decimal           @db.Decimal(10, 2)
-  vatRate     Decimal           @db.Decimal(5, 2) @default(21)
+  vatRate     Decimal           @default(21) @db.Decimal(5, 2)
   vatAmount   Decimal           @db.Decimal(10, 2)
   total       Decimal           @db.Decimal(10, 2)
   viewToken   String            @unique @default(dbgenerated("gen_random_uuid()"))
@@ -548,22 +598,22 @@ model WorkSchedule {
 }
 
 model AbsenceRequest {
-  id          String        @id @default(cuid())
+  id          String          @id @default(cuid())
   userId      String
-  user        User          @relation("AbsenceRequests", fields: [userId], references: [id], onDelete: Cascade)
-  type        AbsenceType   @default(VACATION)
-  startDate   DateTime      @db.Date
-  endDate     DateTime      @db.Date
-  hours       Decimal       @db.Decimal(5, 2)
+  user        User            @relation("AbsenceRequests", fields: [userId], references: [id], onDelete: Cascade)
+  type        AbsenceType     @default(VACATION)
+  startDate   DateTime        @db.Date
+  endDate     DateTime        @db.Date
+  hours       Decimal         @db.Decimal(5, 2)
   description String?
-  status      AbsenceStatus @default(PENDING)
+  status      AbsenceStatus   @default(PENDING)
   reviewedBy  String?
-  reviewer    User?         @relation("AbsenceReviewer", fields: [reviewedBy], references: [id])
+  reviewer    User?           @relation("AbsenceReviewer", fields: [reviewedBy], references: [id])
   reviewedAt  DateTime?
   timeEntries TimeEntry[]
   pattern     AbsencePattern?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model AbsencePattern {
@@ -576,11 +626,11 @@ model AbsencePattern {
   // Verplicht en niet nullable: een dag leeg laten is dubbelzinnig. Nul is nul.
   // De vorm is gelijk aan WeekSchedule uit src/lib/work-schedule.ts, zodat
   // scheduledHoursOn, weekTotal en toWeekSchedule er ongewijzigd op werken.
-  monday    Decimal @db.Decimal(4, 2)
-  tuesday   Decimal @db.Decimal(4, 2)
-  wednesday Decimal @db.Decimal(4, 2)
-  thursday  Decimal @db.Decimal(4, 2)
-  friday    Decimal @db.Decimal(4, 2)
+  monday           Decimal        @db.Decimal(4, 2)
+  tuesday          Decimal        @db.Decimal(4, 2)
+  wednesday        Decimal        @db.Decimal(4, 2)
+  thursday         Decimal        @db.Decimal(4, 2)
+  friday           Decimal        @db.Decimal(4, 2)
 }
 
 model Contract {

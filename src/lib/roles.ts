@@ -25,6 +25,8 @@ export const ROLES = {
       viewReports: true,
       leadStandup: true,
       managePlanning: true,
+      manageRecurringTemplates: true,
+      completeRecurringBatch: true,
     },
   },
   FINANCE: {
@@ -46,6 +48,8 @@ export const ROLES = {
       viewReports: true,
       leadStandup: false,
       managePlanning: false,
+      manageRecurringTemplates: false,
+      completeRecurringBatch: false,
     },
   },
   TEAMLEAD: {
@@ -71,6 +75,11 @@ export const ROLES = {
       viewReports: false,
       leadStandup: true,
       managePlanning: false,
+      // Asymmetrisch met bedoeling: een teamleider mag een batch afronden
+      // (het werk is klaar), maar krijgt de factuur niet te zien. De
+      // beheerder keurt goed en verstuurt.
+      manageRecurringTemplates: false,
+      completeRecurringBatch: true,
     },
   },
   EMPLOYEE: {
@@ -91,6 +100,8 @@ export const ROLES = {
       viewReports: false,
       leadStandup: false,
       managePlanning: false,
+      manageRecurringTemplates: false,
+      completeRecurringBatch: false,
     },
   },
 } as const;
@@ -141,4 +152,16 @@ export function canLeadStandup(role: string): boolean {
 
 export function canManagePlanning(role: string): boolean {
   return role === "ADMIN";
+}
+
+export function canManageRecurringTemplates(role: string): boolean {
+  return role === "ADMIN";
+}
+
+/**
+ * Een teamleider mag een batch afronden maar ziet de factuur niet: hij rondt het
+ * werk af, de beheerder keurt goed en verstuurt.
+ */
+export function canCompleteRecurringBatch(role: string): boolean {
+  return role === "ADMIN" || role === "TEAMLEAD";
 }

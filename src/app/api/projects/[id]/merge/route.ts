@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const { targetId } = schema.parse(await req.json());
 
-    const kies = { id: true, status: true, archivedAt: true } as const;
+    const kies = { id: true, status: true, archivedAt: true, templateId: true } as const;
     const [source, target] = await Promise.all([
       prisma.project.findUnique({ where: { id }, select: kies }),
       prisma.project.findUnique({ where: { id: targetId }, select: kies }),
