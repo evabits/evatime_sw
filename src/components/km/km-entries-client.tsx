@@ -57,6 +57,10 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
   const [entries, setEntries] = useState(initialEntries);
   const [templates, setTemplates] = useState(initialTemplates);
+  // Welk sjabloon het formulier heeft ingevuld. Gaat als `templateId` mee met
+  // de POST, zodat de server kan zien of dit de woon-werkrit is. Wordt leeg
+  // zodra project, km of omschrijving met de hand wijzigt: dan klopt de
+  // koppeling niet meer en zou meesturen de vlag laten liegen.
   const [appliedTemplate, setAppliedTemplate] = useState("");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -201,6 +205,9 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
     const payload = {
       ...data,
       rateOverride: data.rateOverride === "" ? null : data.rateOverride || null,
+      // Alleen bij een nieuwe rit meesturen: de server bepaalt hiermee of dit
+      // de woon-werkrit is. Bij bewerken (editing) is er geen sjabloonkeuze.
+      templateId: !editing && appliedTemplate ? appliedTemplate : undefined,
     };
     try {
       if (editing) {
@@ -364,7 +371,10 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
             <div className="space-y-2">
               <Label>Project *</Label>
-              <Select onValueChange={(v) => form.setValue("projectId", v)} value={form.watch("projectId") ?? ""}>
+              <Select
+                onValueChange={(v) => { form.setValue("projectId", v); setAppliedTemplate(""); }}
+                value={form.watch("projectId") ?? ""}
+              >
                 <SelectTrigger><SelectValue placeholder="Selecteer project" /></SelectTrigger>
                 <SelectContent>
                   {/* title toont de projectomschrijving bij het over-hoveren. */}
@@ -383,7 +393,13 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
             <div className="space-y-2">
               <Label>Kilometers *</Label>
-              <Input type="number" step="0.1" min="0.1" placeholder="45.5" {...form.register("km")} />
+              <Input
+                type="number"
+                step="0.1"
+                min="0.1"
+                placeholder="45.5"
+                {...form.register("km", { onChange: () => setAppliedTemplate("") })}
+              />
               {form.formState.errors.km && <p className="text-xs text-destructive">{form.formState.errors.km.message}</p>}
             </div>
 
@@ -401,7 +417,11 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Omschrijving</Label>
-              <Textarea placeholder="Bijv. bezoek klant Amsterdam" {...form.register("description")} rows={2} />
+              <Textarea
+                placeholder="Bijv. bezoek klant Amsterdam"
+                {...form.register("description", { onChange: () => setAppliedTemplate("") })}
+                rows={2}
+              />
             </div>
 
             <div className="sm:col-span-2 flex flex-wrap items-center gap-4">
