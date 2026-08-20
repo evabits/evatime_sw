@@ -13,7 +13,7 @@ import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
   barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
-import { cycleThrough, shiftPlan, arrowPath } from "@/lib/task-dependencies";
+import { cycleThrough, shiftPlan, arrowPath, planningWarnings, type TaakSignaal } from "@/lib/task-dependencies";
 
 /**
  * De taken waar deze taak op zou kunnen wachten: die van hetzelfde project,
@@ -33,6 +33,18 @@ function alleKoppelingen(project: PlanningProject) {
   return project.tasks.flatMap((t) =>
     (t.waitsOn ?? []).map((w) => ({ taskId: t.id, dependsOnId: w.dependsOnId })),
   );
+}
+
+/**
+ * Kleur van de taakbalk aan de hand van de zwaarste markering. `te-vroeg` en
+ * `buiten-project` zijn een alarm; `verlopen` alleen is een gedempte hint —
+ * zonder een "gereed"-vlag is een afgelopen taak meestal gewoon afgerond werk,
+ * en die mag niet even hard opvallen als een echte schending.
+ */
+function taakKleur(signalen: TaakSignaal[] | undefined): string {
+  if (!signalen) return "bg-primary/50";
+  if (signalen.some((s) => s.soort !== "verlopen")) return "bg-destructive";
+  return "bg-muted-foreground/40";
 }
 
 /**
@@ -318,6 +330,11 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                   const bar = projectBar(project)!;
                   const geo = barGeometry(bar.start, bar.end, venster);
                   const uitgeklapt = open[project.id] ?? false;
+                  // Ook als het project is ingeklapt uitrekenen: de projectbalk zelf
+                  // moet altijd kunnen oplichten, niet pas na uitklappen.
+                  const { perTaak: signalen, projectLooptUit } = planningWarnings(
+                    project, project.tasks, alleKoppelingen(project), vandaag,
+                  );
                   return (
                     <div key={project.id}>
                       <div className="flex items-stretch border-b">
@@ -350,7 +367,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         <div className="relative shrink-0 py-2" style={{ width: breedte }}>
                           <button
                             type="button"
-                            className="absolute h-4 rounded bg-primary hover:bg-primary/80"
+                            className={`absolute h-4 rounded ${projectLooptUit ? "bg-destructive hover:bg-destructive/80" : "bg-primary hover:bg-primary/80"}`}
                             style={{ left: `${geo.leftPct}%`, width: `${geo.widthPct}%`, minWidth: 4 }}
                             title={`${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`}
                             onClick={() => openProject(project)}
@@ -436,9 +453,12 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                                 </div>
                                 <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
                                   <div
-                                    className="absolute h-3 rounded bg-primary/50"
+                                    className={`absolute h-3 rounded ${taakKleur(signalen[taak.id])}`}
                                     style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
-                                    title={`${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`}
+                                    title={[
+                                      `${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`,
+                                      ...(signalen[taak.id] ?? []).map((s) => s.uitleg),
+                                    ].join("\n")}
                                   />
                                 </div>
                               </div>
