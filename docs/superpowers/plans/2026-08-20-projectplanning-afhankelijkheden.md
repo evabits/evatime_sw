@@ -469,7 +469,7 @@ export function shiftPlan(taken: SchedulableTask[], links: DependencyLink[]): Sh
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/task-dependencies.test.ts
 ```
 
-Verwacht: PASS, 16 tests.
+Verwacht: PASS, 15 tests (6 voor cycleThrough, 9 voor shiftPlan).
 
 - [ ] **Step 5: Commit**
 
@@ -759,7 +759,7 @@ export function arrowPath(
 PATH="$HOME/.nvm/versions/node/v20.20.1/bin:$PATH" npx vitest run src/lib/task-dependencies.test.ts
 ```
 
-Verwacht: PASS, 29 tests.
+Verwacht: PASS, 28 tests (15 uit taak 2 plus 13 nieuwe).
 
 - [ ] **Step 5: Commit**
 
