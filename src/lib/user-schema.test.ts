@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { weeklyHoursField, workLevelField } from "./user-schema";
+import {
+  weeklyHoursField, workLevelField, overtimeOpeningDateField, overtimeOpeningHoursField,
+} from "./user-schema";
 
 describe("weeklyHoursField", () => {
   it("empty string => undefined (no target)", () => {
@@ -40,5 +42,41 @@ describe("workLevelField", () => {
 
   it("rejects an unknown level", () => {
     expect(() => workLevelField.parse("PRINCIPAL")).toThrow();
+  });
+});
+
+// Dit onderscheid is de kern van de fix voor het datalek waarbij een scherm
+// dat deze velden niet kent de beginstand stilzwijgend wiste: "sleutel
+// ontbreekt" (undefined) moet anders blijven dan "bewust leeggemaakt" (null).
+describe("overtimeOpeningDateField", () => {
+  it("undefined => undefined (sleutel ontbreekt, kolom blijft ongemoeid)", () => {
+    expect(overtimeOpeningDateField.parse(undefined)).toBeUndefined();
+  });
+  it("'' => null (bewust gewist)", () => {
+    expect(overtimeOpeningDateField.parse("")).toBeNull();
+  });
+  it("null => null", () => {
+    expect(overtimeOpeningDateField.parse(null)).toBeNull();
+  });
+  it("'2026-01-01' => doorgelaten", () => {
+    expect(overtimeOpeningDateField.parse("2026-01-01")).toBe("2026-01-01");
+  });
+  it("verkeerd formaat wordt geweigerd", () => {
+    expect(() => overtimeOpeningDateField.parse("1-1-2026")).toThrow();
+  });
+});
+
+describe("overtimeOpeningHoursField", () => {
+  it("undefined => undefined (sleutel ontbreekt, kolom blijft ongemoeid)", () => {
+    expect(overtimeOpeningHoursField.parse(undefined)).toBeUndefined();
+  });
+  it("'' => null (bewust gewist)", () => {
+    expect(overtimeOpeningHoursField.parse("")).toBeNull();
+  });
+  it("null => null", () => {
+    expect(overtimeOpeningHoursField.parse(null)).toBeNull();
+  });
+  it("negatief mag (een tekort als beginstand)", () => {
+    expect(overtimeOpeningHoursField.parse(-5)).toBe(-5);
   });
 });

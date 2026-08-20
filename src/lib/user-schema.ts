@@ -22,21 +22,34 @@ export const vacationOpeningUsedField = z.preprocess(
   z.coerce.number().min(0, "Kan niet negatief zijn").optional(),
 ) as z.ZodType<number | undefined>;
 
-// Peildatum van het urensaldo, als YYYY-MM-DD. Leeg betekent: deze medewerker
-// heeft geen saldo. Dat de datum op de eerste van een maand moet liggen wordt
-// niet hier gecontroleerd maar met validateOpeningDate — die melding hoort bij
-// de rekenkunde en niet bij het formaat.
+// Peildatum van het urensaldo, als YYYY-MM-DD. Dat de datum op de eerste van
+// een maand moet liggen wordt niet hier gecontroleerd maar met
+// validateOpeningDate — die melding hoort bij de rekenkunde en niet bij het
+// formaat.
+//
+// Anders dan de velden hierboven zet dit veld "" NIET gelijk aan undefined,
+// maar aan null. Dat onderscheid is dragend: de PUT-route schrijft dit veld
+// alleen weg als het `!== undefined` is, zodat een scherm dat deze twee
+// urensaldo-velden niet kent (zoals het huidige gebruikersformulier) de
+// beginstand niet stilzwijgend wist bij het opslaan van bijvoorbeeld een
+// naamswijziging. undefined = sleutel ontbreekt in de aanvraag = kolom blijft
+// ongemoeid. null of "" = bewust leeggemaakt = kolom wordt gewist. Zou "" hier
+// ook naar undefined gaan, dan kon een scherm dat dit veld wél kent de
+// beginstand nooit meer wissen: een lege invoer zou onzichtbaar worden voor
+// de `!== undefined`-check.
 export const overtimeOpeningDateField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd").optional(),
-) as z.ZodType<string | undefined>;
+  (v) => (v === "" ? null : v),
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum als jjjj-mm-dd").optional().nullable(),
+) as z.ZodType<string | null | undefined>;
 
 // De beginstand in uren. Mag negatief zijn: een medewerker kan met een tekort
-// beginnen, anders dan bij de vakantie-uren hierboven.
+// beginnen, anders dan bij de vakantie-uren hierboven. Zelfde
+// undefined-versus-null-onderscheid als overtimeOpeningDateField hierboven,
+// om dezelfde reden.
 export const overtimeOpeningHoursField = z.preprocess(
-  (v) => (v === "" || v == null ? undefined : v),
-  z.coerce.number().optional(),
-) as z.ZodType<number | undefined>;
+  (v) => (v === "" ? null : v),
+  z.coerce.number().optional().nullable(),
+) as z.ZodType<number | null | undefined>;
 
 // Empty input ("" / null / undefined) means "not set" -> undefined.
 // Callers store `workLevel ?? null`.

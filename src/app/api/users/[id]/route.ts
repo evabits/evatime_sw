@@ -63,11 +63,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!isAdmin && data.role !== (currentUser?.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const peilFout = validateOpeningDate(data.overtimeOpeningDate);
-    if (peilFout) return NextResponse.json({ error: peilFout }, { status: 400 });
 
     const updateData: any = { name: data.name, email: data.email };
     if (isAdmin) {
+      // Alleen hier gecontroleerd (en niet vóór de isAdmin-tak): het veld
+      // wordt toch alleen door een beheerder weggeschreven, dus een gewone
+      // medewerker die zijn eigen naam wijzigt mag hier geen 400 op krijgen
+      // voor een peildatum die hij niet eens kan zetten.
+      const peilFout = validateOpeningDate(data.overtimeOpeningDate);
+      if (peilFout) return NextResponse.json({ error: peilFout }, { status: 400 });
+
       updateData.role = data.role;
       updateData.weeklyHours = data.weeklyHours ?? null;
       updateData.workLevel = data.workLevel ?? null;
@@ -77,10 +82,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
         : null;
       updateData.vacationOpeningUsed = data.vacationOpeningUsed ?? null;
-      updateData.overtimeOpeningDate = data.overtimeOpeningDate
-        ? new Date(`${data.overtimeOpeningDate}T00:00:00Z`)
-        : null;
-      updateData.overtimeOpeningHours = data.overtimeOpeningHours ?? null;
+      // Alleen schrijven als de sleutel is meegestuurd: schermen die deze
+      // twee urensaldo-velden niet kennen (zoals het huidige
+      // gebruikersformulier) sturen ze helemaal niet mee, en dan is
+      // data.overtimeOpeningDate/-Hours undefined. Zonder deze guard zou
+      // zo'n opslag (bijv. alleen een naamswijziging) de kolom stilzwijgend
+      // op null zetten en de beginstand wissen. Zie overtimeOpeningDateField
+      // in user-schema.ts voor het undefined/null-onderscheid dat dit
+      // mogelijk maakt.
+      if (data.overtimeOpeningDate !== undefined) {
+        updateData.overtimeOpeningDate = data.overtimeOpeningDate
+          ? new Date(`${data.overtimeOpeningDate}T00:00:00Z`)
+          : null;
+      }
+      if (data.overtimeOpeningHours !== undefined) {
+        updateData.overtimeOpeningHours = data.overtimeOpeningHours;
+      }
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 
