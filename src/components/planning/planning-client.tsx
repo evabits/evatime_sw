@@ -13,7 +13,7 @@ import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
   barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
-import { cycleThrough, shiftPlan } from "@/lib/task-dependencies";
+import { cycleThrough, shiftPlan, arrowPath } from "@/lib/task-dependencies";
 
 /**
  * De taken waar deze taak op zou kunnen wachten: die van hetzelfde project,
@@ -47,6 +47,13 @@ const ZOOM = {
 type ZoomStand = keyof typeof ZOOM;
 
 const NAAMKOLOM_PX = 224;
+
+/**
+ * Vaste hoogte van een taakrij, inclusief de onderrand. Vast en niet door de
+ * inhoud bepaald, want de pijlen rekenen ermee: rij × deze hoogte is het
+ * middelpunt van de balk.
+ */
+const TAAKRIJ_PX = 25;
 
 export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [zoom, setZoom] = useState<ZoomStand>("maanden");
@@ -346,42 +353,94 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         </div>
                       </div>
 
-                      {uitgeklapt && project.tasks.map((taak) => {
-                        const tGeo = barGeometry(taak.startDate, taak.endDate, venster);
-                        return (
-                          <div key={taak.id} className="flex items-stretch border-b bg-muted/20">
-                            <div
-                              className="sticky left-0 z-[1] shrink-0 flex items-center gap-0.5 px-3 pl-8 py-1.5 text-sm bg-card"
-                              style={{ width: NAAMKOLOM_PX }}
-                            >
-                              <button
-                                type="button"
-                                className="truncate text-muted-foreground hover:text-foreground text-left flex-1"
-                                onClick={() => openTaak(project, taak)}
-                                title="Taak bewerken"
-                              >
-                                {taak.name}
-                              </button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omhoog" disabled={bezig} onClick={() => verplaats(taak.id, "up")}>
-                                <ChevronUp className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omlaag" disabled={bezig} onClick={() => verplaats(taak.id, "down")}>
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Verwijderen" disabled={bezig} onClick={() => verwijderTaak(taak.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
+                      {uitgeklapt && (
+                        // relative: draagt de pijlenlaag, die anders geen aanknopingspunt
+                        // heeft om zich op de taakrijen te leggen.
+                        <div className="relative">
+                          <svg
+                            className="absolute top-0 z-0 pointer-events-none text-muted-foreground"
+                            style={{
+                              left: NAAMKOLOM_PX,
+                              width: breedte,
+                              height: project.tasks.length * TAAKRIJ_PX,
+                            }}
+                          >
+                            {alleKoppelingen(project).map((koppeling) => {
+                              const vanIdx = project.tasks.findIndex((t) => t.id === koppeling.dependsOnId);
+                              const naarIdx = project.tasks.findIndex((t) => t.id === koppeling.taskId);
+                              // Beide kanten horen bij dit project; is dat toch niet zo,
+                              // dan is er niets te tekenen in plaats van een gok te wagen.
+                              if (vanIdx === -1 || naarIdx === -1) return null;
+                              const van = project.tasks[vanIdx];
+                              const naar = project.tasks[naarIdx];
+                              const punten = arrowPath(
+                                { ...barGeometry(van.startDate, van.endDate, venster), rij: vanIdx },
+                                { ...barGeometry(naar.startDate, naar.endDate, venster), rij: naarIdx },
+                                { breedte, rijHoogte: TAAKRIJ_PX },
+                              );
+                              const laatste = punten[punten.length - 1];
+                              // Geschonden: de opvolger begint op of vóór de einddatum van
+                              // de voorganger — die is dan nog niet klaar.
+                              const geschonden = new Date(naar.startDate) <= new Date(van.endDate);
+                              return (
+                                <g key={`${koppeling.dependsOnId}-${koppeling.taskId}`} className={geschonden ? "text-destructive" : undefined}>
+                                  <polyline
+                                    points={punten.map((p) => `${p.x},${p.y}`).join(" ")}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth={1.5}
+                                  />
+                                  <polygon
+                                    points={`${laatste.x},${laatste.y} ${laatste.x - 5},${laatste.y - 3} ${laatste.x - 5},${laatste.y + 3}`}
+                                    fill="currentColor"
+                                  />
+                                </g>
+                              );
+                            })}
+                          </svg>
+
+                          {project.tasks.map((taak) => {
+                            const tGeo = barGeometry(taak.startDate, taak.endDate, venster);
+                            return (
                               <div
-                                className="absolute h-3 rounded bg-primary/50"
-                                style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
-                                title={`${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                                key={taak.id}
+                                className="flex items-stretch border-b bg-muted/20"
+                                style={{ height: TAAKRIJ_PX }}
+                              >
+                                <div
+                                  className="sticky left-0 z-[1] shrink-0 flex items-center gap-0.5 px-3 pl-8 text-sm bg-card"
+                                  style={{ width: NAAMKOLOM_PX }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="truncate text-muted-foreground hover:text-foreground text-left flex-1"
+                                    onClick={() => openTaak(project, taak)}
+                                    title="Taak bewerken"
+                                  >
+                                    {taak.name}
+                                  </button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Omhoog" disabled={bezig} onClick={() => verplaats(taak.id, "up")}>
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Omlaag" disabled={bezig} onClick={() => verplaats(taak.id, "down")}>
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Verwijderen" disabled={bezig} onClick={() => verwijderTaak(taak.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
+                                  <div
+                                    className="absolute h-3 rounded bg-primary/50"
+                                    style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
+                                    title={`${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
