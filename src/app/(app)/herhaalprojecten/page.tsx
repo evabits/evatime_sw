@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { serialize } from "@/lib/utils";
-import { canManageRecurringBatches, canManageRecurringTemplates } from "@/lib/roles";
+import { canManageRecurringBatches, canManageRecurringTemplates, isAdmin } from "@/lib/roles";
 import { RecurringClient } from "@/components/recurring/recurring-client";
 
 export default async function HerhaalprojectenPage() {
@@ -42,6 +42,9 @@ export default async function HerhaalprojectenPage() {
       initialBatches={serialize(batches)}
       customers={serialize(customers)}
       canManageTemplates={canManageRecurringTemplates(role)}
+      // Een teamleider draait het werk, de beheerder doet de facturatie. Wat er
+      // aan de klant in rekening wordt gebracht hoort dus niet op zijn scherm.
+      toonBedragen={isAdmin(role)}
     />
   );
 }

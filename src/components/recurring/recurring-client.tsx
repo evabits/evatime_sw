@@ -42,9 +42,11 @@ interface Props {
   initialBatches: any[];
   customers: { id: string; name: string }[];
   canManageTemplates: boolean;
+  /** Of deze rol de tarieven en factuurbedragen mag zien. */
+  toonBedragen: boolean;
 }
 
-export function RecurringClient({ initialTemplates, initialBatches, customers, canManageTemplates }: Props) {
+export function RecurringClient({ initialTemplates, initialBatches, customers, canManageTemplates, toonBedragen }: Props) {
   const router = useRouter();
   const templates = initialTemplates;
   const batches = initialBatches;
@@ -268,7 +270,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
             <TableBody>
               {templates.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell>
+                  <TableCell colSpan={toonBedragen ? 5 : 4} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell>
                 </TableRow>
               )}
               {templates.map((t) => (
@@ -279,7 +281,9 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                     {BILLING_LABELS[t.billing] ?? t.billing}
                     {t.tracksQuality && <span className="text-xs text-muted-foreground"> (goed-/afkeur)</span>}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
+                  {toonBedragen && (
+                    <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
+                  )}
                   <TableCell>
                     <div className="flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => openStartBatch(t)} title="Nieuwe batch starten">
@@ -522,11 +526,16 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
               </div>
               {draft && (
                 <p className="text-sm font-mono bg-muted rounded-md px-3 py-2">
+                  {/* Zonder de bedragen blijft de optelsom staan: die is de
+                      controle op wat er is ingevuld, en daar gaat het bij het
+                      voltooien om. */}
                   {isFixed
-                    ? `Vast bedrag: ${formatCurrency(draft.subtotal)}`
+                    ? toonBedragen
+                      ? `Vast bedrag: ${formatCurrency(draft.subtotal)}`
+                      : "Vast bedrag"
                     : tracksQuality
-                      ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`
-                      : `${totaal} × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}`}
+                      ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`
+                      : `${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`}
                 </p>
               )}
               {draft?.reference && (
