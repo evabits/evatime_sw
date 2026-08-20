@@ -13,7 +13,7 @@ import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
   barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
-import { cycleThrough } from "@/lib/task-dependencies";
+import { cycleThrough, shiftPlan } from "@/lib/task-dependencies";
 
 /**
  * De taken waar deze taak op zou kunnen wachten: die van hetzelfde project,
@@ -65,6 +65,10 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [formStart, setFormStart] = useState("");
   const [formEind, setFormEind] = useState("");
   const [formWachtOp, setFormWachtOp] = useState<string[]>([]);
+  // Het voorgerekende overzicht, of null als er niets te verschuiven valt.
+  const [verschuiving, setVerschuiving] = useState<
+    { taakId: string; regels: ReturnType<typeof shiftPlan> } | null
+  >(null);
 
   /** ISO voor een <input type="date">; die accepteert niets anders. */
   const isoVoorInvoer = (d: string | Date | null | undefined) =>
@@ -132,9 +136,40 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       });
       return;
     }
-    await verstuur(`/api/project-tasks/${venstertje.taak.id}`, "PUT", {
+    const taak = venstertje.taak;
+    const project = venstertje.project;
+    const ok = await verstuur(`/api/project-tasks/${taak.id}`, "PUT", {
       name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
     });
+    if (!ok) return;
+
+    // router.refresh() (in verstuur) haalt de verse gegevens pas later op; het
+    // scherm heeft ze nu nog niet. Reken het voorbeeld daarom door met wat we
+    // zelf net verstuurd hebben: deze taak met haar nieuwe datums, en haar
+    // koppelingen vervangen door wat er in de aanvinklijst stond.
+    const taken = project.tasks.map((t) =>
+      t.id === taak.id ? { ...t, startDate: formStart, endDate: formEind } : t,
+    );
+    const koppelingen = alleKoppelingen(project)
+      .filter((k) => k.taskId !== taak.id)
+      .concat(formWachtOp.map((dependsOnId) => ({ taskId: taak.id, dependsOnId })));
+    const regels = shiftPlan(taken, koppelingen);
+    if (regels.length > 0) setVerschuiving({ taakId: taak.id, regels });
+  }
+
+  /** "Alleen deze taak": het overzicht dicht, de keten blijft staan zoals hij stond. */
+  function alleenDezeTaak() {
+    setVerschuiving(null);
+    router.refresh();
+  }
+
+  /** "Alles verschuiven": dezelfde PUT nogmaals, nu met applyShift zodat de server de keten doorrekent. */
+  async function verschuifAlles() {
+    if (!verschuiving) return;
+    const ok = await verstuur(`/api/project-tasks/${verschuiving.taakId}`, "PUT", {
+      name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp, applyShift: true,
+    });
+    if (ok) setVerschuiving(null);
   }
 
   async function verwijderTaak(taakId: string) {
@@ -154,6 +189,12 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const breedte = dagen * ZOOM[zoom].pxPerDag;
   const vandaagPct = todayOffsetPct(vandaag, venster);
   const kop = timelineHeader(venster, zoom);
+
+  // Het venster is al dicht als het overzicht verschijnt, dus zoeken we het
+  // project via de taak op in plaats van het uit het venstertje te halen.
+  const projectVoorVerschuiving = verschuiving
+    ? projects.find((p) => p.tasks.some((t) => t.id === verschuiving.taakId))
+    : undefined;
 
   const groepen = groupByCustomer(projects.filter((p) => projectBar(p) !== null));
   // Ook per klant, en met dezelfde sortering als de tijdlijn erboven. De lijst
@@ -421,6 +462,49 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setVenstertje(null)} disabled={bezig}>Annuleren</Button>
             <Button onClick={bewaar} disabled={bezig}>{bezig ? "Opslaan..." : "Opslaan"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={verschuiving !== null} onOpenChange={(o) => { if (!o) alleenDezeTaak(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Taken die meeschuiven</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {verschuiving?.regels.map((regel) => {
+              // Alleen relevant met een eigen projectperiode; zonder die spant
+              // de balk zich toch om de taken, dus dan kan niets uitsteken.
+              const periode =
+                projectVoorVerschuiving?.plannedStart && projectVoorVerschuiving?.plannedEnd
+                  ? {
+                      start: new Date(projectVoorVerschuiving.plannedStart),
+                      eind: new Date(projectVoorVerschuiving.plannedEnd),
+                    }
+                  : null;
+              const buitenPeriode =
+                periode !== null && (regel.naarStart < periode.start || regel.naarEind > periode.eind);
+              return (
+                <div key={regel.id} className="text-sm">
+                  <p className="truncate">{regel.name}</p>
+                  <p className="text-muted-foreground">
+                    {formatDate(regel.vanStart)} t/m {formatDate(regel.vanEind)}
+                    {" → "}
+                    {formatDate(regel.naarStart)} t/m {formatDate(regel.naarEind)}
+                  </p>
+                  {buitenPeriode && (
+                    <p className="text-destructive">Valt buiten de projectperiode</p>
+                  )}
+                </div>
+              );
+            })}
+            {fout && <p className="text-sm text-destructive">{fout}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={alleenDezeTaak} disabled={bezig}>Alleen deze taak</Button>
+            <Button onClick={verschuifAlles} disabled={bezig}>Alles verschuiven</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
