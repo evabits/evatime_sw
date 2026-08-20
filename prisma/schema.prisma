@@ -22,6 +22,12 @@ model User {
   // altijd was.
   vacationOpeningDate DateTime?         @db.Date
   vacationOpeningUsed Decimal?          @db.Decimal(7, 2)
+  // Beginstand van het urensaldo: vanaf welke datum de app zelf doortelt, en
+  // wat er op dat moment al stond. Allebei leeg betekent: geen saldo voor deze
+  // medewerker. Zelfde patroon als vacationOpeningDate hierboven, omdat de app
+  // pas in mei 2026 in gebruik is genomen en de eerste maanden onvolledig zijn.
+  overtimeOpeningDate  DateTime?            @db.Date
+  overtimeOpeningHours Decimal?             @db.Decimal(7, 2)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   archivedAt          DateTime?
@@ -39,6 +45,27 @@ model User {
   standupsLed         Standup[]           @relation("StandupLeader")
   standupNotes        StandupNote[]       @relation("StandupSubject")
   workSchedule        WorkSchedule?
+  overtimeAdjustments  OvertimeAdjustment[]
+}
+
+model OvertimeAdjustment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  // Positief of negatief. Uitbetalen is negatief, inruilen voor een vrije dag
+  // ook, en een correctie kan beide kanten op.
+  hours       Decimal  @db.Decimal(7, 2)
+  // Verplicht: een mutatie zonder uitleg is over een half jaar niet meer te
+  // plaatsen. Daarom is een mutatie ook niet te wijzigen, alleen toe te voegen
+  // en te verwijderen — zo ontstaan er geen stille correcties op correcties.
+  reason      String
+  // Wie hem invoerde. Geen relatie, zodat de mutatie blijft staan als die
+  // persoon later uit dienst gaat en zijn rij wordt opgeruimd.
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, date])
 }
 
 enum Role {
