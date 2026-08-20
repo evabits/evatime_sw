@@ -3,7 +3,7 @@ import {
   canViewReports,
   canManagePlanning,
   canManageRecurringTemplates,
-  canCompleteRecurringBatch,
+  canManageRecurringBatches,
 } from "./roles";
 
 describe("canViewReports", () => {
@@ -43,15 +43,15 @@ describe("canManageRecurringTemplates", () => {
   });
 });
 
-describe("canCompleteRecurringBatch", () => {
-  it("lets an admin and a team lead finish a batch", () => {
-    expect(canCompleteRecurringBatch("ADMIN")).toBe(true);
-    expect(canCompleteRecurringBatch("TEAMLEAD")).toBe(true);
+describe("canManageRecurringBatches", () => {
+  it("lets an admin and a team lead start and finish a batch", () => {
+    expect(canManageRecurringBatches("ADMIN")).toBe(true);
+    expect(canManageRecurringBatches("TEAMLEAD")).toBe(true);
   });
 
   it("keeps everyone else out", () => {
-    expect(canCompleteRecurringBatch("FINANCE")).toBe(false);
-    expect(canCompleteRecurringBatch("EMPLOYEE")).toBe(false);
-    expect(canCompleteRecurringBatch("ONBEKEND")).toBe(false);
+    expect(canManageRecurringBatches("FINANCE")).toBe(false);
+    expect(canManageRecurringBatches("EMPLOYEE")).toBe(false);
+    expect(canManageRecurringBatches("ONBEKEND")).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError, projectNameTakenError } from "@/lib/api";
-import { canManageRecurringTemplates } from "@/lib/roles";
+import { canManageRecurringBatches } from "@/lib/roles";
 import { suggestBatchName } from "@/lib/recurring";
 
 const schema = z.object({
@@ -15,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = (session.user as any)?.role ?? "EMPLOYEE";
-    if (!canManageRecurringTemplates(role)) {
+    if (!canManageRecurringBatches(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
