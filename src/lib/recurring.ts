@@ -66,3 +66,106 @@ export function recurringInvoiceIntro(opts: {
     `${Number(opts.approved ?? 0)} goedgekeurd en ${Number(opts.rejected ?? 0)} afgekeurd.`
   );
 }
+
+export type RecurringTemplateData = {
+  id: string;
+  name: string;
+  customerId: string;
+  billing: BillingMode;
+  /** Prisma levert Decimal als string aan. */
+  unitPrice: number | string | null;
+  defaultQuantity: number | string | null;
+  lineDescription: string;
+  invoiceSubject: string | null;
+  tracksQuality: boolean;
+};
+
+export type BatchData = {
+  id: string;
+  name: string;
+  generatedInvoiceId: string | null;
+  deliveredAt: Date | string;
+};
+
+/** Eén factuurregel plus de bijbehorende kopteksten. */
+export type RecurringDraft = {
+  subject: string;
+  intro: string;
+  line: {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+    lineType: "OTHER";
+  };
+  subtotal: number;
+};
+
+/**
+ * De conceptfactuur die uit een voltooide batch volgt.
+ *
+ * Eén regel van het type OTHER: dit is geen tijd- of kilometerregistratie maar
+ * een afgesproken stukprijs, en die hoort niet aan uren gekoppeld te worden.
+ */
+export function recurringInvoiceDraft(
+  sjabloon: RecurringTemplateData,
+  batch: BatchData,
+  invoer: BatchInput,
+): RecurringDraft {
+  const totaal = batchTotal(invoer, sjabloon.tracksQuality);
+  const prijs = Number(sjabloon.unitPrice ?? 0);
+  const bedrag = Math.round(totaal * prijs * 100) / 100;
+
+  return {
+    // Een factuur zonder onderwerp leest als een fout; de batchnaam is altijd
+    // beter dan niets.
+    subject: sjabloon.invoiceSubject?.trim() || batch.name,
+    intro: recurringInvoiceIntro({
+      batchnaam: batch.name,
+      opgeleverdOp: batch.deliveredAt,
+      totaal,
+      tracksQuality: sjabloon.tracksQuality,
+      approved: invoer.approved,
+      rejected: invoer.rejected,
+    }),
+    line: {
+      description: sjabloon.lineDescription,
+      quantity: totaal,
+      unitPrice: prijs,
+      total: bedrag,
+      lineType: "OTHER",
+    },
+    subtotal: bedrag,
+  };
+}
+
+/**
+ * Waarom een batch niet voltooid mag worden, of `null` als het mag.
+ *
+ * De volgorde is bewust: eerst wat er niet aan te doen is (al gefactureerd, een
+ * manier die nog niet bestaat), dan wat de beheerder moet instellen, dan wat de
+ * invoer zelf mankeert. Zo krijgt iemand de melding die hem verder helpt.
+ */
+export function completeBatchDenial(
+  sjabloon: RecurringTemplateData,
+  batch: BatchData,
+  invoer: BatchInput,
+): string | null {
+  if (batch.generatedInvoiceId) {
+    return "Deze batch is al gefactureerd. Verwijder eerst de conceptfactuur als je opnieuw wilt beginnen.";
+  }
+  if (sjabloon.billing === "HOURS") {
+    return "Factureren op uren is nog niet beschikbaar voor herhaalprojecten.";
+  }
+  if (Number(sjabloon.unitPrice ?? 0) <= 0) {
+    return "Stel eerst een tarief in op het sjabloon.";
+  }
+
+  const getallen = [invoer.quantity, invoer.approved, invoer.rejected]
+    .filter((n) => n !== null && n !== undefined)
+    .map(Number);
+  if (getallen.some((n) => n < 0)) return "Een aantal kan niet negatief zijn.";
+
+  if (batchTotal(invoer, sjabloon.tracksQuality) <= 0) return "Vul een aantal groter dan nul in.";
+  return null;
+}
