@@ -5,12 +5,15 @@ import { z } from "zod";
 import { canManagePlanning } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { validateDateRange } from "@/lib/planning";
+import { dependencyError } from "@/lib/task-dependency-rules";
 
 const schema = z.object({
   name: z.string().trim().min(1),
   // Verplicht, anders van beide: een taak zonder datums kun je niet tekenen.
   startDate: z.string().min(1),
   endDate: z.string().min(1),
+  // Zodat je een nieuwe taak meteen achter een bestaande kunt hangen.
+  dependsOnIds: z.array(z.string()).optional(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,14 +41,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       select: { sortOrder: true },
     });
 
-    const taak = await prisma.projectTask.create({
-      data: {
-        projectId: id,
-        name: data.name,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        sortOrder: (laatste?.sortOrder ?? -1) + 1,
-      },
+    if (data.dependsOnIds) {
+      const koppelFout = await dependencyError(id, null, data.dependsOnIds);
+      if (koppelFout) return NextResponse.json({ error: koppelFout }, { status: 400 });
+    }
+
+    const taak = await prisma.$transaction(async (tx) => {
+      const nieuw = await tx.projectTask.create({
+        data: {
+          projectId: id,
+          name: data.name,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          sortOrder: (laatste?.sortOrder ?? -1) + 1,
+        },
+      });
+      if (data.dependsOnIds && data.dependsOnIds.length > 0) {
+        await tx.taskDependency.createMany({
+          data: data.dependsOnIds.map((dependsOnId) => ({ taskId: nieuw.id, dependsOnId })),
+        });
+      }
+      return nieuw;
     });
 
     return NextResponse.json(taak, { status: 201 });

@@ -13,6 +13,39 @@ import {
   groupByCustomer, projectBar, unplannedProjects, timelineWindow,
   barGeometry, todayOffsetPct, timelineHeader, type PlanningProject,
 } from "@/lib/planning";
+import { cycleThrough, shiftPlan, arrowPath, planningWarnings, type TaakSignaal } from "@/lib/task-dependencies";
+
+/**
+ * De taken waar deze taak op zou kunnen wachten: die van hetzelfde project,
+ * zichzelf niet meegerekend. Een aparte functie omdat TypeScript de soort van
+ * het venster anders niet meeneemt in de filter.
+ */
+function andereTaken(
+  venstertje: { soort: "taak-nieuw"; project: PlanningProject } | { soort: "taak-bewerk"; project: PlanningProject; taak: PlanningProject["tasks"][number] },
+) {
+  return venstertje.soort === "taak-bewerk"
+    ? venstertje.project.tasks.filter((t) => t.id !== venstertje.taak.id)
+    : venstertje.project.tasks;
+}
+
+/** Alle koppelingen van een project, in de vorm die task-dependencies verwacht. */
+function alleKoppelingen(project: PlanningProject) {
+  return project.tasks.flatMap((t) =>
+    (t.waitsOn ?? []).map((w) => ({ taskId: t.id, dependsOnId: w.dependsOnId })),
+  );
+}
+
+/**
+ * Kleur van de taakbalk aan de hand van de zwaarste markering. `te-vroeg` en
+ * `buiten-project` zijn een alarm; `verlopen` alleen is een gedempte hint —
+ * zonder een "gereed"-vlag is een afgelopen taak meestal gewoon afgerond werk,
+ * en die mag niet even hard opvallen als een echte schending.
+ */
+function taakKleur(signalen: TaakSignaal[] | undefined): string {
+  if (!signalen) return "bg-primary/50";
+  if (signalen.some((s) => s.soort !== "verlopen")) return "bg-destructive";
+  return "bg-muted-foreground/40";
+}
 
 /**
  * Pixels per dag per zoomstand. Alleen de totale breedte verandert; de plaatsing
@@ -26,6 +59,13 @@ const ZOOM = {
 type ZoomStand = keyof typeof ZOOM;
 
 const NAAMKOLOM_PX = 224;
+
+/**
+ * Vaste hoogte van een taakrij, inclusief de onderrand. Vast en niet door de
+ * inhoud bepaald, want de pijlen rekenen ermee: rij × deze hoogte is het
+ * middelpunt van de balk.
+ */
+const TAAKRIJ_PX = 25;
 
 export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [zoom, setZoom] = useState<ZoomStand>("maanden");
@@ -43,6 +83,15 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
   const [formNaam, setFormNaam] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEind, setFormEind] = useState("");
+  const [formWachtOp, setFormWachtOp] = useState<string[]>([]);
+  // Het voorgerekende overzicht, of null als er niets te verschuiven valt. De
+  // projectperiode staat er zelf bij: op het moment dat bewaar() dit vastlegt
+  // heeft hij het project nog in handen, en dat is betrouwbaarder dan hem later
+  // terugzoeken in `projects` — die prop is nog niet ververst, en bij een net
+  // aangemaakte taak staat diens id daar sowieso nog niet in.
+  const [verschuiving, setVerschuiving] = useState<
+    { taakId: string; regels: ReturnType<typeof shiftPlan>; periode: { start: Date; eind: Date } | null } | null
+  >(null);
 
   /** ISO voor een <input type="date">; die accepteert niets anders. */
   const isoVoorInvoer = (d: string | Date | null | undefined) =>
@@ -60,6 +109,7 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     setFormNaam("");
     setFormStart("");
     setFormEind("");
+    setFormWachtOp([]);
     setVenstertje({ soort: "taak-nieuw", project });
   }
 
@@ -68,11 +118,17 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     setFormNaam(taak.name);
     setFormStart(isoVoorInvoer(taak.startDate));
     setFormEind(isoVoorInvoer(taak.endDate));
+    setFormWachtOp(taak.waitsOn?.map((w) => w.dependsOnId) ?? []);
     setVenstertje({ soort: "taak-bewerk", project, taak });
   }
 
-  /** Eén plek voor elke schrijfactie: verstuurt, meldt de fout, en ververst bij succes. */
-  async function verstuur(url: string, method: string, body?: unknown) {
+  /**
+   * Eén plek voor elke schrijfactie: verstuurt, meldt de fout, en ververst bij
+   * succes. Geeft bij succes de json-respons terug (elke route antwoordt met
+   * json) zodat een aanroeper — zoals het aanmaken van een taak — bij het
+   * aangemaakte record kan; bij een fout is het `false`.
+   */
+  async function verstuur(url: string, method: string, body?: unknown): Promise<false | Record<string, unknown>> {
     setBezig(true);
     setFout("");
     const res = await fetch(url, {
@@ -87,7 +143,26 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
     }
     setVenstertje(null);
     router.refresh();
-    return true;
+    // Leeg object i.p.v. `true` bij een respons zonder json: zo blijft het
+    // returntype één vorm en hoeft een aanroeper niet ook nog `true` te verstaan.
+    return await res.json().catch(() => ({}));
+  }
+
+  /**
+   * Rekent voor of het net opgeslagene iets verderop in de keten laat
+   * verschuiven, en toont het overzicht alleen als dat daadwerkelijk zo is.
+   * Gedeeld door aanmaken én bewerken, want de rekenkunde erachter — shiftPlan
+   * over de eigen net-verstuurde gegevens heen, niet over wat er nog op het
+   * scherm staat — is voor allebei hetzelfde.
+   */
+  function toonVerschuivingAlsNodig(
+    taakId: string,
+    taken: Parameters<typeof shiftPlan>[0],
+    koppelingen: Parameters<typeof shiftPlan>[1],
+    periode: { start: Date; eind: Date } | null,
+  ) {
+    const regels = shiftPlan(taken, koppelingen);
+    if (regels.length > 0) setVerschuiving({ taakId, regels, periode });
   }
 
   async function bewaar() {
@@ -102,15 +177,66 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
       });
       return;
     }
+    const project = venstertje.project;
+    // Nu vastleggen, terwijl we het project nog rechtstreeks in handen hebben —
+    // niet pas bij het tonen van het overzicht ergens anders naar terugzoeken.
+    const periode =
+      project.plannedStart && project.plannedEnd
+        ? { start: new Date(project.plannedStart), eind: new Date(project.plannedEnd) }
+        : null;
     if (venstertje.soort === "taak-nieuw") {
-      await verstuur(`/api/projects/${venstertje.project.id}/tasks`, "POST", {
-        name: formNaam, startDate: formStart, endDate: formEind,
+      const nieuw = await verstuur(`/api/projects/${project.id}/tasks`, "POST", {
+        name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
       });
+      // Geen taak zonder id om mee door te rekenen — ook niet als de route ooit
+      // een body zonder id teruggeeft.
+      const nieuwId = nieuw && typeof nieuw.id === "string" ? nieuw.id : null;
+      if (!nieuwId) return;
+
+      // Dezelfde redenering als bij bewerken: de POST is al geslaagd, dus we
+      // rekenen door met de taken zoals ze op het scherm stonden, aangevuld met
+      // de nieuwe taak — met het echte id uit de respons, niet ervoor gegokt.
+      const taken = [
+        ...project.tasks,
+        { id: nieuwId, name: formNaam, startDate: formStart, endDate: formEind },
+      ];
+      const koppelingen = alleKoppelingen(project)
+        .concat(formWachtOp.map((dependsOnId) => ({ taskId: nieuwId, dependsOnId })));
+      toonVerschuivingAlsNodig(nieuwId, taken, koppelingen, periode);
       return;
     }
-    await verstuur(`/api/project-tasks/${venstertje.taak.id}`, "PUT", {
-      name: formNaam, startDate: formStart, endDate: formEind,
+    const taak = venstertje.taak;
+    const opgeslagen = await verstuur(`/api/project-tasks/${taak.id}`, "PUT", {
+      name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp,
     });
+    if (!opgeslagen) return;
+
+    // router.refresh() (in verstuur) haalt de verse gegevens pas later op; het
+    // scherm heeft ze nu nog niet. Reken het voorbeeld daarom door met wat we
+    // zelf net verstuurd hebben: deze taak met haar nieuwe datums, en haar
+    // koppelingen vervangen door wat er in de aanvinklijst stond.
+    const taken = project.tasks.map((t) =>
+      t.id === taak.id ? { ...t, startDate: formStart, endDate: formEind } : t,
+    );
+    const koppelingen = alleKoppelingen(project)
+      .filter((k) => k.taskId !== taak.id)
+      .concat(formWachtOp.map((dependsOnId) => ({ taskId: taak.id, dependsOnId })));
+    toonVerschuivingAlsNodig(taak.id, taken, koppelingen, periode);
+  }
+
+  /** "Alleen deze taak": het overzicht dicht, de keten blijft staan zoals hij stond. */
+  function alleenDezeTaak() {
+    setVerschuiving(null);
+    router.refresh();
+  }
+
+  /** "Alles verschuiven": dezelfde PUT nogmaals, nu met applyShift zodat de server de keten doorrekent. */
+  async function verschuifAlles() {
+    if (!verschuiving) return;
+    const ok = await verstuur(`/api/project-tasks/${verschuiving.taakId}`, "PUT", {
+      name: formNaam, startDate: formStart, endDate: formEind, dependsOnIds: formWachtOp, applyShift: true,
+    });
+    if (ok) setVerschuiving(null);
   }
 
   async function verwijderTaak(taakId: string) {
@@ -209,6 +335,11 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                   const bar = projectBar(project)!;
                   const geo = barGeometry(bar.start, bar.end, venster);
                   const uitgeklapt = open[project.id] ?? false;
+                  // Ook als het project is ingeklapt uitrekenen: de projectbalk zelf
+                  // moet altijd kunnen oplichten, niet pas na uitklappen.
+                  const { perTaak: signalen, projectLooptUit, projectUitleg } = planningWarnings(
+                    project, project.tasks, alleKoppelingen(project), vandaag,
+                  );
                   return (
                     <div key={project.id}>
                       <div className="flex items-stretch border-b">
@@ -241,50 +372,108 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                         <div className="relative shrink-0 py-2" style={{ width: breedte }}>
                           <button
                             type="button"
-                            className="absolute h-4 rounded bg-primary hover:bg-primary/80"
+                            className={`absolute h-4 rounded ${projectLooptUit ? "bg-destructive hover:bg-destructive/80" : "bg-primary hover:bg-primary/80"}`}
                             style={{ left: `${geo.leftPct}%`, width: `${geo.widthPct}%`, minWidth: 4 }}
-                            title={`${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`}
+                            title={[
+                              `${project.name} — ${formatDate(bar.start)} t/m ${formatDate(bar.end)} — klik om te plannen`,
+                              ...(projectUitleg ? [projectUitleg] : []),
+                            ].join("\n")}
                             onClick={() => openProject(project)}
                           />
                         </div>
                       </div>
 
-                      {uitgeklapt && project.tasks.map((taak) => {
-                        const tGeo = barGeometry(taak.startDate, taak.endDate, venster);
-                        return (
-                          <div key={taak.id} className="flex items-stretch border-b bg-muted/20">
-                            <div
-                              className="sticky left-0 z-[1] shrink-0 flex items-center gap-0.5 px-3 pl-8 py-1.5 text-sm bg-card"
-                              style={{ width: NAAMKOLOM_PX }}
-                            >
-                              <button
-                                type="button"
-                                className="truncate text-muted-foreground hover:text-foreground text-left flex-1"
-                                onClick={() => openTaak(project, taak)}
-                                title="Taak bewerken"
-                              >
-                                {taak.name}
-                              </button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omhoog" disabled={bezig} onClick={() => verplaats(taak.id, "up")}>
-                                <ChevronUp className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Omlaag" disabled={bezig} onClick={() => verplaats(taak.id, "down")}>
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" title="Verwijderen" disabled={bezig} onClick={() => verwijderTaak(taak.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
+                      {uitgeklapt && (
+                        // relative: draagt de pijlenlaag, die anders geen aanknopingspunt
+                        // heeft om zich op de taakrijen te leggen.
+                        <div className="relative">
+                          <svg
+                            className="absolute top-0 z-0 pointer-events-none text-muted-foreground"
+                            style={{
+                              left: NAAMKOLOM_PX,
+                              width: breedte,
+                              height: project.tasks.length * TAAKRIJ_PX,
+                            }}
+                          >
+                            {alleKoppelingen(project).map((koppeling) => {
+                              const vanIdx = project.tasks.findIndex((t) => t.id === koppeling.dependsOnId);
+                              const naarIdx = project.tasks.findIndex((t) => t.id === koppeling.taskId);
+                              // Beide kanten horen bij dit project; is dat toch niet zo,
+                              // dan is er niets te tekenen in plaats van een gok te wagen.
+                              if (vanIdx === -1 || naarIdx === -1) return null;
+                              const van = project.tasks[vanIdx];
+                              const naar = project.tasks[naarIdx];
+                              const punten = arrowPath(
+                                { ...barGeometry(van.startDate, van.endDate, venster), rij: vanIdx },
+                                { ...barGeometry(naar.startDate, naar.endDate, venster), rij: naarIdx },
+                                { breedte, rijHoogte: TAAKRIJ_PX },
+                              );
+                              const laatste = punten[punten.length - 1];
+                              // Geschonden: de opvolger begint op of vóór de einddatum van
+                              // de voorganger — die is dan nog niet klaar.
+                              const geschonden = new Date(naar.startDate) <= new Date(van.endDate);
+                              return (
+                                <g key={`${koppeling.dependsOnId}-${koppeling.taskId}`} className={geschonden ? "text-destructive" : undefined}>
+                                  <polyline
+                                    points={punten.map((p) => `${p.x},${p.y}`).join(" ")}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth={1.5}
+                                  />
+                                  <polygon
+                                    points={`${laatste.x},${laatste.y} ${laatste.x - 5},${laatste.y - 3} ${laatste.x - 5},${laatste.y + 3}`}
+                                    fill="currentColor"
+                                  />
+                                </g>
+                              );
+                            })}
+                          </svg>
+
+                          {project.tasks.map((taak) => {
+                            const tGeo = barGeometry(taak.startDate, taak.endDate, venster);
+                            return (
                               <div
-                                className="absolute h-3 rounded bg-primary/50"
-                                style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
-                                title={`${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                                key={taak.id}
+                                className="flex items-stretch border-b bg-muted/20"
+                                style={{ height: TAAKRIJ_PX }}
+                              >
+                                <div
+                                  className="sticky left-0 z-[1] shrink-0 flex items-center gap-0.5 px-3 pl-8 text-sm bg-card"
+                                  style={{ width: NAAMKOLOM_PX }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="truncate text-muted-foreground hover:text-foreground text-left flex-1"
+                                    onClick={() => openTaak(project, taak)}
+                                    title="Taak bewerken"
+                                  >
+                                    {taak.name}
+                                  </button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Omhoog" disabled={bezig} onClick={() => verplaats(taak.id, "up")}>
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Omlaag" disabled={bezig} onClick={() => verplaats(taak.id, "down")}>
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" title="Verwijderen" disabled={bezig} onClick={() => verwijderTaak(taak.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="relative shrink-0 py-1.5" style={{ width: breedte }}>
+                                  <div
+                                    className={`absolute h-3 rounded ${taakKleur(signalen[taak.id])}`}
+                                    style={{ left: `${tGeo.leftPct}%`, width: `${tGeo.widthPct}%`, minWidth: 4 }}
+                                    title={[
+                                      `${taak.name} — ${formatDate(taak.startDate)} t/m ${formatDate(taak.endDate)}`,
+                                      ...(signalen[taak.id] ?? []).map((s) => s.uitleg),
+                                    ].join("\n")}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -352,12 +541,90 @@ export function PlanningClient({ projects }: { projects: PlanningProject[] }) {
                 Laat allebei leeg om de balk de taken te laten volgen.
               </p>
             )}
+            {venstertje && venstertje.soort !== "project" && andereTaken(venstertje).length > 0 && (
+              <div className="space-y-1">
+                <Label>Wacht op</Label>
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+                  {andereTaken(venstertje).map((t) => {
+                      // Een keuze die een kringloop zou sluiten laten we zien maar
+                      // niet aanklikken, met de reden erbij — anders zoek je je
+                      // wezenloos naar waarom iets niet kan.
+                      const keten =
+                        venstertje.soort === "taak-bewerk"
+                          ? cycleThrough(alleKoppelingen(venstertje.project), venstertje.taak.id, t.id)
+                          : null;
+                      const naam = (id: string) =>
+                        venstertje.project.tasks.find((x) => x.id === id)?.name ?? "?";
+                      return (
+                        <label
+                          key={t.id}
+                          className={`flex items-center gap-2 text-sm ${keten ? "text-muted-foreground" : ""}`}
+                          title={keten ? `Zou een kringloop sluiten: ${keten.map(naam).join(" → ")}` : undefined}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-input accent-primary"
+                            disabled={Boolean(keten)}
+                            checked={formWachtOp.includes(t.id)}
+                            onChange={(e) =>
+                              setFormWachtOp((huidig) =>
+                                e.target.checked ? [...huidig, t.id] : huidig.filter((x) => x !== t.id),
+                              )
+                            }
+                          />
+                          <span className="truncate">{t.name}</span>
+                          {keten && <span className="text-xs">(kringloop)</span>}
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
             {fout && <p className="text-sm text-destructive">{fout}</p>}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setVenstertje(null)} disabled={bezig}>Annuleren</Button>
             <Button onClick={bewaar} disabled={bezig}>{bezig ? "Opslaan..." : "Opslaan"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={verschuiving !== null} onOpenChange={(o) => { if (!o) alleenDezeTaak(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Taken die meeschuiven</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {verschuiving?.regels.map((regel) => {
+              // Alleen relevant met een eigen projectperiode; zonder die spant
+              // de balk zich toch om de taken, dus dan kan niets uitsteken.
+              // De periode is al vastgelegd toen bewaar() het project nog in
+              // handen had (zie hierboven), niet hier achteraf teruggezocht.
+              const periode = verschuiving.periode;
+              const buitenPeriode =
+                periode !== null && (regel.naarStart < periode.start || regel.naarEind > periode.eind);
+              return (
+                <div key={regel.id} className="text-sm">
+                  <p className="truncate">{regel.name}</p>
+                  <p className="text-muted-foreground">
+                    {formatDate(regel.vanStart)} t/m {formatDate(regel.vanEind)}
+                    {" → "}
+                    {formatDate(regel.naarStart)} t/m {formatDate(regel.naarEind)}
+                  </p>
+                  {buitenPeriode && (
+                    <p className="text-destructive">Valt buiten de projectperiode</p>
+                  )}
+                </div>
+              );
+            })}
+            {fout && <p className="text-sm text-destructive">{fout}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={alleenDezeTaak} disabled={bezig}>Alleen deze taak</Button>
+            <Button onClick={verschuifAlles} disabled={bezig}>Alles verschuiven</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -19,6 +19,8 @@ export type PlanningTask = {
   startDate: string | Date;
   endDate: string | Date;
   sortOrder: number;
+  /** Waar deze taak op wacht. Alleen gevuld op het planningsscherm. */
+  waitsOn?: { dependsOnId: string }[];
 };
 
 export type PlanningProject = {
