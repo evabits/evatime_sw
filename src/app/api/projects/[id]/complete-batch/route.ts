@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { canCompleteRecurringBatch } from "@/lib/roles";
+import { canManageRecurringBatches } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { batchTotal, completeBatchDenial, recurringInvoiceDraft } from "@/lib/recurring";
 import { STANDAARD_BETALINGSTEKST } from "@/lib/invoice-defaults";
@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const session = await auth();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = (session.user as any)?.role ?? "EMPLOYEE";
-    if (!canCompleteRecurringBatch(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!canManageRecurringBatches(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { id } = await params;
     const data = schema.parse(await req.json());

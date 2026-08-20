@@ -26,7 +26,7 @@ export const ROLES = {
       leadStandup: true,
       managePlanning: true,
       manageRecurringTemplates: true,
-      completeRecurringBatch: true,
+      manageRecurringBatches: true,
     },
   },
   FINANCE: {
@@ -49,7 +49,7 @@ export const ROLES = {
       leadStandup: false,
       managePlanning: false,
       manageRecurringTemplates: false,
-      completeRecurringBatch: false,
+      manageRecurringBatches: false,
     },
   },
   TEAMLEAD: {
@@ -79,7 +79,7 @@ export const ROLES = {
       // (het werk is klaar), maar krijgt de factuur niet te zien. De
       // beheerder keurt goed en verstuurt.
       manageRecurringTemplates: false,
-      completeRecurringBatch: true,
+      manageRecurringBatches: true,
     },
   },
   EMPLOYEE: {
@@ -101,7 +101,7 @@ export const ROLES = {
       leadStandup: false,
       managePlanning: false,
       manageRecurringTemplates: false,
-      completeRecurringBatch: false,
+      manageRecurringBatches: false,
     },
   },
 } as const;
@@ -159,9 +159,10 @@ export function canManageRecurringTemplates(role: string): boolean {
 }
 
 /**
- * Een teamleider mag een batch afronden maar ziet de factuur niet: hij rondt het
- * werk af, de beheerder keurt goed en verstuurt.
+ * Een teamleider mag batches starten en afronden, maar niet de sjablonen
+ * aanpassen: hij draait het werk, de beheerder bepaalt de afspraken met de klant
+ * en keurt de factuur goed.
  */
-export function canCompleteRecurringBatch(role: string): boolean {
+export function canManageRecurringBatches(role: string): boolean {
   return role === "ADMIN" || role === "TEAMLEAD";
 }

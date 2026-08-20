@@ -241,60 +241,68 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
         <p className="text-muted-foreground">Terugkerend werk dat telkens hetzelfde factuurtje oplevert</p>
       </div>
 
-      {canManageTemplates && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Sjablonen</CardTitle>
+      {/* De sjablonenkaart is er voor iedereen die batches mag draaien: een
+          teamleider start ze hiervandaan. Alleen het beheer zelf — toevoegen,
+          wijzigen, archiveren — blijft bij de beheerder, want dat zijn de
+          afspraken met de klant. */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>Sjablonen</CardTitle>
+          {canManageTemplates && (
             <Button onClick={openCreateTemplate}>
               <Plus className="h-4 w-4 mr-2" /> Sjabloon toevoegen
             </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Naam</TableHead>
+                <TableHead>Klant</TableHead>
+                <TableHead>Facturatie</TableHead>
+                <TableHead className="text-right">Tarief</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {templates.length === 0 && (
                 <TableRow>
-                  <TableHead>Naam</TableHead>
-                  <TableHead>Klant</TableHead>
-                  <TableHead>Facturatie</TableHead>
-                  <TableHead className="text-right">Tarief</TableHead>
-                  <TableHead></TableHead>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen sjablonen</TableCell>
-                  </TableRow>
-                )}
-                {templates.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell>{t.customer?.name}</TableCell>
-                    <TableCell>
-                      {BILLING_LABELS[t.billing] ?? t.billing}
-                      {t.tracksQuality && <span className="text-xs text-muted-foreground"> (goed-/afkeur)</span>}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" onClick={() => openStartBatch(t)} title="Nieuwe batch starten">
-                          <Repeat className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)} title="Wijzigen">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => archiveTemplate(t.id)} title="Archiveren">
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+              )}
+              {templates.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableCell>{t.customer?.name}</TableCell>
+                  <TableCell>
+                    {BILLING_LABELS[t.billing] ?? t.billing}
+                    {t.tracksQuality && <span className="text-xs text-muted-foreground"> (goed-/afkeur)</span>}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 justify-end">
+                      <Button variant="ghost" size="icon" onClick={() => openStartBatch(t)} title="Nieuwe batch starten">
+                        <Repeat className="h-3.5 w-3.5" />
+                      </Button>
+                      {canManageTemplates && (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)} title="Wijzigen">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => archiveTemplate(t.id)} title="Archiveren">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

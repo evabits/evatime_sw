@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { serialize } from "@/lib/utils";
-import { canCompleteRecurringBatch, canManageRecurringTemplates } from "@/lib/roles";
+import { canManageRecurringBatches, canManageRecurringTemplates } from "@/lib/roles";
 import { RecurringClient } from "@/components/recurring/recurring-client";
 
 export default async function HerhaalprojectenPage() {
@@ -10,7 +10,7 @@ export default async function HerhaalprojectenPage() {
   const role = (session?.user as any)?.role ?? "EMPLOYEE";
   // Een teamleider mag alleen batches voltooien; een sjabloonbeheerder (admin)
   // mag dat ook. Wie geen van beide mag, hoort hier niet.
-  if (!canCompleteRecurringBatch(role)) redirect("/");
+  if (!canManageRecurringBatches(role)) redirect("/");
 
   const [templates, batches, customers] = await Promise.all([
     prisma.recurringTemplate.findMany({
