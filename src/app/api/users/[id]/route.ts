@@ -6,7 +6,9 @@ import { hash } from "bcryptjs";
 import { handleError } from "@/lib/api";
 import {
   vacationOpeningDateField, vacationOpeningUsedField, weeklyHoursField, workLevelField,
+  overtimeOpeningDateField, overtimeOpeningHoursField,
 } from "@/lib/user-schema";
+import { validateOpeningDate } from "@/lib/overtime";
 
 const updateSchema = z.object({
   name: z.string().min(1),
@@ -17,11 +19,14 @@ const updateSchema = z.object({
   workLevel: workLevelField,
   vacationOpeningDate: vacationOpeningDateField,
   vacationOpeningUsed: vacationOpeningUsedField,
+  overtimeOpeningDate: overtimeOpeningDateField,
+  overtimeOpeningHours: overtimeOpeningHoursField,
 });
 
 const userSelect = {
   id: true, name: true, email: true, role: true, weeklyHours: true, workLevel: true,
   vacationOpeningDate: true, vacationOpeningUsed: true,
+  overtimeOpeningDate: true, overtimeOpeningHours: true,
   createdAt: true, archivedAt: true,
 } as const;
 
@@ -35,6 +40,10 @@ function serializeUser(u: { weeklyHours: any } & Record<string, any>) {
       ? u.vacationOpeningDate.toISOString().slice(0, 10)
       : null,
     vacationOpeningUsed: u.vacationOpeningUsed != null ? Number(u.vacationOpeningUsed) : null,
+    overtimeOpeningDate: u.overtimeOpeningDate
+      ? u.overtimeOpeningDate.toISOString().slice(0, 10)
+      : null,
+    overtimeOpeningHours: u.overtimeOpeningHours != null ? Number(u.overtimeOpeningHours) : null,
   };
 }
 
@@ -54,6 +63,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!isAdmin && data.role !== (currentUser?.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    const peilFout = validateOpeningDate(data.overtimeOpeningDate);
+    if (peilFout) return NextResponse.json({ error: peilFout }, { status: 400 });
 
     const updateData: any = { name: data.name, email: data.email };
     if (isAdmin) {
@@ -66,6 +77,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         ? new Date(`${data.vacationOpeningDate}T00:00:00Z`)
         : null;
       updateData.vacationOpeningUsed = data.vacationOpeningUsed ?? null;
+      updateData.overtimeOpeningDate = data.overtimeOpeningDate
+        ? new Date(`${data.overtimeOpeningDate}T00:00:00Z`)
+        : null;
+      updateData.overtimeOpeningHours = data.overtimeOpeningHours ?? null;
     }
     if (data.password) updateData.password = await hash(data.password, 12);
 
