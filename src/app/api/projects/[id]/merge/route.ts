@@ -60,8 +60,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Dat zijn de vier registratiemodellen. ProjectMember wordt hieronder
     // eerst gekopieerd naar het doel en verdwijnt daarna vanzelf mee met het
     // verwijderen van de bron (Cascade); ProjectTask wordt verplaatst, want
-    // planning hoort bij het werk en niet bij de prijsafspraken. Twee andere
-    // relaties op Project zijn ook Cascade en gaan bewust NIET mee:
+    // planning hoort bij het werk en niet bij de prijsafspraken.
+    //
+    // TaskDependency verhuist niet apart mee en hoeft dat ook niet: een
+    // koppeling wijst naar twee taken en niet naar een project, en beide
+    // uiteinden verhuizen hierboven samen. Wie die regel ooit weghaalt of
+    // splitst, breekt daarmee ook de afhankelijkheden.
+    //
+    // Twee andere relaties op Project zijn ook Cascade en gaan bewust NIET mee:
     // ProjectLevelRate en de tags-koppeling worden stilletjes verwijderd, niet
     // verplaatst. Dat is geen gat maar het
     // ontwerp — een conceptproject kan tarieven en tags hebben (admin-only, zie

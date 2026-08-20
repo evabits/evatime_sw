@@ -5,11 +5,19 @@ import { z } from "zod";
 import { canManagePlanning } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { validateDateRange, swapOrder } from "@/lib/planning";
+import { shiftPlan } from "@/lib/task-dependencies";
+import { dependencyError } from "@/lib/task-dependency-rules";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
+  // De volledige nieuwe verzameling koppelingen van deze taak; wat er niet in
+  // staat, vervalt. Afwezig betekent "laat ze met rust".
+  dependsOnIds: z.array(z.string()).optional(),
+  // Of de keten achter deze taak mee mag schuiven. Het scherm heeft dat al
+  // voorgerekend en laten bevestigen; de server rekent het opnieuw uit.
+  applyShift: z.boolean().optional(),
 });
 
 const moveSchema = z.object({ move: z.enum(["up", "down"]) });
@@ -36,14 +44,55 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const datumFout = validateDateRange(data.startDate, data.endDate);
     if (datumFout) return NextResponse.json({ error: datumFout }, { status: 400 });
 
-    const bijgewerkt = await prisma.projectTask.update({
-      where: { id: taak!.id },
-      data: {
-        name: data.name,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-      },
+    if (data.dependsOnIds) {
+      const koppelFout = await dependencyError(taak!.projectId, taak!.id, data.dependsOnIds);
+      if (koppelFout) return NextResponse.json({ error: koppelFout }, { status: 400 });
+    }
+
+    const bijgewerkt = await prisma.$transaction(async (tx) => {
+      const taakNa = await tx.projectTask.update({
+        where: { id: taak!.id },
+        data: {
+          name: data.name,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+        },
+      });
+
+      if (data.dependsOnIds) {
+        // Vervangen, niet aanvullen: het scherm stuurt de volledige lijst.
+        await tx.taskDependency.deleteMany({ where: { taskId: taak!.id } });
+        if (data.dependsOnIds.length > 0) {
+          await tx.taskDependency.createMany({
+            data: data.dependsOnIds.map((dependsOnId) => ({ taskId: taak!.id, dependsOnId })),
+          });
+        }
+      }
+
+      if (data.applyShift) {
+        // Opnieuw doorrekenen met onze eigen gegevens. Het scherm heeft alleen
+        // het voorbeeld getekend; wat het stuurt is geen bewijs.
+        const [taken, koppelingen] = await Promise.all([
+          tx.projectTask.findMany({
+            where: { projectId: taak!.projectId },
+            select: { id: true, name: true, startDate: true, endDate: true },
+          }),
+          tx.taskDependency.findMany({
+            where: { task: { projectId: taak!.projectId } },
+            select: { taskId: true, dependsOnId: true },
+          }),
+        ]);
+        for (const verschoven of shiftPlan(taken, koppelingen)) {
+          await tx.projectTask.update({
+            where: { id: verschoven.id },
+            data: { startDate: verschoven.naarStart, endDate: verschoven.naarEind },
+          });
+        }
+      }
+
+      return taakNa;
     });
+
     return NextResponse.json(bijgewerkt);
   } catch (e) { return handleError(e); }
 }
