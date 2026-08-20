@@ -56,6 +56,24 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   return `${formatDate(d)} ${tijd}`;
 }
 
+/**
+ * Uren als decimaal getal in Nederlandse notatie: `1,5` in plaats van `1:30`.
+ *
+ * Voor de loonverwerking, waar de getallen overgetypt worden in een
+ * salarissysteem dat met decimalen rekent — daar is `1:30` een uitnodiging tot
+ * een rekenfout. De urenschermen houden `formatHours`: bij het invullen van je
+ * dag denk je in uren en minuten.
+ *
+ * Nullen achter de komma vallen weg, dus `8` blijft `8` en `177,14` blijft
+ * `177,14`.
+ */
+export function formatHoursDecimal(hours: number | string | null | undefined): string {
+  if (hours === null || hours === undefined) return "0";
+  const num = typeof hours === "string" ? parseFloat(hours) : hours;
+  if (Number.isNaN(num)) return "0";
+  return num.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
+}
+
 export function formatHours(hours: number | string | null | undefined): string {
   if (hours === null || hours === undefined) return "0:00";
   const num = typeof hours === "string" ? parseFloat(hours) : hours;

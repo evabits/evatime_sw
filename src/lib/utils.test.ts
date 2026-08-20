@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDate, formatDateTime } from "./utils";
+import { formatDate, formatDateTime, formatHoursDecimal } from "./utils";
 
 describe("formatDate", () => {
   it("writes a date as DD-MMM-YYYY with the month spelled out short", () => {
@@ -42,5 +42,39 @@ describe("formatDateTime", () => {
 
   it("gives nothing for an empty date", () => {
     expect(formatDateTime(null)).toBe("");
+  });
+});
+
+describe("formatHoursDecimal", () => {
+  it("writes a half hour as a decimal, not as minutes", () => {
+    // Dit is het hele punt: 1:30 wordt 1,5.
+    expect(formatHoursDecimal(1.5)).toBe("1,5");
+  });
+
+  it("uses a comma, because this is a Dutch screen", () => {
+    expect(formatHoursDecimal(177.14)).toBe("177,14");
+  });
+
+  it("drops trailing zeros, so a whole number stays whole", () => {
+    expect(formatHoursDecimal(8)).toBe("8");
+    expect(formatHoursDecimal(8.0)).toBe("8");
+  });
+
+  it("rounds to two decimals", () => {
+    expect(formatHoursDecimal(1.005)).toBe("1,01");
+  });
+
+  it("keeps the sign on a shortfall", () => {
+    expect(formatHoursDecimal(-2.25)).toBe("-2,25");
+  });
+
+  it("copes with Decimal arriving as a string", () => {
+    expect(formatHoursDecimal("167.25")).toBe("167,25");
+  });
+
+  it("falls back to zero for nothing at all", () => {
+    expect(formatHoursDecimal(null)).toBe("0");
+    expect(formatHoursDecimal(undefined)).toBe("0");
+    expect(formatHoursDecimal("onzin")).toBe("0");
   });
 });

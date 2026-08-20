@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { MemberPicker } from "@/components/shared/member-picker";
-import { formatHours } from "@/lib/utils";
+import { formatHoursDecimal } from "@/lib/utils";
 import { readHiddenIds, hiddenStorageKey } from "@/lib/hidden-members";
 
 type ContractType = "PERMANENT" | "FIXED_TERM" | "ZERO_HOURS";
@@ -144,10 +144,10 @@ export function PayrollClient({ userId }: { userId: string }) {
                       <span className="text-muted-foreground"> · {row.contractHours}u/wk</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatHours(row.workedHours)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatHours(row.wbsoHours)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatHoursDecimal(row.workedHours)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatHoursDecimal(row.wbsoHours)}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {row.overtime != null ? formatHours(row.overtime) : <span className="text-muted-foreground">—</span>}
+                    {row.overtime != null ? formatHoursDecimal(row.overtime) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-right font-mono">{row.km.toLocaleString("nl-NL")} km</TableCell>
                 </TableRow>
