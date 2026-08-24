@@ -514,6 +514,9 @@ model Quote {
   issueDate   DateTime          @db.Date
   validUntil  DateTime          @db.Date
   status      QuoteStatus       @default(DRAFT)
+  /// De t.a.v.-regel op deze offerte. Leeg betekent geen t.a.v.-regel; null
+  /// betekent dat er nooit iets is ingevuld en dat die van de klant geldt.
+  attention   String?
   reference   String?
   subject     String?
   notes       String?

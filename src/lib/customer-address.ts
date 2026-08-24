@@ -20,14 +20,24 @@ export type CustomerForAddress = {
  *
  * De t.a.v.-regel staat direct onder de naam en alleen als er iemand is
  * ingevuld. Postcode en plaats delen een regel, zoals op een envelop.
+ *
+ * Een document mag zijn eigen t.a.v. meegeven: een offerte gaat soms naar een
+ * andere contactpersoon dan de klantgegevens zeggen, en daarvoor horen die
+ * gegevens niet aangepast te worden. Het onderscheid is opzet — `null` of
+ * `undefined` betekent "niets ingevuld, neem die van de klant", een lege string
+ * betekent "op dit document geen t.a.v.-regel". Zonder dat onderscheid zou elk
+ * bestaand document zijn t.a.v.-regel kwijtraken of hem nooit kwijt kunnen.
  */
-export function customerAddressLines(customer: CustomerForAddress | null | undefined): string[] {
+export function customerAddressLines(
+  customer: CustomerForAddress | null | undefined,
+  attention?: string | null,
+): string[] {
   if (!customer) return [];
 
   const schoon = (v: string | null | undefined) => v?.trim() || "";
   const regels = [schoon(customer.name)];
 
-  const tav = schoon(customer.attention);
+  const tav = schoon(attention === null || attention === undefined ? customer.attention : attention);
   if (tav) regels.push(`T.a.v. ${tav}`);
 
   regels.push(schoon(customer.address));

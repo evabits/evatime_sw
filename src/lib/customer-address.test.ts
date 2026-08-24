@@ -10,6 +10,38 @@ const klant = {
   country: "Nederland",
 };
 
+describe("customerAddressLines met een eigen t.a.v.", () => {
+  it("lets the document override the customer's attention line", () => {
+    // Een offerte gaat soms naar een andere contactpersoon dan de klantgegevens
+    // zeggen, zonder dat die gegevens daarvoor aangepast horen te worden.
+    expect(customerAddressLines(klant, "Jan de Vries")).toEqual([
+      "Acquaint B.V.",
+      "T.a.v. Jan de Vries",
+      "Hoofdstraat 12",
+      "7411 AB Deventer",
+      "Nederland",
+    ]);
+  });
+
+  it("drops the attention line when the document explicitly clears it", () => {
+    // Leeg is een keuze: op déze offerte geen t.a.v.-regel.
+    expect(customerAddressLines(klant, "")).not.toContain("T.a.v. Afdeling Inkoop");
+    expect(customerAddressLines(klant, "   ")).toEqual([
+      "Acquaint B.V.",
+      "Hoofdstraat 12",
+      "7411 AB Deventer",
+      "Nederland",
+    ]);
+  });
+
+  it("falls back to the customer when the document never set one", () => {
+    // null en undefined betekenen "niets ingevuld", niet "geen t.a.v." — anders
+    // zouden alle bestaande offertes hun t.a.v.-regel kwijtraken.
+    expect(customerAddressLines(klant, null)).toContain("T.a.v. Afdeling Inkoop");
+    expect(customerAddressLines(klant, undefined)).toContain("T.a.v. Afdeling Inkoop");
+  });
+});
+
 describe("customerAddressLines", () => {
   it("puts the attention line under the name and above the address", () => {
     expect(customerAddressLines(klant)).toEqual([
