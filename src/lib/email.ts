@@ -266,7 +266,7 @@ export async function sendReviewPlannedEmail(
   await transport.sendMail({ from, to: employee.email, subject: `Functioneringsgesprek gepland (${review.period})`, html });
 }
 
-export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
+export async function sendQuoteEmail(quote: any, settings: any, naar?: string): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
@@ -332,7 +332,9 @@ export async function sendQuoteEmail(quote: any, settings: any): Promise<void> {
 
   await transport.sendMail({
     from,
-    to: quote.customer.email,
+    // Een meegegeven adres wint van dat in de klantgegevens; de aanroeper heeft
+    // dan bewust een ander adres gekozen voor deze ene verzending.
+    to: naar ?? quote.customer.email,
     ...customerMailCopy(settings),
     subject: `Offerte ${quote.quoteNumber}${quote.subject ? ` — ${quote.subject}` : ""}`,
     html,

@@ -49,7 +49,7 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
         )}
         <View style={s.row}>
           <View style={s.addressBlock}>
-            {customerAddressLines(quote.customer).map((regel, i) => (
+            {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
               <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
           </View>

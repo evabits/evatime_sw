@@ -45,6 +45,9 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  // Het adres waar deze verzending naartoe gaat. Voorgevuld met dat van de klant
+  // en alleen voor deze ene verzending; het wordt niet bewaard.
+  const [sendEmail, setSendEmail] = useState("");
   const [converting, setConverting] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -54,6 +57,10 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
   const [validUntil, setValidUntil] = useState(format(new Date(quote.validUntil), "yyyy-MM-dd"));
   const [vatRate, setVatRate] = useState(Number(quote.vatRate));
   const [notes, setNotes] = useState(quote.notes ?? "");
+  // Voorgevuld met de t.a.v. van de klant zolang deze offerte er zelf geen
+  // heeft: je hoeft hem alleen aan te passen als hij afwijkt. Leeg opslaan is
+  // een keuze en betekent op déze offerte geen t.a.v.-regel.
+  const [attention, setAttention] = useState(quote.attention ?? quote.customer?.attention ?? "");
   const [reference, setReference] = useState(quote.reference ?? "");
   const [subject, setSubject] = useState(quote.subject ?? "");
   const [lines, setLines] = useState<Line[]>(
@@ -96,6 +103,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     setValidUntil(format(new Date(quote.validUntil), "yyyy-MM-dd"));
     setVatRate(Number(quote.vatRate));
     setNotes(quote.notes ?? "");
+    setAttention(quote.attention ?? quote.customer?.attention ?? "");
     setReference(quote.reference ?? "");
     setSubject(quote.subject ?? "");
   }
@@ -106,7 +114,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     const res = await fetch(`/api/quotes/${quote.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, reference, subject, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, attention, reference, subject, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -139,7 +147,11 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     setConfirmSend(false);
     setSending(true);
     setError("");
-    const res = await fetch(`/api/quotes/${quote.id}/send`, { method: "POST" });
+    const res = await fetch(`/api/quotes/${quote.id}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: sendEmail.trim() || undefined }),
+    });
     setSending(false);
     if (res.ok) {
       const data = await res.json();
@@ -235,7 +247,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
                 </Select>
               )}
               {(quote.status === "DRAFT" || quote.status === "SENT") && quote.customer?.email && (
-                <Button variant="outline" onClick={() => setConfirmSend(true)} disabled={sending}>
+                <Button variant="outline" onClick={() => { setSendEmail(quote.customer?.email ?? ""); setConfirmSend(true); }} disabled={sending}>
                   <Mail className="h-4 w-4 mr-2" /> {sending ? "Verzenden..." : "Verzenden"}
                 </Button>
               )}
@@ -286,7 +298,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Aan</p>
               <div className="text-sm space-y-0.5">
-                {customerAddressLines(quote.customer).map((regel, i) => (
+                {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
                   <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{regel}</p>
                 ))}
                 {quote.customer?.vatNumber && <p className="text-muted-foreground">BTW: {quote.customer.vatNumber}</p>}
@@ -314,6 +326,12 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 border-t pt-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">T.a.v.</p>
+              {editing
+                ? <Input value={attention} onChange={(e) => setAttention(e.target.value)} placeholder="Leeg laten voor geen t.a.v." className="h-7 text-sm" />
+                : <p className="text-sm">{(quote.attention ?? quote.customer?.attention) || <span className="text-muted-foreground italic">—</span>}</p>}
+            </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Kenmerk</p>
               {editing ? <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optioneel" className="h-7 text-sm" /> : <p className="text-sm">{quote.reference || <span className="text-muted-foreground italic">—</span>}</p>}
@@ -477,7 +495,11 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
             <DialogTitle>Offerte verzenden</DialogTitle>
             <DialogDescription>De offerte wordt per e-mail verstuurd naar:</DialogDescription>
           </DialogHeader>
-          <p className="font-medium text-sm">{quote.customer?.email}</p>
+          {/* Invulveld en geen vaste tekst: een offerte gaat lang niet altijd
+              naar het adres uit de klantgegevens. Wat hier staat geldt alleen
+              voor deze verzending. */}
+          <Input type="email" value={sendEmail} onChange={(e) => setSendEmail(e.target.value)}
+            placeholder="naam@bedrijf.nl" className="text-sm" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmSend(false)}>Annuleren</Button>
             <Button onClick={sendQuote}>Verzenden</Button>

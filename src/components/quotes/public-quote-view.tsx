@@ -64,7 +64,7 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         )}
         <div className="top-header">
           <div className="address-block">
-            {customerAddressLines(quote.customer).map((regel, i) => (
+            {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
               <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>

@@ -2,16 +2,25 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
+import { z } from "zod";
 import { isAdmin } from "@/lib/roles";
 import { sendQuoteEmail } from "@/lib/email";
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+// Een offerte gaat niet altijd naar het adres in de klantgegevens: soms naar een
+// projectleider, soms naar een inkoopafdeling. Dit geldt alleen voor deze
+// verzending en wordt niet bewaard.
+const schema = z.object({ email: z.string().trim().optional() });
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session || !isAdmin((session.user as any)?.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id } = await params;
+    // Een verzoek zonder body is een verzending naar het adres van de klant,
+    // zoals het altijd al ging.
+    const { email } = schema.parse(await req.json().catch(() => ({})));
 
     const [quote, settings] = await Promise.all([
       prisma.quote.findUnique({
@@ -26,10 +35,17 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     ]);
 
     if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (!quote.customer.email) return NextResponse.json({ error: "Klant heeft geen e-mailadres" }, { status: 400 });
+    // Eigen controle en geen zod .email(): die levert via handleError de Engelse
+    // melding "Validation failed" op, en dit scherm is Nederlands.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Geen geldig e-mailadres" }, { status: 400 });
+    }
+
+    const naar = email || quote.customer.email;
+    if (!naar) return NextResponse.json({ error: "Klant heeft geen e-mailadres" }, { status: 400 });
 
     try {
-      await sendQuoteEmail(quote, settings);
+      await sendQuoteEmail(quote, settings, naar);
     } catch (e) {
       // Net als bij de factuur: de reden van de mailserver in beeld in plaats
       // van een kale "Internal server error".
