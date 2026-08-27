@@ -126,8 +126,8 @@ export function OvertimeClient({ user, lines, saldo, lopend }: Props) {
 
   async function saveAdjustment() {
     // Vóór het versturen controleren: zonder dit komt een leeg verplicht veld
-    // terug als de generieke zod-fout "Validation failed" van handleError, in
-    // het Engels en zonder aan te wijzen welk veld het is.
+    // terug als de zod-fout van handleError, die wel het veldpad noemt maar niet
+    // in de woorden van dit scherm.
     if (!adjustDate) {
       setAdjustError("Vul een datum in");
       return;

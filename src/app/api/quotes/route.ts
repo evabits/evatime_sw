@@ -7,8 +7,11 @@ import { isAdmin } from "@/lib/roles";
 
 const lineSchema = z.object({
   description: z.string().min(1),
-  quantity: z.number().positive(),
-  unitPrice: z.number().positive(),
+  // Geen .positive(): een regel van € 0,00 (of een negatieve kortingsregel) is
+  // toegestaan, en de bewerk-route accepteert die al. Stond dat verschil er wel,
+  // dan kon je zo'n regel wel opslaan maar het document er niet mee aanmaken.
+  quantity: z.number(),
+  unitPrice: z.number(),
 });
 
 const schema = z.object({
