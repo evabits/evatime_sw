@@ -35,8 +35,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ]);
 
     if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    // Eigen controle en geen zod .email(): die levert via handleError de Engelse
-    // melding "Validation failed" op, en dit scherm is Nederlands.
+    // Eigen controle en geen zod .email(): handleError noemt wel het veld, maar
+    // "Controleer de invoer: email" zegt niet dat het adres zelf ongeldig is.
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Geen geldig e-mailadres" }, { status: 400 });
     }

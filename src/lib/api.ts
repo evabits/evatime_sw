@@ -5,9 +5,23 @@ import { prisma } from "./prisma";
 import { isProjectMember } from "./project-members";
 import { canonicalizeTagNames } from "./tags";
 
+/**
+ * Maakt van zod-issues een leesbare melding. Het kale "Validation failed" zei
+ * niet welk veld fout was, waardoor een gebruiker alleen kon gokken; de paden
+ * blijven technisch ("lines.0.unitPrice") maar wijzen wel de regel aan.
+ */
+export function zodErrorMessage(issues: { path: PropertyKey[] }[]): string {
+  const velden = [...new Set(issues.map((i) => i.path.map(String).join(".")).filter(Boolean))];
+  if (velden.length === 0) return "Controleer de invoer";
+  return `Controleer de invoer: ${velden.join(", ")}`;
+}
+
 export function handleError(error: unknown) {
   if (error instanceof ZodError) {
-    return NextResponse.json({ error: "Validation failed", issues: error.issues }, { status: 400 });
+    return NextResponse.json(
+      { error: zodErrorMessage(error.issues), issues: error.issues },
+      { status: 400 },
+    );
   }
   // Een unieke sleutel die botst is geen serverfout maar een invoerfout: de
   // gebruiker heeft een waarde ingevuld die al bestaat. Zonder deze tak kreeg

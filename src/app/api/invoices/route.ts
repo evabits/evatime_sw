@@ -10,8 +10,11 @@ import { head } from "@vercel/blob";
 
 const lineSchema = z.object({
   description: z.string().min(1),
-  quantity: z.number().positive(),
-  unitPrice: z.number().positive(),
+  // Geen .positive(): een regel van € 0,00 (of een negatieve kortingsregel) is
+  // toegestaan, en de bewerk-route accepteert die al. Stond dat verschil er wel,
+  // dan kon je zo'n regel wel opslaan maar het document er niet mee aanmaken.
+  quantity: z.number(),
+  unitPrice: z.number(),
   lineType: z.enum(["HOURS", "KM", "OTHER", "EXPENSE"]),
   timeEntryIds: z.array(z.string()).optional(),
   kmEntryIds: z.array(z.string()).optional(),
