@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/utils";
+import { REVIEW_STATUS_LABELS, REVIEW_STATUS_VARIANTS } from "@/lib/reviews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,18 +44,6 @@ interface Review {
   reviewer: { id: string; name: string | null } | null;
   createdAt: string;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  PLANNED: "Gepland",
-  SELF_COMPLETED: "Zelfreflectie ingediend",
-  COMPLETED: "Afgerond",
-};
-
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
-  PLANNED: "outline",
-  SELF_COMPLETED: "secondary",
-  COMPLETED: "default",
-};
 
 function allQuestions(snapshot: { sections: Section[] }) {
   return snapshot.sections.flatMap((s) => s.questions);
@@ -328,8 +317,8 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-sm">{r.period}</TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANTS[r.status] ?? "outline"}>
-                        {STATUS_LABELS[r.status] ?? r.status}
+                      <Badge variant={REVIEW_STATUS_VARIANTS[r.status] ?? "outline"}>
+                        {REVIEW_STATUS_LABELS[r.status] ?? r.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{r.plannedDate ? formatDate(r.plannedDate) : <span className="text-muted-foreground">—</span>}</TableCell>
@@ -395,8 +384,8 @@ export function ReviewsAdminClient({ userId, initialReviews }: { userId: string;
             <DialogTitle>
               Functioneringsgesprek {editorReview?.period}
               {editorReview && (
-                <Badge variant={STATUS_VARIANTS[editorReview.status] ?? "outline"} className="ml-2">
-                  {STATUS_LABELS[editorReview.status] ?? editorReview.status}
+                <Badge variant={REVIEW_STATUS_VARIANTS[editorReview.status] ?? "outline"} className="ml-2">
+                  {REVIEW_STATUS_LABELS[editorReview.status] ?? editorReview.status}
                 </Badge>
               )}
             </DialogTitle>

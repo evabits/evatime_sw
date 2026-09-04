@@ -12,7 +12,12 @@ export default async function PersoneelPage() {
   const users = await prisma.user.findMany({
     where: { archivedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, role: true, contracts: { select: contractSelect } },
+    select: {
+      id: true, name: true, email: true, role: true, contracts: { select: contractSelect },
+      // Alleen het lopende gesprek. De periode is "2026-Q3", dus aflopend
+      // sorteren op die tekst geeft het laatste gesprek bovenaan.
+      reviews: { orderBy: { period: "desc" }, take: 1, select: { period: true, status: true } },
+    },
   });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -25,6 +30,7 @@ export default async function PersoneelPage() {
       salaryMonthly: current?.salaryMonthly ?? null,
       contractType: current?.contractType ?? null,
       endDate: current?.endDate ?? null,
+      review: u.reviews[0] ?? null,
     };
   });
 
