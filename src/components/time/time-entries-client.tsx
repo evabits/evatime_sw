@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -70,6 +71,11 @@ interface Props {
 export function TimeEntriesClient({ projects: projectsProp, customers, users, initialEntries, userId, role, currentUserLevel, workSchedule, commuteTemplate }: Props) {
   const isAdmin = role === "ADMIN";
 
+  // Voor de meldingenstrook in de layout: die draait niet opnieuw bij
+  // client-navigatie, dus na het boeken van uren moet hij hier op zijn kop
+  // gezet worden. Anders blijft "je uren zijn niet compleet" staan terwijl je
+  // ze net hebt ingevuld.
+  const router = useRouter();
   const [projects, setProjects] = useState(projectsProp);
   const [entries, setEntries] = useState(initialEntries);
   const [editing, setEditing] = useState<string | null>(null);
@@ -467,6 +473,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           body: JSON.stringify(payload),
         });
         if (res.ok) {
+          router.refresh();
           setEditing(null);
           // Net als bij Annuleren en bij het toevoegen: het formulier is hierna
           // weer een leeg toevoegformulier, dus alles hoort leeg.
@@ -490,6 +497,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           body: JSON.stringify(payload),
         });
         if (res.ok) {
+          router.refresh();
           const targetUser = data.userId ?? userId;
           const switchedFilter =
             isAdmin && targetUser !== userId && filterUser !== "all" && filterUser !== targetUser;
@@ -524,6 +532,7 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
   async function deleteEntry(id: string) {
     if (!confirm("Weet u zeker dat u deze registratie wilt verwijderen?")) return;
     await fetch(`/api/time/${id}`, { method: "DELETE" });
+    router.refresh();
     setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 

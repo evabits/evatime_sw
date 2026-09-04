@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scheduledHoursOn, targetSoFar, weekTotal, toWeekSchedule, missingHours } from "./work-schedule";
+import { scheduledHoursOn, targetSoFar, targetBefore, weekTotal, toWeekSchedule, missingHours } from "./work-schedule";
 
 // Merlijn werkt 32 uur: maandag t/m donderdag acht uur, vrijdag vrij.
 const MERLIJN = { monday: 8, tuesday: 8, wednesday: 8, thursday: 8, friday: 0 };
@@ -134,5 +134,27 @@ describe("missingHours", () => {
     // Decimal(4,2)-sommen landen net naast een rond getal; zonder afronding
     // zou hier 0.7999999999999998 uit komen.
     expect(missingHours(6.4, 5.6, false)).toBe(0.8);
+  });
+});
+
+describe("targetBefore", () => {
+  const rooster = { monday: 8, tuesday: 8, wednesday: 8, thursday: 4, friday: 0 };
+
+  it("telt de dag zelf niet mee: maandag verwacht nog niets", () => {
+    // 2026-09-07 is een maandag.
+    expect(targetBefore(rooster, "2026-09-07")).toBe(0);
+  });
+
+  it("telt op dinsdag alleen maandag", () => {
+    expect(targetBefore(rooster, "2026-09-08")).toBe(8);
+  });
+
+  it("telt op vrijdag de vier dagen ervoor", () => {
+    expect(targetBefore(rooster, "2026-09-11")).toBe(28);
+  });
+
+  it("verwacht in het weekend de hele week, ook op zondag", () => {
+    expect(targetBefore(rooster, "2026-09-12")).toBe(28);
+    expect(targetBefore(rooster, "2026-09-13")).toBe(28);
   });
 });
