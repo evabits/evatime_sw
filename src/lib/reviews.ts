@@ -3,6 +3,26 @@ export interface ReviewQuestion { key: string; label: string; hint?: string; res
 export interface ReviewSection { title: string; questions: ReviewQuestion[]; }
 export interface ReviewDefinition { sections: ReviewSection[]; }
 
+/**
+ * De status van een functioneringsgesprek in woorden, met de kleur van de
+ * badge erbij.
+ *
+ * Hier en niet in een scherm: het personeelsoverzicht en het detailscherm
+ * tonen dezelfde status, en twee kopieën van deze lijst lopen vroeg of laat
+ * uiteen — dan heet hetzelfde gesprek op de ene pagina anders dan op de andere.
+ */
+export const REVIEW_STATUS_LABELS: Record<string, string> = {
+  PLANNED: "Gepland",
+  SELF_COMPLETED: "Zelfreflectie ingediend",
+  COMPLETED: "Afgerond",
+};
+
+export const REVIEW_STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
+  PLANNED: "outline",
+  SELF_COMPLETED: "secondary",
+  COMPLETED: "default",
+};
+
 export function currentQuarter(date: Date = new Date()): string {
   const q = Math.floor(date.getUTCMonth() / 3) + 1;
   return `${date.getUTCFullYear()}-Q${q}`;

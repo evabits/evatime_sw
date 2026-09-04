@@ -6,12 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pencil, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { REVIEW_STATUS_LABELS, REVIEW_STATUS_VARIANTS } from "@/lib/reviews";
 
 interface Row {
   id: string; name: string; email: string; role: string;
   jobTitle: string | null; salaryMonthly: number | null;
   contractType: "PERMANENT" | "FIXED_TERM" | "ZERO_HOURS" | null;
   endDate: string | null;
+  /** Het laatste functioneringsgesprek, of null als er nog nooit één was. */
+  review: { period: string; status: string } | null;
 }
 
 const CONTRACT_LABELS: Record<string, string> = {
@@ -55,6 +58,7 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                 <TableHead>Functie</TableHead>
                 <TableHead>Salaris</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Gesprek</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -78,6 +82,18 @@ export function PersoneelListClient({ rows }: { rows: Row[] }) {
                         <Badge variant="destructive">Loopt af</Badge>
                       ) : row.contractType != null ? (
                         <Badge variant="secondary">{CONTRACT_LABELS[row.contractType]}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.review ? (
+                        <span className="flex items-center gap-2">
+                          <Badge variant={REVIEW_STATUS_VARIANTS[row.review.status] ?? "outline"}>
+                            {REVIEW_STATUS_LABELS[row.review.status] ?? row.review.status}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{row.review.period}</span>
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
