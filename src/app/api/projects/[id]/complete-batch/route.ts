@@ -5,7 +5,7 @@ import { z } from "zod";
 import { canManageRecurringBatches } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { batchTotal, completeBatchDenial, recurringInvoiceDraft } from "@/lib/recurring";
-import { STANDAARD_BETALINGSTEKST } from "@/lib/invoice-defaults";
+import { standaardBetalingstekst } from "@/lib/invoice-defaults";
 import { nextInvoiceNumber } from "@/lib/invoice-number";
 
 const schema = z.object({
@@ -30,7 +30,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const batch = await prisma.project.findUnique({
       where: { id },
-      include: { template: true },
+      // De taal van de klant bepaalt de inleiding en de betalingstekst die
+      // hieronder worden opgesteld; die staan straks als tekst op de factuur.
+      include: { template: { include: { customer: { select: { language: true } } } } },
     });
     if (!batch) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!batch.template) {
@@ -51,7 +53,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // De server rekent het aantal en het bedrag zelf uit; wat de client toont is
     // een voorbeeld en geen bewijs.
-    const draft = recurringInvoiceDraft(batch.template as any, batchData, invoer);
+    const taal = batch.template.customer?.language ?? "NL";
+    const draft = recurringInvoiceDraft(batch.template as any, batchData, invoer, taal);
     const totaal = batchTotal(invoer, batch.template.tracksQuality);
 
     // 21%, hetzelfde vaste percentage dat POST /api/invoices als standaard
@@ -84,7 +87,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           subject: draft.subject,
           reference: draft.reference,
           intro: draft.intro,
-          notes: STANDAARD_BETALINGSTEKST,
+          language: taal,
+          notes: standaardBetalingstekst(taal),
           vatRate: btw,
           subtotal: draft.subtotal,
           vatAmount: btwBedrag,

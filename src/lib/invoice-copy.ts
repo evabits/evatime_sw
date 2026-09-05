@@ -26,6 +26,7 @@ export type InvoiceLineForCopy = {
 
 export type InvoiceForCopy = {
   customerId: string;
+  language?: "NL" | "EN";
   issueDate: Date | string;
   dueDate: Date | string;
   vatRate: number | string;
@@ -42,6 +43,7 @@ export type InvoiceCopy = {
     issueDate: Date;
     dueDate: Date;
     status: "DRAFT";
+    language: "NL" | "EN";
     vatRate: number;
     reference: string | null;
     subject: string | null;
@@ -105,6 +107,9 @@ export function invoiceCopyData(bron: InvoiceForCopy, vandaag: Date): InvoiceCop
       issueDate: vandaag,
       dueDate: addDays(vandaag, termijn),
       status: "DRAFT",
+      // De taal hoort bij het document, niet bij de verzending: een kopie van
+      // een Engelse factuur is weer een Engelse factuur.
+      language: bron.language ?? "NL",
       vatRate,
       reference: bron.reference ?? null,
       subject: bron.subject ?? null,

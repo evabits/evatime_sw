@@ -3,6 +3,7 @@ import { Fragment, useEffect } from "react";
 import { groupLinesByType } from "@/lib/invoice-lines";
 import { customerAddressLines } from "@/lib/customer-address";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
+import { docCopy } from "@/lib/document-copy";
 
 interface Props {
   invoice: any;
@@ -11,10 +12,13 @@ interface Props {
 }
 
 export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
+  const taal = invoice.language ?? "NL";
+  const t = docCopy(taal);
+
   useEffect(() => {
     if (autoPrint) {
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(timer);
     }
   }, [autoPrint]);
 
@@ -91,7 +95,7 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         )}
         <div className="top-header">
           <div className="address-block">
-            {customerAddressLines(invoice.customer).map((regel, i) => (
+            {customerAddressLines(invoice.customer, undefined, taal).map((regel, i) => (
               <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
@@ -103,13 +107,13 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
             {settings?.email && <><div className="company-spacer" /><div>{settings.email}</div></>}
             {(settings?.kvkNumber || settings?.vatNumber || settings?.iban) && <div className="company-spacer" />}
             {settings?.kvkNumber && <div>KvK: {settings.kvkNumber}</div>}
-            {settings?.vatNumber && <div>Btw: {settings.vatNumber}</div>}
+            {settings?.vatNumber && <div>{t.labelBtwNummer}: {settings.vatNumber}</div>}
             {settings?.iban && <div>IBAN: {settings.iban}</div>}
           </div>
         </div>
 
         {/* FACTUUR */}
-        <div className="factuur-heading">FACTUUR</div>
+        <div className="factuur-heading">{t.factuur}</div>
 
         {/* Meta */}
         <div className="meta-section">
@@ -117,18 +121,18 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
             <table>
               <tbody>
                 <tr>
-                  <td className="meta-label">Factuurnummer:</td>
+                  <td className="meta-label">{t.factuurnummer}:</td>
                   <td className="meta-value">{invoice.invoiceNumber}</td>
                 </tr>
                 {invoice.reference && (
                   <tr>
-                    <td className="meta-label">Kenmerk:</td>
+                    <td className="meta-label">{t.kenmerk}:</td>
                     <td className="meta-value">{invoice.reference}</td>
                   </tr>
                 )}
                 {invoice.customer?.customerNumber && (
                   <tr>
-                    <td className="meta-label">Klantnummer:</td>
+                    <td className="meta-label">{t.klantnummer}:</td>
                     <td className="meta-value">{invoice.customer.customerNumber}</td>
                   </tr>
                 )}
@@ -139,12 +143,12 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
             <table>
               <tbody>
                 <tr>
-                  <td className="meta-label">Factuurdatum:</td>
-                  <td className="meta-value">{fmt(invoice.issueDate)}</td>
+                  <td className="meta-label">{t.factuurdatum}:</td>
+                  <td className="meta-value">{fmt(invoice.issueDate, taal)}</td>
                 </tr>
                 <tr>
-                  <td className="meta-label">Vervaldatum:</td>
-                  <td className="meta-value">{fmt(invoice.dueDate)}</td>
+                  <td className="meta-label">{t.vervaldatum}:</td>
+                  <td className="meta-value">{fmt(invoice.dueDate, taal)}</td>
                 </tr>
               </tbody>
             </table>
@@ -161,15 +165,15 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         <table className="lines">
           <thead>
             <tr>
-              <th style={{ width: "52%" }}>Omschrijving</th>
-              <th className="right" style={{ width: "10%" }}>Aantal</th>
-              <th className="right" style={{ width: "13%" }}>Prijs</th>
-              <th className="right" style={{ width: "13%" }}>Totaal</th>
-              <th className="right" style={{ width: "12%" }}>Btw</th>
+              <th style={{ width: "52%" }}>{t.omschrijving}</th>
+              <th className="right" style={{ width: "10%" }}>{t.aantal}</th>
+              <th className="right" style={{ width: "13%" }}>{t.prijs}</th>
+              <th className="right" style={{ width: "13%" }}>{t.totaal}</th>
+              <th className="right" style={{ width: "12%" }}>{t.btw}</th>
             </tr>
           </thead>
           <tbody>
-            {groupLinesByType(invoice.lines as any[]).map((groep, gi) => (
+            {groupLinesByType(invoice.lines as any[], taal).map((groep, gi) => (
               <Fragment key={groep.heading ?? `los-${gi}`}>
                 {groep.heading && (
                   <tr>
@@ -180,8 +184,8 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
                   <tr key={line.id ?? i}>
                     <td>{line.description}</td>
                     <td className="right">{Number(line.quantity).toFixed(2)}</td>
-                    <td className="right">{formatCurrency(Number(line.unitPrice))}</td>
-                    <td className="right">{formatCurrency(Number(line.total))}</td>
+                    <td className="right">{formatCurrency(Number(line.unitPrice), taal)}</td>
+                    <td className="right">{formatCurrency(Number(line.total), taal)}</td>
                     <td className="right">{Number(invoice.vatRate).toFixed(0)}%</td>
                   </tr>
                 ))}
@@ -194,16 +198,16 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         <div className="totals-wrap">
           <div className="totals">
             <div className="total-row">
-              <span>Subtotaal</span>
-              <span>{formatCurrency(Number(invoice.subtotal))}</span>
+              <span>{t.subtotaal}</span>
+              <span>{formatCurrency(Number(invoice.subtotal), taal)}</span>
             </div>
             <div className="total-row">
-              <span>BTW {Number(invoice.vatRate).toFixed(0)}%</span>
-              <span>{formatCurrency(Number(invoice.vatAmount))}</span>
+              <span>{t.btwMet(Number(invoice.vatRate).toFixed(0))}</span>
+              <span>{formatCurrency(Number(invoice.vatAmount), taal)}</span>
             </div>
             <div className="total-row grand">
-              <span>Totaal</span>
-              <span>{formatCurrency(Number(invoice.total))}</span>
+              <span>{t.totaal}</span>
+              <span>{formatCurrency(Number(invoice.total), taal)}</span>
             </div>
           </div>
         </div>
@@ -216,8 +220,8 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
 
       {/* Print controls */}
       <div className="print-btn">
-        <button className="btn btn-secondary" onClick={() => window.close()}>Sluiten</button>
-        <button className="btn btn-primary" onClick={() => window.print()}>Afdrukken</button>
+        <button className="btn btn-secondary" onClick={() => window.close()}>{t.sluiten}</button>
+        <button className="btn btn-primary" onClick={() => window.print()}>{t.afdrukken}</button>
       </div>
     </>
   );

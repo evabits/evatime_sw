@@ -105,6 +105,9 @@ model Customer {
   postalCode         String?
   country            String?
   vatNumber          String?
+  /// De taal waarin deze klant zijn facturen en offertes krijgt. Nieuwe
+  /// documenten nemen hem over; per document is hij nog te wijzigen.
+  language           DocumentLanguage    @default(NL)
   notes              String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -389,6 +392,7 @@ model Invoice {
   issueDate      DateTime            @db.Date
   dueDate        DateTime            @db.Date
   status         InvoiceStatus       @default(DRAFT)
+  language       DocumentLanguage    @default(NL)
   reference      String?
   subject        String?
   intro          String?
@@ -499,6 +503,13 @@ model CompanySettings {
   updatedAt    DateTime @updatedAt
 }
 
+/// De taal van een factuur of offerte. Bepaalt de vaste teksten op het
+/// document en in de mail eromheen; wat je zelf typt blijft zoals je het typt.
+enum DocumentLanguage {
+  NL
+  EN
+}
+
 enum QuoteStatus {
   DRAFT
   SENT
@@ -517,6 +528,7 @@ model Quote {
   /// De t.a.v.-regel op deze offerte. Leeg betekent geen t.a.v.-regel; null
   /// betekent dat er nooit iets is ingevuld en dat die van de klant geldt.
   attention   String?
+  language    DocumentLanguage  @default(NL)
   reference   String?
   subject     String?
   notes       String?

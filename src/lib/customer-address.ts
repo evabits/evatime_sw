@@ -1,3 +1,5 @@
+import { docCopy, type Taal } from "./document-copy";
+
 /**
  * Het adresblok van een klant, zoals het op een factuur of offerte hoort.
  *
@@ -31,6 +33,7 @@ export type CustomerForAddress = {
 export function customerAddressLines(
   customer: CustomerForAddress | null | undefined,
   attention?: string | null,
+  taal: Taal = "NL",
 ): string[] {
   if (!customer) return [];
 
@@ -38,7 +41,7 @@ export function customerAddressLines(
   const regels = [schoon(customer.name)];
 
   const tav = schoon(attention === null || attention === undefined ? customer.attention : attention);
-  if (tav) regels.push(`T.a.v. ${tav}`);
+  if (tav) regels.push(`${docCopy(taal).tav} ${tav}`);
 
   regels.push(schoon(customer.address));
 

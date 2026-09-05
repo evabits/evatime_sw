@@ -68,8 +68,8 @@ describe("invoiceCopyData", () => {
     // horen niet in de kopie. Een veld dat er toch in sluipt zou hier opvallen.
     const { invoice, lines } = invoiceCopyData(bron, vandaag);
     expect(Object.keys(invoice).sort()).toEqual([
-      "customerId", "dueDate", "intro", "issueDate", "notes", "reference",
-      "status", "subject", "subtotal", "total", "vatAmount", "vatRate",
+      "customerId", "dueDate", "intro", "issueDate", "language", "notes",
+      "reference", "status", "subject", "subtotal", "total", "vatAmount", "vatRate",
     ]);
     expect(Object.keys(lines[0]).sort()).toEqual([
       "description", "lineType", "quantity", "sortOrder", "total", "unitPrice",

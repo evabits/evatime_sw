@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDate, formatDateTime, formatHoursDecimal } from "./utils";
+import { formatCurrency, formatDate, formatDateTime, formatHoursDecimal } from "./utils";
 
 describe("formatDate", () => {
   it("writes a date as DD-MMM-YYYY with the month spelled out short", () => {
@@ -76,5 +76,27 @@ describe("formatHoursDecimal", () => {
     expect(formatHoursDecimal(null)).toBe("0");
     expect(formatHoursDecimal(undefined)).toBe("0");
     expect(formatHoursDecimal("onzin")).toBe("0");
+  });
+});
+
+describe("Engelse notatie", () => {
+  it("gebruikt Engelse maandafkortingen waar ze verschillen", () => {
+    expect(formatDate("2026-03-12", "EN")).toBe("12-MAR-2026");
+    expect(formatDate("2026-05-12", "EN")).toBe("12-MAY-2026");
+    expect(formatDate("2026-10-12", "EN")).toBe("12-OCT-2026");
+  });
+
+  it("laat de negen gelijke maanden ongemoeid", () => {
+    expect(formatDate("2026-08-12", "EN")).toBe(formatDate("2026-08-12"));
+  });
+
+  it("blijft Nederlands zonder taal", () => {
+    expect(formatDate("2026-03-12")).toBe("12-MRT-2026");
+  });
+
+  it("keert de scheidingstekens om in bedragen", () => {
+    // Non-breaking spaces verschillen per locale; alleen de tekens tellen.
+    expect(formatCurrency(1234.56, "EN").replace(/\s/g, "")).toBe("€1,234.56");
+    expect(formatCurrency(1234.56).replace(/\s/g, "")).toBe("€1.234,56");
   });
 });

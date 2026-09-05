@@ -2,8 +2,11 @@
 import { useState } from "react";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 import { customerAddressLines } from "@/lib/customer-address";
+import { docCopy } from "@/lib/document-copy";
 
 export function PublicQuoteView({ quote, settings }: { quote: any; settings: any }) {
+  const taal = quote.language ?? "NL";
+  const t = docCopy(taal);
   const [status, setStatus] = useState(quote.status);
   const [approvedAt, setApprovedAt] = useState(quote.approvedAt);
   const [approving, setApproving] = useState(false);
@@ -64,7 +67,7 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         )}
         <div className="top-header">
           <div className="address-block">
-            {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
+            {customerAddressLines(quote.customer, quote.attention, taal).map((regel, i) => (
               <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
@@ -76,16 +79,16 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
           </div>
         </div>
 
-        <div className="heading">OFFERTE</div>
+        <div className="heading">{t.offerte}</div>
 
         <div className="meta-section">
           <div>
-            <div><span className="meta-label">Offertenummer:</span>{quote.quoteNumber}</div>
-            {quote.reference && <div><span className="meta-label">Kenmerk:</span>{quote.reference}</div>}
+            <div><span className="meta-label">{t.offertenummer}:</span>{quote.quoteNumber}</div>
+            {quote.reference && <div><span className="meta-label">{t.kenmerk}:</span>{quote.reference}</div>}
           </div>
           <div style={{ textAlign: "right" }}>
-            <div><span className="meta-label">Datum:</span>{fmt(quote.issueDate)}</div>
-            <div><span className="meta-label">Geldig tot:</span>{fmt(quote.validUntil)}</div>
+            <div><span className="meta-label">{t.datum}:</span>{fmt(quote.issueDate, taal)}</div>
+            <div><span className="meta-label">{t.geldigTot}:</span>{fmt(quote.validUntil, taal)}</div>
           </div>
         </div>
 
@@ -94,10 +97,10 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         <table className="lines">
           <thead>
             <tr>
-              <th style={{ width: "60%" }}>Omschrijving</th>
-              <th className="right" style={{ width: "13%" }}>Aantal</th>
-              <th className="right" style={{ width: "13%" }}>Prijs</th>
-              <th className="right" style={{ width: "14%" }}>Totaal</th>
+              <th style={{ width: "60%" }}>{t.omschrijving}</th>
+              <th className="right" style={{ width: "13%" }}>{t.aantal}</th>
+              <th className="right" style={{ width: "13%" }}>{t.prijs}</th>
+              <th className="right" style={{ width: "14%" }}>{t.totaal}</th>
             </tr>
           </thead>
           <tbody>
@@ -105,8 +108,8 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
               <tr key={line.id ?? i}>
                 <td>{line.description}</td>
                 <td className="right">{Number(line.quantity).toFixed(2)}</td>
-                <td className="right">{formatCurrency(Number(line.unitPrice))}</td>
-                <td className="right">{formatCurrency(Number(line.total))}</td>
+                <td className="right">{formatCurrency(Number(line.unitPrice), taal)}</td>
+                <td className="right">{formatCurrency(Number(line.total), taal)}</td>
               </tr>
             ))}
           </tbody>
@@ -114,9 +117,9 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
 
         <div className="totals-wrap">
           <div className="totals">
-            <div className="total-row"><span>Subtotaal</span><span>{formatCurrency(Number(quote.subtotal))}</span></div>
-            <div className="total-row"><span>BTW {Number(quote.vatRate).toFixed(0)}%</span><span>{formatCurrency(Number(quote.vatAmount))}</span></div>
-            <div className="total-row grand"><span>Totaal</span><span>{formatCurrency(Number(quote.total))}</span></div>
+            <div className="total-row"><span>{t.subtotaal}</span><span>{formatCurrency(Number(quote.subtotal), taal)}</span></div>
+            <div className="total-row"><span>{t.btwMet(Number(quote.vatRate).toFixed(0))}</span><span>{formatCurrency(Number(quote.vatAmount), taal)}</span></div>
+            <div className="total-row grand"><span>{t.totaal}</span><span>{formatCurrency(Number(quote.total), taal)}</span></div>
           </div>
         </div>
 
@@ -125,21 +128,21 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         {isApproved ? (
           <div className="approved-section">
             <div className="approved-icon">✅</div>
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Offerte goedgekeurd</div>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{t.offerteGoedgekeurd}</div>
             {approvedAt && (
               <div style={{ fontSize: 13, color: "#555" }}>
-                Goedgekeurd op {fmt(approvedAt)}
+                {t.goedgekeurdOp(fmt(approvedAt, taal))}
               </div>
             )}
           </div>
         ) : status === "SENT" ? (
           <div className="approve-section">
             <div style={{ fontSize: 14, marginBottom: 16, color: "#444" }}>
-              Gaat u akkoord met deze offerte? Klik dan op de knop hieronder.
+              {t.akkoordVraag}
             </div>
             {error && <div style={{ color: "#dc2626", marginBottom: 12, fontSize: 13 }}>{error}</div>}
             <button className="approve-btn" onClick={approve} disabled={approving}>
-              {approving ? "Bezig..." : "Offerte goedkeuren"}
+              {approving ? t.bezig : t.offerteGoedkeuren}
             </button>
           </div>
         ) : null}

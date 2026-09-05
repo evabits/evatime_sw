@@ -22,6 +22,7 @@ const updateSchema = z.object({
   issueDate: z.string().optional(),
   dueDate: z.string().optional(),
   vatRate: z.number().min(0).max(100).optional(),
+  language: z.enum(["NL", "EN"]).optional(),
   lines: z.array(lineSchema).optional(),
   lineIdsToDelete: z.array(z.string()).optional(),
   sentAt: z.string().optional().nullable(),
@@ -125,6 +126,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         where: { id },
         data: {
           ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.language !== undefined ? { language: data.language } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
           ...(data.reference !== undefined ? { reference: data.reference } : {}),
           ...(data.subject !== undefined ? { subject: data.subject } : {}),

@@ -1,4 +1,5 @@
 import { MAANDEN, formatDate } from "./utils";
+import { docCopy, type Taal } from "./document-copy";
 
 /**
  * Herhaalprojecten: terugkerend productie- en testwerk dat telkens hetzelfde
@@ -58,13 +59,17 @@ export function recurringInvoiceIntro(opts: {
   tracksQuality: boolean;
   approved?: number | null;
   rejected?: number | null;
+  taal?: Taal;
 }): string {
-  const eerste = `Hierbij ontvangt u de factuur voor ${opts.batchnaam}, opgeleverd op ${formatDate(opts.opgeleverdOp)}.`;
+  const t = docCopy(opts.taal);
+  const eerste = t.batchIntro(opts.batchnaam, formatDate(opts.opgeleverdOp, opts.taal));
   if (!opts.tracksQuality) return eerste;
-  return (
-    `${eerste} Van de ${opts.totaal} geteste exemplaren zijn er ` +
-    `${Number(opts.approved ?? 0)} goedgekeurd en ${Number(opts.rejected ?? 0)} afgekeurd.`
+  const tweede = t.batchKwaliteit(
+    opts.totaal,
+    Number(opts.approved ?? 0),
+    Number(opts.rejected ?? 0),
   );
+  return `${eerste} ${tweede}`;
 }
 
 /**
@@ -142,6 +147,7 @@ export function recurringInvoiceDraft(
   sjabloon: RecurringTemplateData,
   batch: BatchData,
   invoer: BatchInput,
+  taal: Taal = "NL",
 ): RecurringDraft {
   const totaal = batchTotal(invoer, sjabloon.tracksQuality);
   const prijs = Number(sjabloon.unitPrice ?? 0);
@@ -165,6 +171,7 @@ export function recurringInvoiceDraft(
       tracksQuality: sjabloon.tracksQuality,
       approved: invoer.approved,
       rejected: invoer.rejected,
+      taal,
     }),
     line: {
       description: sjabloon.lineDescription,

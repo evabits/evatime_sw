@@ -26,6 +26,7 @@ const schema = z.object({
   postalCode: z.string().optional(),
   country: z.string().optional(),
   vatNumber: z.string().optional(),
+  language: z.enum(["NL", "EN"]).optional(),
   notes: z.string().optional(),
 });
 
@@ -33,7 +34,7 @@ type FormData = z.infer<typeof schema>;
 
 const EMPTY: FormData = {
   name: "", customerNumber: "", email: "", phone: "", attention: "", address: "", city: "",
-  postalCode: "", country: "", vatNumber: "", notes: "",
+  postalCode: "", country: "", vatNumber: "", language: "NL", notes: "",
 };
 
 interface Props {
@@ -145,6 +146,7 @@ export function CustomersClient({ initialCustomers, initialNumbers }: Props) {
       postalCode: customer.postalCode ?? "",
       country: customer.country ?? "",
       vatNumber: customer.vatNumber ?? "",
+      language: customer.language ?? "NL",
       notes: customer.notes ?? "",
     });
     // customer.levelRates is only absent when the query that loaded this customer
@@ -297,6 +299,21 @@ export function CustomersClient({ initialCustomers, initialNumbers }: Props) {
             <div className="space-y-1">
               <Label>BTW-nummer</Label>
               <Input {...form.register("vatNumber")} />
+            </div>
+            <div className="space-y-1">
+              <Label>Taal documenten</Label>
+              {/* Een gewone select: twee vaste keuzes, en zo werkt hij zonder
+                  Controller samen met react-hook-form. */}
+              <select
+                {...form.register("language")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="NL">Nederlands</option>
+                <option value="EN">Engels</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                De taal van nieuwe facturen en offertes voor deze klant.
+              </p>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Notities</Label>

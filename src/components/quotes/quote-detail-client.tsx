@@ -61,6 +61,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
   // heeft: je hoeft hem alleen aan te passen als hij afwijkt. Leeg opslaan is
   // een keuze en betekent op déze offerte geen t.a.v.-regel.
   const [attention, setAttention] = useState(quote.attention ?? quote.customer?.attention ?? "");
+  const [language, setLanguage] = useState(quote.language ?? "NL");
   const [reference, setReference] = useState(quote.reference ?? "");
   const [subject, setSubject] = useState(quote.subject ?? "");
   const [lines, setLines] = useState<Line[]>(
@@ -114,7 +115,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     const res = await fetch(`/api/quotes/${quote.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, attention, reference, subject, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, attention, reference, subject, language, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -339,6 +340,21 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
             <div>
               <p className="text-xs text-muted-foreground mb-1">Onderwerp</p>
               {editing ? <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Optioneel" className="h-7 text-sm" /> : <p className="text-sm">{quote.subject || <span className="text-muted-foreground italic">—</span>}</p>}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Taal</p>
+              {editing ? (
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="flex h-7 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                >
+                  <option value="NL">Nederlands</option>
+                  <option value="EN">Engels</option>
+                </select>
+              ) : (
+                <p className="text-sm">{quote.language === "EN" ? "Engels" : "Nederlands"}</p>
+              )}
             </div>
           </div>
 

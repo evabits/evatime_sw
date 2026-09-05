@@ -15,18 +15,18 @@ export default async function HerhaalprojectenPage() {
   const [templates, batches, customers] = await Promise.all([
     prisma.recurringTemplate.findMany({
       where: { archivedAt: null },
-      include: { customer: { select: { id: true, name: true } } },
+      include: { customer: { select: { id: true, name: true, language: true } } },
       orderBy: { name: "asc" },
     }),
     // Elk project met een templateId is een batch, actief of al voltooid.
     prisma.project.findMany({
       where: { templateId: { not: null } },
       include: {
-        customer: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true, language: true } },
         // Inclusief de klant van het sjabloon: dáár gaat de factuur naartoe, en
         // die kan afwijken van de klant die bij het starten op het project is
         // gezet zodra iemand het sjabloon aanpast.
-        template: { include: { customer: { select: { id: true, name: true } } } },
+        template: { include: { customer: { select: { id: true, name: true, language: true } } } },
         generatedInvoice: { select: { id: true, invoiceNumber: true } },
       },
       orderBy: { createdAt: "desc" },

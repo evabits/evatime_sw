@@ -22,7 +22,7 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
-  customers: { id: string; name: string }[];
+  customers: { id: string; name: string; language?: "NL" | "EN" }[];
 }
 
 interface InvoiceLine {
@@ -205,23 +205,26 @@ export function NewInvoiceClient({ customers }: Props) {
 
   function addLinesFromSelection() {
     const newLines: InvoiceLine[] = [];
+    // De omschrijvingen worden hier als tekst opgesteld en zo opgeslagen, dus
+    // ze moeten meteen in de taal van de klant staan.
+    const taal = customers.find((c) => c.id === customerId)?.language ?? "NL";
 
     const selectedTime = zichtbaarTijd.filter((e) => selectedTimeIds.has(e.id));
     // Eén regel per registratie, op datum en naam. Zie invoice-lines.ts.
-    for (const line of hourInvoiceLines(selectedTime)) {
+    for (const line of hourInvoiceLines(selectedTime, taal)) {
       newLines.push({ ...line, lineType: "HOURS" });
     }
 
     const selectedKm = zichtbaarKm.filter((e) => selectedKmIds.has(e.id));
     // Ook per rit, met dezelfde opbouw als de uren.
-    for (const line of kmInvoiceLines(selectedKm)) {
+    for (const line of kmInvoiceLines(selectedKm, taal)) {
       newLines.push({ ...line, lineType: "KM" });
     }
 
     const selectedExpenses = zichtbareUitgaven.filter((e) => selectedExpenseIds.has(e.id));
     // Eén regel per uitgave: de eigen omschrijving is juist waarom hij op de
     // factuur staat, en groeperen zou die opeten.
-    for (const line of expenseInvoiceLines(selectedExpenses)) {
+    for (const line of expenseInvoiceLines(selectedExpenses, taal)) {
       newLines.push({ ...line, lineType: "EXPENSE" });
     }
 

@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 import { customerAddressLines } from "@/lib/customer-address";
+import { docCopy } from "@/lib/document-copy";
 
 interface Props {
   quote: any;
@@ -10,10 +11,13 @@ interface Props {
 }
 
 export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
+  const taal = quote.language ?? "NL";
+  const t = docCopy(taal);
+
   useEffect(() => {
     if (autoPrint) {
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(timer);
     }
   }, [autoPrint]);
 
@@ -62,7 +66,7 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         )}
         <div className="top-header">
           <div className="address-block">
-            {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
+            {customerAddressLines(quote.customer, quote.attention, taal).map((regel, i) => (
               <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>
@@ -73,23 +77,23 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
             {settings?.email && <><div style={{ height: 8 }} /><div>{settings.email}</div></>}
             {(settings?.kvkNumber || settings?.vatNumber) && <div style={{ height: 8 }} />}
             {settings?.kvkNumber && <div>KvK: {settings.kvkNumber}</div>}
-            {settings?.vatNumber && <div>Btw: {settings.vatNumber}</div>}
+            {settings?.vatNumber && <div>{t.labelBtwNummer}: {settings.vatNumber}</div>}
           </div>
         </div>
 
-        <div className="heading">OFFERTE</div>
+        <div className="heading">{t.offerte}</div>
 
         <div className="meta-section">
           <div className="meta-left">
             <table>
               <tbody>
                 <tr>
-                  <td className="meta-label">Offertenummer:</td>
+                  <td className="meta-label">{t.offertenummer}:</td>
                   <td>{quote.quoteNumber}</td>
                 </tr>
                 {quote.reference && (
                   <tr>
-                    <td className="meta-label">Kenmerk:</td>
+                    <td className="meta-label">{t.kenmerk}:</td>
                     <td>{quote.reference}</td>
                   </tr>
                 )}
@@ -100,12 +104,12 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
             <table>
               <tbody>
                 <tr>
-                  <td className="meta-label">Datum:</td>
-                  <td>{fmt(quote.issueDate)}</td>
+                  <td className="meta-label">{t.datum}:</td>
+                  <td>{fmt(quote.issueDate, taal)}</td>
                 </tr>
                 <tr>
-                  <td className="meta-label">Geldig tot:</td>
-                  <td>{fmt(quote.validUntil)}</td>
+                  <td className="meta-label">{t.geldigTot}:</td>
+                  <td>{fmt(quote.validUntil, taal)}</td>
                 </tr>
               </tbody>
             </table>
@@ -117,10 +121,10 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         <table className="lines">
           <thead>
             <tr>
-              <th style={{ width: "60%" }}>Omschrijving</th>
-              <th className="right" style={{ width: "12%" }}>Aantal</th>
-              <th className="right" style={{ width: "14%" }}>Prijs</th>
-              <th className="right" style={{ width: "14%" }}>Totaal</th>
+              <th style={{ width: "60%" }}>{t.omschrijving}</th>
+              <th className="right" style={{ width: "12%" }}>{t.aantal}</th>
+              <th className="right" style={{ width: "14%" }}>{t.prijs}</th>
+              <th className="right" style={{ width: "14%" }}>{t.totaal}</th>
             </tr>
           </thead>
           <tbody>
@@ -128,8 +132,8 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
               <tr key={line.id ?? i}>
                 <td>{line.description}</td>
                 <td className="right">{Number(line.quantity).toFixed(2)}</td>
-                <td className="right">{formatCurrency(Number(line.unitPrice))}</td>
-                <td className="right">{formatCurrency(Number(line.total))}</td>
+                <td className="right">{formatCurrency(Number(line.unitPrice), taal)}</td>
+                <td className="right">{formatCurrency(Number(line.total), taal)}</td>
               </tr>
             ))}
           </tbody>
@@ -138,16 +142,16 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         <div className="totals-wrap">
           <div className="totals">
             <div className="total-row">
-              <span>Subtotaal</span>
-              <span>{formatCurrency(Number(quote.subtotal))}</span>
+              <span>{t.subtotaal}</span>
+              <span>{formatCurrency(Number(quote.subtotal), taal)}</span>
             </div>
             <div className="total-row">
-              <span>BTW {Number(quote.vatRate).toFixed(0)}%</span>
-              <span>{formatCurrency(Number(quote.vatAmount))}</span>
+              <span>{t.btwMet(Number(quote.vatRate).toFixed(0))}</span>
+              <span>{formatCurrency(Number(quote.vatAmount), taal)}</span>
             </div>
             <div className="total-row grand">
-              <span>Totaal</span>
-              <span>{formatCurrency(Number(quote.total))}</span>
+              <span>{t.totaal}</span>
+              <span>{formatCurrency(Number(quote.total), taal)}</span>
             </div>
           </div>
         </div>
@@ -156,8 +160,8 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
       </div>
 
       <div className="print-btn">
-        <button className="btn btn-secondary" onClick={() => window.close()}>Sluiten</button>
-        <button className="btn btn-primary" onClick={() => window.print()}>Afdrukken</button>
+        <button className="btn btn-secondary" onClick={() => window.close()}>{t.sluiten}</button>
+        <button className="btn btn-primary" onClick={() => window.print()}>{t.afdrukken}</button>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 import { resolveHourRate, type RateEntry } from "./rates";
 import { kmRate } from "./report-totals";
 import { formatDate } from "./utils";
+import { docCopy, type Taal } from "./document-copy";
 
 /**
  * De opbouw van elke factuurregel: datum, wie het deed, waar het op geboekt is
@@ -16,8 +17,9 @@ function regelOmschrijving(
   project: string | undefined,
   eigen: string | null | undefined,
   terugval: string,
+  taal: Taal,
 ): string {
-  const delen = [formatDate(datum), wie, project, eigen?.trim()].filter(
+  const delen = [formatDate(datum, taal), wie, project, eigen?.trim()].filter(
     (d): d is string => !!d && d.length > 0,
   );
   return delen.length > 0 ? delen.join(" — ") : terugval;
@@ -61,7 +63,7 @@ export type HourInvoiceLine = {
  * Een regel zonder tarief valt weg: `unitPrice` moet van de factuurroute
  * positief zijn, en het scherm laat zo'n regel daarom ook niet aanvinken.
  */
-export function hourInvoiceLines(entries: HourEntryForInvoice[]): HourInvoiceLine[] {
+export function hourInvoiceLines(entries: HourEntryForInvoice[], taal: Taal = "NL"): HourInvoiceLine[] {
   return entries
     .filter((e) => resolveHourRate(e) != null)
     .slice()
@@ -72,7 +74,8 @@ export function hourInvoiceLines(entries: HourEntryForInvoice[]): HourInvoiceLin
         e.user?.name,
         e.project?.name,
         e.description,
-        "Werkzaamheden",
+        docCopy(taal).terugvalWerkzaamheden,
+        taal,
       ),
       quantity: Number(e.hours),
       unitPrice: resolveHourRate(e)!,
@@ -103,7 +106,7 @@ export type KmInvoiceLine = {
  * Een rit zonder tarief valt weg in plaats van tegen nul euro mee te gaan: nul
  * per kilometer is geen factureerbaar tarief.
  */
-export function kmInvoiceLines(entries: KmEntryForInvoice[]): KmInvoiceLine[] {
+export function kmInvoiceLines(entries: KmEntryForInvoice[], taal: Taal = "NL"): KmInvoiceLine[] {
   return entries
     .filter((e) => kmRate(e) > 0)
     .slice()
@@ -114,7 +117,8 @@ export function kmInvoiceLines(entries: KmEntryForInvoice[]): KmInvoiceLine[] {
         e.user?.name,
         e.project?.name,
         e.description,
-        "Reiskosten",
+        docCopy(taal).terugvalReiskosten,
+        taal,
       ),
       quantity: Number(e.km),
       unitPrice: kmRate(e),
@@ -152,7 +156,7 @@ export type ExpenseInvoiceLine = {
  * Een bedrag van nul of minder valt weg, net als een urenregel zonder tarief:
  * de factuurroute eist een positieve prijs.
  */
-export function expenseInvoiceLines(expenses: ExpenseForInvoice[]): ExpenseInvoiceLine[] {
+export function expenseInvoiceLines(expenses: ExpenseForInvoice[], taal: Taal = "NL"): ExpenseInvoiceLine[] {
   return expenses
     .filter((e) => Number(e.amount) > 0)
     .slice()
@@ -163,20 +167,14 @@ export function expenseInvoiceLines(expenses: ExpenseForInvoice[]): ExpenseInvoi
         e.user?.name,
         e.project?.name,
         e.description?.trim() || e.category?.name,
-        "Uitgave",
+        docCopy(taal).terugvalUitgave,
+        taal,
       ),
       quantity: 1,
       unitPrice: Number(e.amount),
       expenseIds: [e.id],
     }));
 }
-
-/** Het kopje boven elke soort regel op de factuur. */
-export const LINE_TYPE_HEADINGS: Record<string, string> = {
-  HOURS: "Uren:",
-  KM: "Ritten:",
-  EXPENSE: "Uitgaven:",
-};
 
 /** De volgorde waarin de groepen op de factuur staan, gelijk aan het factuurscherm. */
 const GROEP_VOLGORDE = ["HOURS", "KM", "EXPENSE", "OTHER"];
@@ -200,9 +198,16 @@ export type LineGroup<T> = {
  */
 export function groupLinesByType<T extends { lineType?: string | null }>(
   lines: T[],
+  taal: Taal = "NL",
 ): LineGroup<T>[] {
+  const t = docCopy(taal);
+  const koppen: Record<string, string> = {
+    HOURS: t.groepUren,
+    KM: t.groepRitten,
+    EXPENSE: t.groepUitgaven,
+  };
   return GROEP_VOLGORDE.map((soort) => ({
-    heading: LINE_TYPE_HEADINGS[soort] ?? null,
+    heading: koppen[soort] ?? null,
     lines: lines.filter((l) => (l.lineType ?? "OTHER") === soort),
   })).filter((g) => g.lines.length > 0);
 }
