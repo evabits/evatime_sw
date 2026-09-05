@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate, formatHours, formatWeekday } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, ClipboardCheck, FolderOpen, FileCheck } from "lucide-react";
+import { Clock, Car, Euro, TrendingUp, Umbrella, CalendarDays, FolderOpen, FileCheck } from "lucide-react";
 import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { RecentEntries } from "@/components/dashboard/recent-entries";
 import { startOfMonth, endOfMonth, format } from "date-fns";
@@ -146,14 +146,6 @@ export default async function DashboardPage() {
       : [Promise.resolve([]), Promise.resolve([]), Promise.resolve([])]),
   ]);
 
-  const pendingReview = userId
-    ? await prisma.performanceReview.findFirst({
-        where: { userId, status: { in: ["PLANNED", "SELF_COMPLETED"] } },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, period: true, status: true },
-      })
-    : null;
-
   const totalHours = Number(timeStats._sum.hours ?? 0);
   const totalKm = Number(kmStats._sum.km ?? 0);
   // Een budgetrij voor een jaar wint; anders zegt het contract het. Met een
@@ -232,20 +224,6 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Overzicht voor {now.toLocaleString("nl-NL", { month: "long", year: "numeric" })}</p>
       </div>
-
-      {pendingReview && pendingReview.status === "PLANNED" && (
-        <Link href="/beoordelingen" className="block">
-          <Card className="border-primary/40 bg-primary/5">
-            <CardContent className="p-4 flex items-center gap-3">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
-              <div>
-                <p className="font-medium">Zelfreflectie openstaand ({pendingReview.period})</p>
-                <p className="text-sm text-muted-foreground">Vul je zelfreflectie in vóór het gesprek.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      )}
 
       {isAdmin && customerlessProjects > 0 && (
         <Link href="/projects?filter=no-customer" className="block">

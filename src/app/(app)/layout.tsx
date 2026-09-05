@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { impersonationFromSession } from "@/lib/impersonation";
+import { MeldingenBanner } from "@/components/layout/meldingen-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             realName={impersonating.realName}
           />
         )}
+        <MeldingenBanner userId={(session.user as any)?.id ?? ""} />
         <div className="container mx-auto p-6 max-w-7xl">{children}</div>
       </main>
     </div>

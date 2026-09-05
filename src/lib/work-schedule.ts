@@ -59,6 +59,31 @@ export function targetSoFar(schedule: WeekSchedule, today: string): number {
   return rond(DAGEN.slice(0, verstreken).reduce((som, d) => som + schedule[d], 0));
 }
 
+/**
+ * Het aantal verstreken weekdagen van deze week, de dag zelf NIET meegerekend.
+ * Maandag geeft 0, dinsdag 1, en het weekend geeft de volle 5.
+ */
+export function weekdagenVoorVandaag(today: string): number {
+  const dag = new Date(`${today}T00:00:00Z`).getUTCDay();
+  // Zondag is 0 en betekent hier "de hele week is voorbij", niet "nog niets".
+  if (dag === 0) return 5;
+  return Math.min(dag - 1, 5);
+}
+
+/**
+ * Het doel tot en met gisteren: de som van de geroosterde uren van de
+ * weekdagen die al voorbij zijn.
+ *
+ * Anders dan `targetSoFar`, die de dag zelf wél meetelt. Dat klopt voor de
+ * herinneringsmail op vrijdagmiddag, maar niet voor een melding die de hele
+ * week in beeld staat: op maandagochtend om negen uur is niemand achter op de
+ * uren van maandag.
+ */
+export function targetBefore(schedule: WeekSchedule, today: string): number {
+  const verstreken = weekdagenVoorVandaag(today);
+  return rond(DAGEN.slice(0, verstreken).reduce((som, d) => som + schedule[d], 0));
+}
+
 /** Het weektotaal. Voor het scherm en om met weeklyHours te vergelijken. */
 export function weekTotal(schedule: WeekSchedule): number {
   return rond(DAGEN.reduce((som, d) => som + schedule[d], 0));
