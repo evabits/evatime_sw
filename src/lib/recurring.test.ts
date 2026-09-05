@@ -228,3 +228,33 @@ describe("completeBatchDenial", () => {
     );
   });
 });
+
+describe("recurringInvoiceIntro in het Engels", () => {
+  it("schrijft de inleiding en de aantallen in het Engels", () => {
+    expect(
+      recurringInvoiceIntro({
+        batchnaam: "H3X AUG26",
+        opgeleverdOp: "2026-03-12",
+        totaal: 120,
+        tracksQuality: true,
+        approved: 118,
+        rejected: 2,
+        taal: "EN",
+      }),
+    ).toBe(
+      "Please find enclosed the invoice for H3X AUG26, delivered on 12-MAR-2026. " +
+        "Of the 120 units tested, 118 passed and 2 were rejected.",
+    );
+  });
+
+  it("blijft Nederlands zonder taal", () => {
+    expect(
+      recurringInvoiceIntro({
+        batchnaam: "H3X AUG26",
+        opgeleverdOp: "2026-03-12",
+        totaal: 120,
+        tracksQuality: false,
+      }),
+    ).toBe("Hierbij ontvangt u de factuur voor H3X AUG26, opgeleverd op 12-MRT-2026.");
+  });
+});

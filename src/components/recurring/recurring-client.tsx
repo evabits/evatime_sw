@@ -201,6 +201,9 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
         completing.template,
         { id: completing.id, name: completing.name, generatedInvoiceId: completing.generatedInvoiceId, deliveredAt: completeForm.deliveredAt || vandaagIso() },
         invoer,
+        // Het voorbeeld hoort te tonen wat er straks werkelijk op de factuur
+        // komt, dus in de taal van de klant.
+        completing.template?.customer?.language ?? "NL",
       )
     : null;
 

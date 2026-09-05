@@ -71,6 +71,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [vatRate, setVatRate] = useState(Number(invoice.vatRate));
   const [notes, setNotes] = useState(invoice.notes ?? "");
   const [reference, setReference] = useState(invoice.reference ?? "");
+  const [language, setLanguage] = useState(invoice.language ?? "NL");
   const [subject, setSubject] = useState(invoice.subject ?? "");
   const [intro, setIntro] = useState(invoice.intro ?? "");
   const [lines, setLines] = useState<Line[]>(
@@ -138,6 +139,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     setVatRate(Number(invoice.vatRate));
     setNotes(invoice.notes ?? "");
     setReference(invoice.reference ?? "");
+    setLanguage(invoice.language ?? "NL");
     setSubject(invoice.subject ?? "");
     setIntro(invoice.intro ?? "");
   }
@@ -148,7 +150,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     const res = await fetch(`/api/invoices/${invoice.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, intro, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, intro, language, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -439,6 +441,21 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                 <p className="text-sm">{invoice.subject || <span className="text-muted-foreground italic">—</span>}</p>
               )}
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Taal</p>
+              {editing ? (
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="flex h-7 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                >
+                  <option value="NL">Nederlands</option>
+                  <option value="EN">Engels</option>
+                </select>
+              ) : (
+                <p className="text-sm">{invoice.language === "EN" ? "Engels" : "Nederlands"}</p>
+              )}
+            </div>
           </div>
 
           {/* Inleiding — staat op de factuur boven de regels, dus hier onder kenmerk en
@@ -498,7 +515,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groupLinesByType(displayLines as any[]).map((groep, gi) => (
+              {groupLinesByType(displayLines as any[], language).map((groep, gi) => (
                 <Fragment key={groep.heading ?? `los-${gi}`}>
                   {groep.heading && (
                     <TableRow className="hover:bg-transparent">

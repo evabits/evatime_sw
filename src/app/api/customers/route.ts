@@ -18,6 +18,8 @@ const schema = z.object({
   postalCode: z.string().optional(),
   country: z.string().optional(),
   vatNumber: z.string().optional(),
+  // De standaardtaal voor nieuwe facturen en offertes van deze klant.
+  language: z.enum(["NL", "EN"]).optional(),
   notes: z.string().optional(),
   levelRates: levelRatesField,
 });

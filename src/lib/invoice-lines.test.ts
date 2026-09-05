@@ -170,3 +170,15 @@ describe("groupLinesByType", () => {
     expect(groupLinesByType([])).toEqual([]);
   });
 });
+
+describe("Engelse factuurregels", () => {
+  it("zet de kopjes en de datum in het Engels", () => {
+    const groepen = groupLinesByType([{ lineType: "HOURS" }, { lineType: "KM" }], "EN");
+    expect(groepen.map((g) => g.heading)).toEqual(["Hours:", "Travel:"]);
+  });
+
+  it("houdt de Nederlandse kopjes zonder taal", () => {
+    const groepen = groupLinesByType([{ lineType: "HOURS" }, { lineType: "KM" }]);
+    expect(groepen.map((g) => g.heading)).toEqual(["Uren:", "Ritten:"]);
+  });
+});

@@ -6,7 +6,8 @@ export default async function NewInvoicePage() {
   const customers = await prisma.customer.findMany({
     where: { archivedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    // De taal bepaalt in welke taal de regelomschrijvingen worden opgesteld.
+    select: { id: true, name: true, language: true },
   });
 
   return <NewInvoiceClient customers={serialize(customers)} />;

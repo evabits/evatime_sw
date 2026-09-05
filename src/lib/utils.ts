@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { Taal } from "./document-copy";
 
 export function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
@@ -9,15 +10,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string | null | undefined): string {
-  if (amount === null || amount === undefined) return "€0,00";
+/**
+ * Een bedrag in euro's. Standaard Nederlands (`€ 1.234,56`); met `"EN"` in de
+ * Engelse notatie (`€1,234.56`), voor een factuur of offerte in die taal.
+ */
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  taal: Taal = "NL",
+): string {
+  if (amount === null || amount === undefined) return taal === "EN" ? "€0.00" : "€0,00";
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(num);
+  const locale = taal === "EN" ? "en-GB" : "nl-NL";
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(num);
 }
 
 // Geëxporteerd zodat de tijdas van de planningstijdlijn dezelfde maandnamen
 // toont als formatDate, in plaats van een eigen lijst te dupliceren.
 export const MAANDEN = ["JAN", "FEB", "MRT", "APR", "MEI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
+
+/**
+ * Dezelfde afkortingen in het Engels. Alleen maart, mei en oktober verschillen;
+ * de andere negen staan er onveranderd in zodat de lijst op index blijft
+ * werken en niemand hoeft na te denken over welke wel en welke niet.
+ */
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 /**
  * De enige datumweergave in deze app: `01-JAN-2026`.
@@ -29,11 +45,15 @@ export const MAANDEN = ["JAN", "FEB", "MRT", "APR", "MEI", "JUN", "JUL", "AUG", 
  * database staat op middernacht UTC en komt in Amsterdam op dezelfde dag uit;
  * een tijdstip als "verzonden op" hoort juist in lokale tijd te staan.
  */
-export function formatDate(date: Date | string | null | undefined): string {
+export function formatDate(
+  date: Date | string | null | undefined,
+  taal: Taal = "NL",
+): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "";
-  return `${String(d.getDate()).padStart(2, "0")}-${MAANDEN[d.getMonth()]}-${d.getFullYear()}`;
+  const maanden = taal === "EN" ? MONTHS : MAANDEN;
+  return `${String(d.getDate()).padStart(2, "0")}-${maanden[d.getMonth()]}-${d.getFullYear()}`;
 }
 
 /**

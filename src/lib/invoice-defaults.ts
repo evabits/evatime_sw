@@ -1,3 +1,5 @@
+import { docCopy, type Taal } from "./document-copy";
+
 /**
  * De standaardtekst onderaan een factuur.
  *
@@ -8,5 +10,9 @@
  * De dertig dagen hier horen bij de vervaldatum, die ook op vandaag plus dertig
  * staat.
  */
-export const STANDAARD_BETALINGSTEKST =
-  "Wij verzoeken u vriendelijk het totaalbedrag binnen 30 dagen over te maken op onze IBAN rekening NL90 INGB 0008 9967 99 t.n.v. EVAbits onder vermelding van het factuurnummer.";
+export function standaardBetalingstekst(taal: Taal = "NL"): string {
+  return docCopy(taal).betalingstekst;
+}
+
+/** De Nederlandse tekst, voor waar geen taal in beeld is. */
+export const STANDAARD_BETALINGSTEKST = standaardBetalingstekst("NL");

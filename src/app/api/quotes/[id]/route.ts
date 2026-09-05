@@ -17,6 +17,7 @@ const updateSchema = z.object({
   issueDate: z.string().optional(),
   validUntil: z.string().optional(),
   vatRate: z.number().min(0).max(100).optional(),
+  language: z.enum(["NL", "EN"]).optional(),
   // Niet getrimd naar null: een lege string is hier een keuze ("op deze offerte
   // geen t.a.v.-regel") en moet te onderscheiden blijven van niets ingevuld.
   attention: z.string().optional().nullable(),
@@ -105,6 +106,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           ...(data.validUntil ? { validUntil: new Date(data.validUntil) } : {}),
           ...(data.vatRate !== undefined ? { vatRate: data.vatRate } : {}),
           ...(data.attention !== undefined ? { attention: data.attention } : {}),
+          ...(data.language !== undefined ? { language: data.language } : {}),
           ...(data.reference !== undefined ? { reference: data.reference } : {}),
           ...(data.subject !== undefined ? { subject: data.subject } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),

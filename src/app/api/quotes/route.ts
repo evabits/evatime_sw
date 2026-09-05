@@ -58,6 +58,13 @@ export async function POST(req: Request) {
     const vatAmount = (subtotal * data.vatRate) / 100;
     const total = subtotal + vatAmount;
     const quoteNumber = await getNextQuoteNumber();
+    // De taal komt van de klant en wordt hier vastgelegd. Dat moet nú gebeuren:
+    // de regelomschrijvingen zijn al in die taal opgesteld en worden als tekst
+    // opgeslagen, dus later omzetten laat ze staan zoals ze zijn.
+    const klant = await prisma.customer.findUnique({
+      where: { id: data.customerId },
+      select: { language: true },
+    });
 
     const quote = await prisma.quote.create({
       data: {
@@ -72,6 +79,7 @@ export async function POST(req: Request) {
         reference: data.reference ?? null,
         subject: data.subject ?? null,
         notes: data.notes ?? null,
+        language: klant?.language ?? "NL",
         lines: {
           create: data.lines.map((l) => ({
             description: l.description,

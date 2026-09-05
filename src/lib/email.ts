@@ -6,6 +6,7 @@ import { InvoicePdf } from "@/components/invoices/invoice-pdf";
 import { QuotePdf } from "@/components/quotes/quote-pdf";
 import { customerMailCopy } from "@/lib/mail-copy";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
+import { docCopy } from "@/lib/document-copy";
 
 const transport = nodemailer.createTransport(
   MailtrapTransport({ token: process.env.MAILTRAP_API_TOKEN! })
@@ -36,14 +37,16 @@ async function fetchAttachment(a: { url: string; filename: string }) {
 }
 
 function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
+  const taal = invoice.language ?? "NL";
+  const t = docCopy(taal);
   const linesHtml = invoice.lines
     .map(
       (l: any) => `
     <tr>
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;">${l.description}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${Number(l.quantity).toFixed(2)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.unitPrice))}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.total))}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.unitPrice), taal)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.total), taal)}</td>
     </tr>`
     )
     .join("");
@@ -55,39 +58,39 @@ function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   <p style="font-size:20px;font-weight:700;margin:0 0 4px;">${settings?.name ?? ""}</p>
   <p style="color:#666;margin:0 0 32px;">${settings?.email ?? ""}</p>
 
-  <p style="margin:0 0 8px;">Geachte ${invoice.customer.name},</p>
-  <p style="margin:0 0 24px;">Hierbij ontvangt u factuur <strong>${invoice.invoiceNumber}</strong>${invoice.subject ? ` — ${invoice.subject}` : ""}.</p>
+  <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
+  <p style="margin:0 0 24px;">${t.mailFactuurZin(invoice.invoiceNumber, invoice.subject ? ` — ${invoice.subject}` : "")}</p>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>
       <tr style="background:#f8f9fa;">
-        <th style="padding:8px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:#888;">Omschrijving</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Aantal</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Prijs</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Totaal</th>
+        <th style="padding:8px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:#888;">${t.omschrijving}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.aantal}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.prijs}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.totaal}</th>
       </tr>
     </thead>
     <tbody>${linesHtml}</tbody>
   </table>
 
   <table style="margin-left:auto;width:240px;">
-    <tr><td style="padding:4px 0;">Subtotaal</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(invoice.subtotal))}</td></tr>
-    <tr><td style="padding:4px 0;">BTW (${Number(invoice.vatRate).toFixed(0)}%)</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(invoice.vatAmount))}</td></tr>
+    <tr><td style="padding:4px 0;">${t.subtotaal}</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(invoice.subtotal), taal)}</td></tr>
+    <tr><td style="padding:4px 0;">${t.btwMet(Number(invoice.vatRate).toFixed(0))}</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(invoice.vatAmount), taal)}</td></tr>
     <tr style="font-weight:700;font-size:16px;border-top:2px solid #111;">
-      <td style="padding:8px 0 4px;">Totaal</td>
-      <td style="padding:8px 0 4px;text-align:right;">${formatCurrency(Number(invoice.total))}</td>
+      <td style="padding:8px 0 4px;">${t.totaal}</td>
+      <td style="padding:8px 0 4px;text-align:right;">${formatCurrency(Number(invoice.total), taal)}</td>
     </tr>
   </table>
 
-  <p style="margin:24px 0 8px;color:#666;font-size:13px;">Factuurdatum: ${fmt(invoice.issueDate)} &nbsp;·&nbsp; Vervaldatum: ${fmt(invoice.dueDate)}</p>
+  <p style="margin:24px 0 8px;color:#666;font-size:13px;">${t.factuurdatum}: ${fmt(invoice.issueDate, taal)} &nbsp;·&nbsp; ${t.vervaldatum}: ${fmt(invoice.dueDate, taal)}</p>
   ${invoice.notes ? `<p style="margin:0 0 24px;color:#444;font-size:13px;white-space:pre-wrap;">${invoice.notes}</p>` : ""}
 
-  <a href="${publicUrl}" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken / afdrukken</a>
+  <a href="${publicUrl}" style="display:inline-block;margin-top:16px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">${t.mailKnopFactuur}</a>
 
   <p style="margin-top:40px;color:#888;font-size:12px;">
     ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}<br>
     ${settings?.iban ? `IBAN: ${settings.iban}` : ""}
-    ${settings?.vatNumber ? ` &nbsp;·&nbsp; BTW: ${settings.vatNumber}` : ""}
+    ${settings?.vatNumber ? ` &nbsp;·&nbsp; ${t.labelBtwNummer}: ${settings.vatNumber}` : ""}
     ${settings?.kvkNumber ? ` &nbsp;·&nbsp; KvK: ${settings.kvkNumber}` : ""}
   </p>
 </div>
@@ -105,8 +108,9 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
     ...(invoice.attachments ?? []).map(fetchAttachment),
   ]);
 
+  const t = docCopy(invoice.language);
   const attachments = [
-    { filename: `Factuur-${invoice.invoiceNumber}.pdf`, content: pdfBuffer },
+    { filename: t.bestandsnaamFactuur(invoice.invoiceNumber), content: pdfBuffer },
     ...blobAttachments,
   ];
 
@@ -114,13 +118,15 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
     from,
     to: invoice.customer.email,
     ...customerMailCopy(settings),
-    subject: `Factuur ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
+    subject: t.mailOnderwerpFactuur(invoice.invoiceNumber, invoice.subject ? ` — ${invoice.subject}` : ""),
     html: invoiceHtml(invoice, settings, publicUrl),
     attachments,
   });
 }
 
 export async function sendReminderEmail(invoice: any, settings: any): Promise<void> {
+  const taal = invoice.language ?? "NL";
+  const t = docCopy(taal);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/invoice/${invoice.viewToken}`;
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
@@ -131,17 +137,17 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
 <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
   <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
 
-  <p style="margin:0 0 8px;">Geachte ${invoice.customer.name},</p>
-  <p style="margin:0 0 16px;">Wij constateren dat factuur <strong>${invoice.invoiceNumber}</strong> van <strong>${fmt(invoice.issueDate)}</strong> met vervaldatum <strong>${fmt(invoice.dueDate)}</strong> nog niet is voldaan.</p>
-  <p style="margin:0 0 16px;">Het openstaande bedrag is <strong>${formatCurrency(Number(invoice.total))}</strong>.</p>
-  <p style="margin:0 0 24px;">Graag verzoeken wij u dit bedrag zo spoedig mogelijk over te maken onder vermelding van het factuurnummer.</p>
+  <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
+  <p style="margin:0 0 16px;">${t.herinneringZin(invoice.invoiceNumber, fmt(invoice.issueDate, taal), fmt(invoice.dueDate, taal))}</p>
+  <p style="margin:0 0 16px;">${t.herinneringBedrag(formatCurrency(Number(invoice.total), taal))}</p>
+  <p style="margin:0 0 24px;">${t.herinneringVerzoek}</p>
 
-  <a href="${publicUrl}" style="display:inline-block;margin-top:8px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">Factuur bekijken</a>
+  <a href="${publicUrl}" style="display:inline-block;margin-top:8px;padding:10px 20px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;">${t.mailKnopFactuurBekijken}</a>
 
   <p style="margin-top:40px;color:#888;font-size:12px;">
     ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}<br>
     ${settings?.iban ? `IBAN: ${settings.iban}` : ""}
-    ${settings?.vatNumber ? ` &nbsp;·&nbsp; BTW: ${settings.vatNumber}` : ""}
+    ${settings?.vatNumber ? ` &nbsp;·&nbsp; ${t.labelBtwNummer}: ${settings.vatNumber}` : ""}
   </p>
 </div>
 </body>
@@ -151,7 +157,7 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
     from,
     to: invoice.customer.email,
     ...customerMailCopy(settings),
-    subject: `Herinnering: openstaande factuur ${invoice.invoiceNumber}`,
+    subject: t.mailOnderwerpHerinnering(invoice.invoiceNumber),
     html,
   });
 }
@@ -267,6 +273,8 @@ export async function sendReviewPlannedEmail(
 }
 
 export async function sendQuoteEmail(quote: any, settings: any, naar?: string): Promise<void> {
+  const taal = quote.language ?? "NL";
+  const t = docCopy(taal);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const publicUrl = `${appUrl}/quote/${quote.viewToken}`;
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
@@ -276,8 +284,8 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
     <tr>
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;">${l.description}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${Number(l.quantity).toFixed(2)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.unitPrice))}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.total))}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.unitPrice), taal)}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatCurrency(Number(l.total), taal)}</td>
     </tr>`)
     .join("");
 
@@ -288,34 +296,34 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
   <p style="font-size:20px;font-weight:700;margin:0 0 4px;">${settings?.name ?? ""}</p>
   <p style="color:#666;margin:0 0 32px;">${settings?.email ?? ""}</p>
 
-  <p style="margin:0 0 8px;">Geachte ${quote.customer.name},</p>
-  <p style="margin:0 0 24px;">Hierbij ontvangt u offerte <strong>${quote.quoteNumber}</strong>${quote.subject ? ` — ${quote.subject}` : ""}.</p>
+  <p style="margin:0 0 8px;">${t.aanhef(quote.customer.name)}</p>
+  <p style="margin:0 0 24px;">${t.mailOfferteZin(quote.quoteNumber, quote.subject ? ` — ${quote.subject}` : "")}</p>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>
       <tr style="background:#f8f9fa;">
-        <th style="padding:8px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:#888;">Omschrijving</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Aantal</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Prijs</th>
-        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">Totaal</th>
+        <th style="padding:8px 12px;text-align:left;font-size:12px;text-transform:uppercase;color:#888;">${t.omschrijving}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.aantal}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.prijs}</th>
+        <th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;color:#888;">${t.totaal}</th>
       </tr>
     </thead>
     <tbody>${linesHtml}</tbody>
   </table>
 
   <table style="margin-left:auto;width:240px;">
-    <tr><td style="padding:4px 0;">Subtotaal</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(quote.subtotal))}</td></tr>
-    <tr><td style="padding:4px 0;">BTW (${Number(quote.vatRate).toFixed(0)}%)</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(quote.vatAmount))}</td></tr>
+    <tr><td style="padding:4px 0;">${t.subtotaal}</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(quote.subtotal), taal)}</td></tr>
+    <tr><td style="padding:4px 0;">${t.btwMet(Number(quote.vatRate).toFixed(0))}</td><td style="padding:4px 0;text-align:right;">${formatCurrency(Number(quote.vatAmount), taal)}</td></tr>
     <tr style="font-weight:700;font-size:16px;border-top:2px solid #111;">
-      <td style="padding:8px 0 4px;">Totaal</td>
-      <td style="padding:8px 0 4px;text-align:right;">${formatCurrency(Number(quote.total))}</td>
+      <td style="padding:8px 0 4px;">${t.totaal}</td>
+      <td style="padding:8px 0 4px;text-align:right;">${formatCurrency(Number(quote.total), taal)}</td>
     </tr>
   </table>
 
-  <p style="margin:24px 0 8px;color:#666;font-size:13px;">Datum: ${fmt(quote.issueDate)} &nbsp;·&nbsp; Geldig tot: ${fmt(quote.validUntil)}</p>
+  <p style="margin:24px 0 8px;color:#666;font-size:13px;">${t.datum}: ${fmt(quote.issueDate, taal)} &nbsp;·&nbsp; ${t.geldigTot}: ${fmt(quote.validUntil, taal)}</p>
   ${quote.notes ? `<p style="margin:0 0 24px;color:#444;font-size:13px;white-space:pre-wrap;">${quote.notes}</p>` : ""}
 
-  <a href="${publicUrl}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Offerte bekijken &amp; goedkeuren</a>
+  <a href="${publicUrl}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#397d3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">${t.mailKnopOfferte}</a>
 
   <p style="margin-top:40px;color:#888;font-size:12px;">
     ${settings?.name ?? ""} &nbsp;·&nbsp; ${settings?.email ?? ""}<br>
@@ -336,10 +344,10 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
     // dan bewust een ander adres gekozen voor deze ene verzending.
     to: naar ?? quote.customer.email,
     ...customerMailCopy(settings),
-    subject: `Offerte ${quote.quoteNumber}${quote.subject ? ` — ${quote.subject}` : ""}`,
+    subject: t.mailOnderwerpOfferte(quote.quoteNumber, quote.subject ? ` — ${quote.subject}` : ""),
     html,
     attachments: [
-      { filename: `Offerte-${quote.quoteNumber}.pdf`, content: pdfBuffer },
+      { filename: t.bestandsnaamOfferte(quote.quoteNumber), content: pdfBuffer },
       ...extraAttachments,
     ],
   });

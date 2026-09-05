@@ -111,6 +111,13 @@ export async function POST(req: Request) {
   const vatAmount = (subtotal * data.vatRate) / 100;
   const total = subtotal + vatAmount;
   const invoiceNumber = await nextInvoiceNumber();
+  // De taal komt van de klant en wordt hier vastgelegd. Dat moet nú gebeuren:
+  // de regelomschrijvingen zijn al in die taal opgesteld en worden als tekst
+  // opgeslagen, dus later omzetten laat ze staan zoals ze zijn.
+  const klant = await prisma.customer.findUnique({
+    where: { id: data.customerId },
+    select: { language: true },
+  });
 
   const invoice = await prisma.$transaction(async (tx) => {
     const inv = await tx.invoice.create({
@@ -124,6 +131,7 @@ export async function POST(req: Request) {
         subtotal,
         total,
         notes: data.notes,
+        language: klant?.language ?? "NL",
       },
     });
 

@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { formatDate as fmt } from "@/lib/utils";
 import { customerAddressLines } from "@/lib/customer-address";
+import { docCopy } from "@/lib/document-copy";
 
 const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 10, color: "#111", padding: "40px 48px 64px" },
@@ -32,12 +33,14 @@ const s = StyleSheet.create({
   bold: { fontFamily: "Helvetica-Bold" },
 });
 
-function fmtCurrency(n: number) {
-  return `€ ${n.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtCurrency(n: number, locale: string) {
+  return `€ ${n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
   const vatRate = Number(quote.vatRate);
+  const taal = quote.language ?? "NL";
+  const t = docCopy(taal);
 
   return (
     <Document>
@@ -49,7 +52,7 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
         )}
         <View style={s.row}>
           <View style={s.addressBlock}>
-            {customerAddressLines(quote.customer, quote.attention).map((regel, i) => (
+            {customerAddressLines(quote.customer, quote.attention, taal).map((regel, i) => (
               <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
           </View>
@@ -60,33 +63,33 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
             {settings?.email && <><Text>{"\n"}</Text><Text>{settings.email}</Text></>}
             {(settings?.kvkNumber || settings?.vatNumber || settings?.iban) && <Text>{"\n"}</Text>}
             {settings?.kvkNumber && <Text>KvK: {settings.kvkNumber}</Text>}
-            {settings?.vatNumber && <Text>Btw: {settings.vatNumber}</Text>}
+            {settings?.vatNumber && <Text>{t.labelBtwNummer}: {settings.vatNumber}</Text>}
           </View>
         </View>
 
-        <Text style={s.heading}>OFFERTE</Text>
+        <Text style={s.heading}>{t.offerte}</Text>
 
         <View style={s.metaRow}>
           <View>
             <View style={{ flexDirection: "row", marginBottom: 2 }}>
-              <Text style={s.metaLabel}>Offertenummer:</Text>
+              <Text style={s.metaLabel}>{t.offertenummer}:</Text>
               <Text>{quote.quoteNumber}</Text>
             </View>
             {quote.reference && (
               <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={s.metaLabel}>Kenmerk:</Text>
+                <Text style={s.metaLabel}>{t.kenmerk}:</Text>
                 <Text>{quote.reference}</Text>
               </View>
             )}
           </View>
           <View style={{ textAlign: "right" }}>
             <View style={{ flexDirection: "row", marginBottom: 2, justifyContent: "flex-end" }}>
-              <Text style={s.metaLabel}>Datum:</Text>
-              <Text>{fmt(quote.issueDate)}</Text>
+              <Text style={s.metaLabel}>{t.datum}:</Text>
+              <Text>{fmt(quote.issueDate, taal)}</Text>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-              <Text style={s.metaLabel}>Geldig tot:</Text>
-              <Text>{fmt(quote.validUntil)}</Text>
+              <Text style={s.metaLabel}>{t.geldigTot}:</Text>
+              <Text>{fmt(quote.validUntil, taal)}</Text>
             </View>
           </View>
         </View>
@@ -94,34 +97,34 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
         {quote.subject && <Text style={s.subject}>{quote.subject}</Text>}
 
         <View style={s.tableHeader}>
-          <Text style={[s.headerText, s.colDesc]}>Omschrijving</Text>
-          <Text style={[s.headerText, s.colNum]}>Aantal</Text>
-          <Text style={[s.headerText, s.colPrice]}>Prijs</Text>
-          <Text style={[s.headerText, s.colTotal]}>Totaal</Text>
+          <Text style={[s.headerText, s.colDesc]}>{t.omschrijving}</Text>
+          <Text style={[s.headerText, s.colNum]}>{t.aantal}</Text>
+          <Text style={[s.headerText, s.colPrice]}>{t.prijs}</Text>
+          <Text style={[s.headerText, s.colTotal]}>{t.totaal}</Text>
         </View>
 
         {quote.lines.map((line: any) => (
           <View key={line.id} style={s.tableRow}>
             <Text style={s.colDesc}>{line.description}</Text>
             <Text style={s.colNum}>{Number(line.quantity).toFixed(2)}</Text>
-            <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice))}</Text>
-            <Text style={s.colTotal}>{fmtCurrency(Number(line.total))}</Text>
+            <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice), t.locale)}</Text>
+            <Text style={s.colTotal}>{fmtCurrency(Number(line.total), t.locale)}</Text>
           </View>
         ))}
 
         <View style={s.totalsWrap}>
           <View style={s.totals}>
             <View style={s.totalRow}>
-              <Text>Subtotaal</Text>
-              <Text>{fmtCurrency(Number(quote.subtotal))}</Text>
+              <Text>{t.subtotaal}</Text>
+              <Text>{fmtCurrency(Number(quote.subtotal), t.locale)}</Text>
             </View>
             <View style={s.totalRow}>
-              <Text>BTW {vatRate.toFixed(0)}%</Text>
-              <Text>{fmtCurrency(Number(quote.vatAmount))}</Text>
+              <Text>{t.btwMet(vatRate.toFixed(0))}</Text>
+              <Text>{fmtCurrency(Number(quote.vatAmount), t.locale)}</Text>
             </View>
             <View style={s.totalGrand}>
-              <Text style={s.totalGrandText}>Totaal</Text>
-              <Text style={s.totalGrandText}>{fmtCurrency(Number(quote.total))}</Text>
+              <Text style={s.totalGrandText}>{t.totaal}</Text>
+              <Text style={s.totalGrandText}>{fmtCurrency(Number(quote.total), t.locale)}</Text>
             </View>
           </View>
         </View>

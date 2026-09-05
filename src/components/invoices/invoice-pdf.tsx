@@ -2,6 +2,7 @@ import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/render
 import { groupLinesByType } from "@/lib/invoice-lines";
 import { customerAddressLines } from "@/lib/customer-address";
 import { formatDate as fmt } from "@/lib/utils";
+import { docCopy } from "@/lib/document-copy";
 
 const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 10, color: "#111", padding: "40px 48px 64px" },
@@ -40,12 +41,15 @@ const s = StyleSheet.create({
   bold: { fontFamily: "Helvetica-Bold" },
 });
 
-function fmtCurrency(n: number) {
-  return `€ ${n.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtCurrency(n: number, locale: string) {
+  return `€ ${n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any }) {
   const vatRate = Number(invoice.vatRate);
+  // De taal staat op de factuur zelf, dus alles hieronder volgt hem vanzelf.
+  const taal = invoice.language ?? "NL";
+  const t = docCopy(taal);
 
   return (
     <Document>
@@ -62,7 +66,7 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
         {/* Klant links, bedrijf rechts */}
         <View style={s.row}>
           <View style={s.addressBlock}>
-            {customerAddressLines(invoice.customer).map((regel, i) => (
+            {customerAddressLines(invoice.customer, undefined, taal).map((regel, i) => (
               <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
           </View>
@@ -73,42 +77,42 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
             {settings?.email && <><Text>{"\n"}</Text><Text>{settings.email}</Text></>}
             {(settings?.kvkNumber || settings?.vatNumber || settings?.iban) && <Text>{"\n"}</Text>}
             {settings?.kvkNumber && <Text>KvK: {settings.kvkNumber}</Text>}
-            {settings?.vatNumber && <Text>Btw: {settings.vatNumber}</Text>}
+            {settings?.vatNumber && <Text>{t.labelBtwNummer}: {settings.vatNumber}</Text>}
             {settings?.iban && <Text>IBAN: {settings.iban}</Text>}
           </View>
         </View>
 
         {/* FACTUUR */}
-        <Text style={s.heading}>FACTUUR</Text>
+        <Text style={s.heading}>{t.factuur}</Text>
 
         {/* Meta */}
         <View style={s.metaRow}>
           <View>
             <View style={{ flexDirection: "row", marginBottom: 2 }}>
-              <Text style={s.metaLabel}>Factuurnummer:</Text>
+              <Text style={s.metaLabel}>{t.factuurnummer}:</Text>
               <Text>{invoice.invoiceNumber}</Text>
             </View>
             {invoice.reference && (
               <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={s.metaLabel}>Kenmerk:</Text>
+                <Text style={s.metaLabel}>{t.kenmerk}:</Text>
                 <Text>{invoice.reference}</Text>
               </View>
             )}
             {invoice.customer?.customerNumber && (
               <View style={{ flexDirection: "row" }}>
-                <Text style={s.metaLabel}>Klantnummer:</Text>
+                <Text style={s.metaLabel}>{t.klantnummer}:</Text>
                 <Text>{invoice.customer.customerNumber}</Text>
               </View>
             )}
           </View>
           <View style={{ textAlign: "right" }}>
             <View style={{ flexDirection: "row", marginBottom: 2, justifyContent: "flex-end" }}>
-              <Text style={s.metaLabel}>Factuurdatum:</Text>
-              <Text>{fmt(invoice.issueDate)}</Text>
+              <Text style={s.metaLabel}>{t.factuurdatum}:</Text>
+              <Text>{fmt(invoice.issueDate, taal)}</Text>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-              <Text style={s.metaLabel}>Vervaldatum:</Text>
-              <Text>{fmt(invoice.dueDate)}</Text>
+              <Text style={s.metaLabel}>{t.vervaldatum}:</Text>
+              <Text>{fmt(invoice.dueDate, taal)}</Text>
             </View>
           </View>
         </View>
@@ -121,23 +125,23 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
 
         {/* Table header */}
         <View style={s.tableHeader}>
-          <Text style={[s.headerText, s.colDesc]}>Omschrijving</Text>
-          <Text style={[s.headerText, s.colNum]}>Aantal</Text>
-          <Text style={[s.headerText, s.colPrice]}>Prijs</Text>
-          <Text style={[s.headerText, s.colTotal]}>Totaal</Text>
-          <Text style={[s.headerText, s.colBtw]}>Btw</Text>
+          <Text style={[s.headerText, s.colDesc]}>{t.omschrijving}</Text>
+          <Text style={[s.headerText, s.colNum]}>{t.aantal}</Text>
+          <Text style={[s.headerText, s.colPrice]}>{t.prijs}</Text>
+          <Text style={[s.headerText, s.colTotal]}>{t.totaal}</Text>
+          <Text style={[s.headerText, s.colBtw]}>{t.btw}</Text>
         </View>
 
         {/* Lines, per soort met een kopje ertussen */}
-        {groupLinesByType(invoice.lines as any[]).map((groep, gi) => (
+        {groupLinesByType(invoice.lines as any[], taal).map((groep, gi) => (
           <View key={groep.heading ?? `los-${gi}`}>
             {groep.heading && <Text style={s.groupHeading}>{groep.heading}</Text>}
             {groep.lines.map((line: any) => (
               <View key={line.id} style={s.tableRow}>
                 <Text style={s.colDesc}>{line.description}</Text>
                 <Text style={s.colNum}>{Number(line.quantity).toFixed(2)}</Text>
-                <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice))}</Text>
-                <Text style={s.colTotal}>{fmtCurrency(Number(line.total))}</Text>
+                <Text style={s.colPrice}>{fmtCurrency(Number(line.unitPrice), t.locale)}</Text>
+                <Text style={s.colTotal}>{fmtCurrency(Number(line.total), t.locale)}</Text>
                 <Text style={s.colBtw}>{vatRate.toFixed(0)}%</Text>
               </View>
             ))}
@@ -148,16 +152,16 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
         <View style={s.totalsWrap}>
           <View style={s.totals}>
             <View style={s.totalRow}>
-              <Text>Subtotaal</Text>
-              <Text>{fmtCurrency(Number(invoice.subtotal))}</Text>
+              <Text>{t.subtotaal}</Text>
+              <Text>{fmtCurrency(Number(invoice.subtotal), t.locale)}</Text>
             </View>
             <View style={s.totalRow}>
-              <Text>BTW {vatRate.toFixed(0)}%</Text>
-              <Text>{fmtCurrency(Number(invoice.vatAmount))}</Text>
+              <Text>{t.btwMet(vatRate.toFixed(0))}</Text>
+              <Text>{fmtCurrency(Number(invoice.vatAmount), t.locale)}</Text>
             </View>
             <View style={s.totalGrand}>
-              <Text style={s.totalGrandText}>Totaal</Text>
-              <Text style={s.totalGrandText}>{fmtCurrency(Number(invoice.total))}</Text>
+              <Text style={s.totalGrandText}>{t.totaal}</Text>
+              <Text style={s.totalGrandText}>{fmtCurrency(Number(invoice.total), t.locale)}</Text>
             </View>
           </View>
         </View>
