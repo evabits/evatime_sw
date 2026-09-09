@@ -11,6 +11,7 @@ export type PeriodPreset =
   | "this-week"
   | "last-week"
   | "this-year"
+  | "all"
   | "custom";
 
 /** De volgorde waarin de keuzelijst de opties toont. */
@@ -20,6 +21,7 @@ export const PERIOD_ORDER: PeriodPreset[] = [
   "this-week",
   "last-week",
   "this-year",
+  "all",
   "custom",
 ];
 
@@ -29,6 +31,7 @@ export const PERIOD_LABELS: Record<PeriodPreset, string> = {
   "this-week": "Deze week",
   "last-week": "Vorige week",
   "this-year": "Dit jaar",
+  all: "Alles",
   custom: "Aangepast",
 };
 
@@ -61,6 +64,11 @@ export function resolvePeriod(
     case "this-year":
       // Bewust tot en met vandaag, niet tot en met 31 december.
       return { from: fmt(startOfYear(now)), to: fmt(now) };
+    case "all":
+      // Een vaste ondergrens in plaats van een open bereik: de rapportage
+      // vraagt om twee datums, en er bestaat geen registratie van vóór dit
+      // bedrijf. Tot en met vandaag, net als "dit jaar".
+      return { from: "2000-01-01", to: fmt(now) };
     case "custom":
       return null;
   }
