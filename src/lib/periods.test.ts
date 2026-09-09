@@ -63,13 +63,27 @@ describe("resolvePeriod edge cases", () => {
 describe("PERIOD_ORDER and PERIOD_LABELS", () => {
   it("lists the presets in the order the dropdown shows them", () => {
     expect(PERIOD_ORDER).toEqual([
-      "this-month", "last-month", "this-week", "last-week", "this-year", "custom",
+      "this-month", "last-month", "this-week", "last-week", "this-year", "all", "custom",
     ]);
   });
 
   it("has a Dutch label for every preset in the order", () => {
     expect(PERIOD_ORDER.map((p) => PERIOD_LABELS[p])).toEqual([
-      "Deze maand", "Vorige maand", "Deze week", "Vorige week", "Dit jaar", "Aangepast",
+      "Deze maand", "Vorige maand", "Deze week", "Vorige week", "Dit jaar", "Alles", "Aangepast",
     ]);
+  });
+});
+
+describe("de periode Alles", () => {
+  it("loopt van ver vóór het bedrijf tot en met vandaag", () => {
+    expect(resolvePeriod("all", new Date("2026-09-09T12:00:00Z"))).toEqual({
+      from: "2000-01-01",
+      to: "2026-09-09",
+    });
+  });
+
+  it("staat in de keuzelijst met een eigen label", () => {
+    expect(PERIOD_ORDER).toContain("all");
+    expect(PERIOD_LABELS.all).toBe("Alles");
   });
 });

@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
+import { formatHours } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -486,7 +488,22 @@ export function ProjectsClient({ initialProjects, customers, allTags, users, ini
                       : <Badge variant="outline" className="text-xs">Nee</Badge>}
                   </TableCell>
                   <TableCell className="text-right">{p.defaultKmRate ? `€${Number(p.defaultKmRate).toFixed(2)}` : "—"}</TableCell>
-                  <TableCell className="text-right">{p._count?.timeEntries ?? 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.hours > 0 ? (
+                      // Naar de rapportage van dit ene project, over de hele
+                      // looptijd. Dat scheelt het project opzoeken in een lijst
+                      // van tientallen.
+                      <Link
+                        href={`/reports?project=${p.id}&period=all`}
+                        className="underline underline-offset-2 hover:text-primary"
+                        title="Toon de geschreven uren"
+                      >
+                        {formatHours(p.hours)}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {p.members?.length ?? 0}
                   </TableCell>

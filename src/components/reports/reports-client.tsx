@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { formatHours, formatCurrency } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { TimeRows } from "@/components/reports/time-rows";
 import { KmRows } from "@/components/reports/km-rows";
 import { ExpenseRows } from "@/components/reports/expense-rows";
 import { ENTRY_ENDPOINT, type BulkKind, type BulkAction } from "@/lib/bulk-entries";
-import { resolvePeriod } from "@/lib/periods";
+import { resolvePeriod, type PeriodPreset } from "@/lib/periods";
 import { EntryEditDialog } from "./entry-edit-dialog";
 import { BulkBar } from "./bulk-bar";
 
@@ -20,17 +20,30 @@ interface Props {
   tags: { id: string; name: string }[];
   categories: any[];
   role: string;
+  /** Voorgevuld vanuit de URL, bijvoorbeeld vanaf het projectoverzicht. */
+  initialProjectId?: string;
+  initialPeriod?: PeriodPreset;
 }
 
-export function ReportsClient({ customers, projects, users, tags, categories, role }: Props) {
+export function ReportsClient({
+  customers,
+  projects,
+  users,
+  tags,
+  categories,
+  role,
+  initialProjectId = "",
+  initialPeriod,
+}: Props) {
   const [filters, setFilters] = useState<FilterState>(() => {
-    const range = resolvePeriod("this-month", new Date())!;
+    const periode = initialPeriod ?? "this-month";
+    const range = resolvePeriod(periode, new Date())!;
     return {
-      period: "this-month",
+      period: periode,
       from: range.from,
       to: range.to,
       customerId: "",
-      projectId: "",
+      projectId: initialProjectId,
       userId: "",
       billable: "",
       invoiced: "",
@@ -99,6 +112,14 @@ export function ReportsClient({ customers, projects, users, tags, categories, ro
     setSelected((prev) => ({ ...prev, [kind]: new Set<string>() }));
     await loadReport();
   }
+
+  // Wie via een link binnenkomt met een project in de URL wil het rapport zien,
+  // niet eerst nog op Toon drukken. Eén keer, bij binnenkomst: daarna is het
+  // scherm van de gebruiker.
+  useEffect(() => {
+    if (initialProjectId) loadReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadReport() {
     setLoading(true);
