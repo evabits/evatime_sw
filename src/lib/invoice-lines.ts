@@ -11,6 +11,14 @@ import { docCopy, type Taal } from "./document-copy";
  * Lege stukken vallen weg in plaats van als streepje of dubbele scheiding te
  * blijven staan; blijft er niets over, dan draagt `terugval` de regel.
  */
+/**
+ * Een gewoon koppelteken en geen lang minteken: dat laatste is niet-ASCII, en
+ * een klant kreeg onze mail daardoor niet in zijn inbox — zijn filter zag het
+ * als een vreemd teken. Het staat ook op de PDF, dus het hoort overal hetzelfde
+ * te zijn.
+ */
+const SCHEIDING = " - ";
+
 function regelOmschrijving(
   datum: string | Date,
   wie: string | undefined,
@@ -22,7 +30,7 @@ function regelOmschrijving(
   const delen = [formatDate(datum, taal), wie, project, eigen?.trim()].filter(
     (d): d is string => !!d && d.length > 0,
   );
-  return delen.length > 0 ? delen.join(" — ") : terugval;
+  return delen.length > 0 ? delen.join(SCHEIDING) : terugval;
 }
 
 /** Datum eerst, dan naam: zonder vaste volgorde is een lange factuur onleesbaar. */

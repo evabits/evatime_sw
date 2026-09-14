@@ -59,7 +59,7 @@ function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   <p style="color:#666;margin:0 0 32px;">${settings?.email ?? ""}</p>
 
   <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
-  <p style="margin:0 0 24px;">${t.mailFactuurZin(invoice.invoiceNumber, invoice.subject ? ` — ${invoice.subject}` : "")}</p>
+  <p style="margin:0 0 24px;">${t.mailFactuurZin(invoice.invoiceNumber, invoice.subject ? ` - ${invoice.subject}` : "")}</p>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>
@@ -118,7 +118,7 @@ export async function sendInvoiceEmail(invoice: any, settings: any): Promise<voi
     from,
     to: invoice.customer.email,
     ...customerMailCopy(settings),
-    subject: t.mailOnderwerpFactuur(invoice.invoiceNumber, invoice.subject ? ` — ${invoice.subject}` : ""),
+    subject: t.mailOnderwerpFactuur(invoice.invoiceNumber, invoice.subject ? ` - ${invoice.subject}` : ""),
     html: invoiceHtml(invoice, settings, publicUrl),
     attachments,
   });
@@ -222,8 +222,8 @@ export async function sendBookkeepingEmail(invoice: any, settings: any): Promise
   await transport.sendMail({
     from,
     to,
-    subject: `Verkoopboeking ${invoice.invoiceNumber}${invoice.subject ? ` — ${invoice.subject}` : ""}`,
-    text: `Factuur ${invoice.invoiceNumber} voor ${invoice.customer.name} — ${formatCurrency(Number(invoice.total))}`,
+    subject: `Verkoopboeking ${invoice.invoiceNumber}${invoice.subject ? ` - ${invoice.subject}` : ""}`,
+    text: `Factuur ${invoice.invoiceNumber} voor ${invoice.customer.name} - ${formatCurrency(Number(invoice.total))}`,
     attachments: [{ filename: `Factuur-${invoice.invoiceNumber}.pdf`, content: pdfBuffer }],
   });
 }
@@ -297,7 +297,7 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
   <p style="color:#666;margin:0 0 32px;">${settings?.email ?? ""}</p>
 
   <p style="margin:0 0 8px;">${t.aanhef(quote.customer.name)}</p>
-  <p style="margin:0 0 24px;">${t.mailOfferteZin(quote.quoteNumber, quote.subject ? ` — ${quote.subject}` : "")}</p>
+  <p style="margin:0 0 24px;">${t.mailOfferteZin(quote.quoteNumber, quote.subject ? ` - ${quote.subject}` : "")}</p>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>
@@ -344,7 +344,7 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
     // dan bewust een ander adres gekozen voor deze ene verzending.
     to: naar ?? quote.customer.email,
     ...customerMailCopy(settings),
-    subject: t.mailOnderwerpOfferte(quote.quoteNumber, quote.subject ? ` — ${quote.subject}` : ""),
+    subject: t.mailOnderwerpOfferte(quote.quoteNumber, quote.subject ? ` - ${quote.subject}` : ""),
     html,
     attachments: [
       { filename: t.bestandsnaamOfferte(quote.quoteNumber), content: pdfBuffer },
