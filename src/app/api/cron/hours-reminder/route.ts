@@ -50,7 +50,10 @@ export async function GET(req: Request) {
 
   const settings = await prisma.companySettings.findFirst();
 
-  const weekLabel = `${formatDate(weekStart)} – ${formatDate(weekEnd)}`;
+  // Koppelteken en geen kort lang-minteken: dit label staat in het onderwerp van
+  // de mail, en een niet-ASCII teken in een Subject-header is precies wat strenge
+  // filters weren.
+  const weekLabel = `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
 
   let reminded = 0;
   for (const user of users) {

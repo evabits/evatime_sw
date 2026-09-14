@@ -24,7 +24,7 @@ describe("hourInvoiceLines", () => {
   it("makes one line per entry, naming the day, the person and the work", () => {
     expect(hourInvoiceLines([uur({ id: "t1" })])).toEqual([
       {
-        description: "07-JUL-2026 — Merlijn Kunst — ACQstacks 10x JUL26 — Full stack productie",
+        description: "07-JUL-2026 - Merlijn Kunst - ACQstacks 10x JUL26 - Full stack productie",
         quantity: 4,
         unitPrice: 100,
         timeEntryIds: ["t1"],
@@ -57,7 +57,7 @@ describe("hourInvoiceLines", () => {
 
   it("drops the empty parts instead of leaving a dangling dash", () => {
     const kaal = uur({ id: "t1", description: "   ", project: { id: "p1", name: "ACQstacks 10x JUL26", levelRates: [{ level: "SENIOR", rate: 100 }] } });
-    expect(hourInvoiceLines([kaal])[0].description).toBe("07-JUL-2026 — Merlijn Kunst — ACQstacks 10x JUL26");
+    expect(hourInvoiceLines([kaal])[0].description).toBe("07-JUL-2026 - Merlijn Kunst - ACQstacks 10x JUL26");
   });
 
   it("gives no lines for an empty list", () => {
@@ -78,7 +78,7 @@ describe("kmInvoiceLines", () => {
   it("makes one line per ride, built up like the hours", () => {
     expect(kmInvoiceLines([rit])).toEqual([
       {
-        description: "01-JUL-2026 — Merran Romp — Intern — heen en terug kantoor",
+        description: "01-JUL-2026 - Merran Romp - Intern - heen en terug kantoor",
         quantity: 70,
         unitPrice: 0.23,
         kmEntryIds: ["k1"],
@@ -114,7 +114,7 @@ describe("expenseInvoiceLines", () => {
   it("makes one line per expense, built up like the rest", () => {
     expect(expenseInvoiceLines([uitgave])).toEqual([
       {
-        description: "08-JUL-2026 — Merlijn Kunst — ACQstacks 10x JUL26 — Late levering SAMTEC connectors",
+        description: "08-JUL-2026 - Merlijn Kunst - ACQstacks 10x JUL26 - Late levering SAMTEC connectors",
         quantity: 1,
         unitPrice: 107.27,
         expenseIds: ["e1"],
@@ -180,5 +180,27 @@ describe("Engelse factuurregels", () => {
   it("houdt de Nederlandse kopjes zonder taal", () => {
     const groepen = groupLinesByType([{ lineType: "HOURS" }, { lineType: "KM" }]);
     expect(groepen.map((g) => g.heading)).toEqual(["Uren:", "Ritten:"]);
+  });
+});
+
+describe("geen vreemde tekens in een factuurregel", () => {
+  it("scheidt met een gewoon koppelteken en niets buiten ASCII", () => {
+    // Een lang minteken hield onze mail bij een klant uit de inbox; zijn filter
+    // zag het als een vreemd teken. De omschrijving staat ook in de mailtekst.
+    const [regel] = hourInvoiceLines([
+      {
+        id: "t1",
+        date: "2026-07-07",
+        hours: 8,
+        description: "Full stack productie",
+        rateOverride: 95,
+        user: { name: "Merlijn Kunst" },
+        project: { id: "p1", name: "ACQstacks 10x JUL26" },
+      } as any,
+    ]);
+    expect(regel.description).toBe(
+      "07-JUL-2026 - Merlijn Kunst - ACQstacks 10x JUL26 - Full stack productie",
+    );
+    expect(regel.description).toMatch(/^[\x20-\x7E]*$/);
   });
 });
