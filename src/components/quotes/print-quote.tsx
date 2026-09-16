@@ -48,7 +48,7 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         .totals { width: 280px; }
         .total-row { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
         .total-row.grand { border-bottom: none; border-top: 1px solid #333; padding-top: 7px; font-weight: 700; font-size: 13px; }
-        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; }
+        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; white-space: pre-wrap; }
         .print-btn { position: fixed; bottom: 24px; right: 24px; display: flex; gap: 8px; }
         .btn { padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
         .btn-primary { background: #397d3a; color: white; }

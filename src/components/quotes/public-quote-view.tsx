@@ -51,7 +51,7 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         .totals { width: 280px; }
         .total-row { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
         .total-row.grand { border-bottom: none; border-top: 1px solid #333; padding-top: 7px; font-weight: 700; font-size: 13px; }
-        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; }
+        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; white-space: pre-wrap; }
         .approve-section { margin-top: 40px; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; text-align: center; }
         .approved-section { margin-top: 40px; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; text-align: center; }
         .approve-btn { display: inline-block; padding: 14px 32px; background: #397d3a; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }

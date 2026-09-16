@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { docCopy } from "./document-copy";
+import { docCopy, standaardInTaal } from "./document-copy";
 
 describe("docCopy", () => {
   it("geeft Nederlands voor NL", () => {
@@ -35,5 +35,35 @@ describe("docCopy", () => {
   it("gebruikt de Engelse notatie voor bedragen en datums", () => {
     expect(docCopy("NL").locale).toBe("nl-NL");
     expect(docCopy("EN").locale).toBe("en-GB");
+  });
+});
+
+describe("offerteCondities", () => {
+  it("staat in beide talen met dezelfde facturering", () => {
+    expect(docCopy("NL").offerteCondities).toContain("40% bij opdracht");
+    expect(docCopy("EN").offerteCondities).toContain("40% upon order");
+  });
+
+  it("heeft geen aanhef: die hoort bij één offerte", () => {
+    expect(docCopy("NL").offerteCondities).not.toMatch(/Geachte/);
+    expect(docCopy("NL").offerteCondities.startsWith("Algemene condities:")).toBe(true);
+  });
+});
+
+describe("standaardInTaal", () => {
+  const kies = (t: ReturnType<typeof docCopy>) => t.offerteCondities;
+
+  it("wisselt de standaardtekst mee met de taal van de klant", () => {
+    expect(standaardInTaal(docCopy("NL").offerteCondities, kies, "EN")).toBe(docCopy("EN").offerteCondities);
+    expect(standaardInTaal(docCopy("EN").offerteCondities, kies, "NL")).toBe(docCopy("NL").offerteCondities);
+  });
+
+  it("laat een bewust leeggemaakt veld leeg", () => {
+    expect(standaardInTaal("", kies, "EN")).toBe("");
+  });
+
+  it("laat aangepaste tekst staan", () => {
+    const eigen = docCopy("NL").offerteCondities + "\nLevering in week 40";
+    expect(standaardInTaal(eigen, kies, "EN")).toBe(eigen);
   });
 });

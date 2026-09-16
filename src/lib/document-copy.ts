@@ -55,6 +55,21 @@ const NL = {
   betalingstekst:
     "Wij verzoeken u vriendelijk het totaalbedrag binnen 30 dagen over te maken op onze IBAN rekening NL90 INGB 0008 9967 99 t.n.v. EVAbits onder vermelding van het factuurnummer.",
 
+  // Standaard in het opmerkingenveld van een nieuwe offerte. De aanhef en de
+  // zin over wat er geoffreerd wordt staan hier bewust niet in: die horen bij
+  // één offerte en gaan in de inleiding.
+  offerteCondities: [
+    "Algemene condities:",
+    "Alle genoemde bedragen zijn in Euro en exclusief B.T.W.",
+    "Betaling binnen 30 dagen na factuurdatum",
+    "Deze offerte is geldig tot 30 dagen na dagtekening",
+    "De Algemene Voorwaarden EVAbits BV. zijn van toepassing",
+    "",
+    "Facturering:",
+    "40% bij opdracht",
+    "60% bij levering",
+  ].join("\n"),
+
   // Knoppen op het printscherm en de publieke pagina
   sluiten: "Sluiten",
   afdrukken: "Afdrukken",
@@ -128,6 +143,18 @@ const EN: typeof NL = {
   betalingstekst:
     "We kindly request that you transfer the total amount within 30 days to our IBAN account NL90 INGB 0008 9967 99 in the name of EVAbits, quoting the invoice number.",
 
+  offerteCondities: [
+    "General conditions:",
+    "All amounts stated are in euros and exclude VAT.",
+    "Payment within 30 days of the invoice date",
+    "This quote is valid for 30 days from the date of issue",
+    "The General Terms and Conditions of EVAbits BV apply",
+    "",
+    "Invoicing:",
+    "40% upon order",
+    "60% upon delivery",
+  ].join("\n"),
+
   sluiten: "Close",
   afdrukken: "Print",
   bezig: "Working...",
@@ -169,4 +196,25 @@ const EN: typeof NL = {
  */
 export function docCopy(taal: Taal | string | null | undefined): typeof NL {
   return taal === "EN" ? EN : NL;
+}
+
+/**
+ * De standaardtekst in de taal van een net gekozen klant — maar alleen zolang
+ * er nog niets aan veranderd is.
+ *
+ * Het veld wordt ingevuld zodra het scherm opent, nog vóór er een klant is. Is
+ * de tekst nog precies een van de standaardversies, dan is hij van ons en mag
+ * hij mee met de taal. Heeft de gebruiker erin getypt, dan is hij van hem en
+ * blijft hij staan: een aanpassing weggooien omdat je van klant wisselt is
+ * erger dan een Nederlandse zin op een Engelse offerte.
+ */
+export function standaardInTaal(
+  huidig: string,
+  kies: (t: typeof NL) => string,
+  taal: Taal | string | null | undefined,
+): string {
+  // Leeg telt niet als standaard: het veld begint gevuld, dus leeg is iemand
+  // die de tekst bewust heeft weggehaald.
+  const isStandaard = huidig === kies(NL) || huidig === kies(EN);
+  return isStandaard ? kies(docCopy(taal)) : huidig;
 }

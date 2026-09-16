@@ -69,7 +69,7 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         .total-row.grand { border-bottom: none; border-top: 1px solid #333; padding-top: 7px; font-weight: 700; font-size: 13px; }
 
         /* Notes */
-        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; }
+        .notes { margin-top: 32px; font-size: 12px; line-height: 1.6; color: #333; white-space: pre-wrap; }
         .group-heading { font-weight: 600; padding-top: 14px; border-bottom: none; }
 
         /* Print controls */

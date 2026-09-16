@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
+import { docCopy, standaardInTaal } from "@/lib/document-copy";
 
 interface Line { description: string; quantity: number; unitPrice: number; }
 
@@ -25,10 +26,18 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
   const [intro, setIntro] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(docCopy("NL").offerteCondities);
   const [lines, setLines] = useState<Line[]>([{ description: "", quantity: 1, unitPrice: 0 }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function kiesKlant(id: string) {
+    setCustomerId(id);
+    // De condities wisselen mee naar de taal van de klant, zolang ze nog
+    // onaangeroerd zijn. Zie standaardInTaal.
+    const taal = customers.find((c) => c.id === id)?.language;
+    setNotes((huidig) => standaardInTaal(huidig, (t) => t.offerteCondities, taal));
+  }
 
   function updateLine(i: number, field: keyof Line, value: any) {
     setLines((prev) => prev.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
@@ -85,7 +94,7 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
               <Label>Klant *</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
+              <Select value={customerId} onValueChange={kiesKlant}>
                 <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -195,7 +204,7 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
       <Card>
         <CardHeader><CardTitle className="text-base">Opmerkingen</CardTitle></CardHeader>
         <CardContent>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optionele opmerkingen of voorwaarden..." />
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optionele opmerkingen of voorwaarden..." className="field-sizing-content min-h-[4.5rem]" />
         </CardContent>
       </Card>
 

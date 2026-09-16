@@ -471,7 +471,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
         <CardHeader><CardTitle className="text-base">Opmerkingen</CardTitle></CardHeader>
         <CardContent>
           {editing ? (
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Optionele opmerkingen of voorwaarden..." />
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optionele opmerkingen of voorwaarden..." className="field-sizing-content min-h-[4.5rem]" />
           ) : quote.notes ? (
             <p className="text-sm whitespace-pre-wrap">{quote.notes}</p>
           ) : (
