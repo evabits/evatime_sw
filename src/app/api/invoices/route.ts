@@ -26,6 +26,7 @@ const schema = z.object({
   issueDate: z.string(),
   dueDate: z.string(),
   vatRate: z.number().min(0).max(100).default(21),
+  intro: z.string().optional().nullable(),
   notes: z.string().optional(),
   lines: z.array(lineSchema).min(1),
 });
@@ -130,6 +131,7 @@ export async function POST(req: Request) {
         vatAmount,
         subtotal,
         total,
+        intro: data.intro || null,
         notes: data.notes,
         language: klant?.language ?? "NL",
       },

@@ -17,6 +17,7 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#ddd", paddingVertical: 8, marginBottom: 20 },
   metaLabel: { color: "#555", marginRight: 4 },
   subject: { fontSize: 10, marginBottom: 16, color: "#333" },
+  intro: { fontSize: 10, marginBottom: 16, color: "#333", lineHeight: 1.5 },
   tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 4, marginBottom: 2 },
   tableRow: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#eee", paddingVertical: 5 },
   colDesc: { flex: 3, paddingRight: 8 },
@@ -95,6 +96,9 @@ export function QuotePdf({ quote, settings }: { quote: any; settings: any }) {
         </View>
 
         {quote.subject && <Text style={s.subject}>{quote.subject}</Text>}
+
+        {/* Inleiding, boven de regels zoals op de factuur */}
+        {quote.intro && <Text style={s.intro}>{quote.intro}</Text>}
 
         <View style={s.tableHeader}>
           <Text style={[s.headerText, s.colDesc]}>{t.omschrijving}</Text>

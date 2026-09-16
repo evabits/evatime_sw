@@ -94,6 +94,7 @@ export function NewInvoiceClient({ customers }: Props) {
   const [periodeTot, setPeriodeTot] = useState(() => resolvePeriod("last-month", new Date())!.to);
   const [vatRate, setVatRate] = useState(21);
   const [notes, setNotes] = useState(STANDAARD_BETALINGSTEKST);
+  const [intro, setIntro] = useState("");
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [unbilledTime, setUnbilledTime] = useState<any[]>([]);
   const [unbilledKm, setUnbilledKm] = useState<any[]>([]);
@@ -254,7 +255,7 @@ export function NewInvoiceClient({ customers }: Props) {
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, issueDate, dueDate, vatRate, notes, lines }),
+        body: JSON.stringify({ customerId, issueDate, dueDate, vatRate, intro, notes, lines }),
       });
       if (res.ok) {
         const invoice = await res.json();
@@ -305,6 +306,15 @@ export function NewInvoiceClient({ customers }: Props) {
           <div className="space-y-1">
             <Label>BTW (%)</Label>
             <Input type="number" min="0" max="100" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} />
+          </div>
+          <div className="space-y-1 lg:col-span-3">
+            <Label>Inleiding</Label>
+            <Textarea
+              value={intro}
+              onChange={(e) => setIntro(e.target.value)}
+              placeholder="Optioneel. Staat op de factuur boven de regels."
+              className="field-sizing-content min-h-[4.5rem]"
+            />
           </div>
           <div className="space-y-1 lg:col-span-3">
             <Label>Notities <span className="text-muted-foreground font-normal">(betalingstermijn)</span></Label>

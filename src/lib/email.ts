@@ -60,6 +60,7 @@ function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
 
   <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
   <p style="margin:0 0 24px;">${t.mailFactuurZin(invoice.invoiceNumber, invoice.subject ? ` - ${invoice.subject}` : "")}</p>
+  ${invoice.intro ? `<p style="margin:0 0 24px;white-space:pre-wrap;">${invoice.intro}</p>` : ""}
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>
@@ -298,6 +299,7 @@ export async function sendQuoteEmail(quote: any, settings: any, naar?: string): 
 
   <p style="margin:0 0 8px;">${t.aanhef(quote.customer.name)}</p>
   <p style="margin:0 0 24px;">${t.mailOfferteZin(quote.quoteNumber, quote.subject ? ` - ${quote.subject}` : "")}</p>
+  ${quote.intro ? `<p style="margin:0 0 24px;white-space:pre-wrap;">${quote.intro}</p>` : ""}
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
     <thead>

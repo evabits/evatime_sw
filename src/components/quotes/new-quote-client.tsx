@@ -24,6 +24,7 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
   const [vatRate, setVatRate] = useState(21);
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
+  const [intro, setIntro] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([{ description: "", quantity: 1, unitPrice: 0 }]);
   const [saving, setSaving] = useState(false);
@@ -53,7 +54,7 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customerId, issueDate, validUntil, vatRate, reference: reference || null, subject: subject || null, notes: notes || null, lines }),
+      body: JSON.stringify({ customerId, issueDate, validUntil, vatRate, reference: reference || null, subject: subject || null, intro: intro || null, notes: notes || null, lines }),
     });
     setSaving(false);
     if (res.ok) {
@@ -106,6 +107,15 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
             <div className="space-y-1">
               <Label>Onderwerp</Label>
               <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Optioneel" />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Inleiding</Label>
+              <Textarea
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
+                placeholder="Optioneel. Staat op de offerte boven de regels."
+                className="field-sizing-content min-h-[4.5rem]"
+              />
             </div>
           </div>
         </CardContent>

@@ -39,6 +39,7 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         .meta-left td, .meta-right td { padding: 1px 12px 1px 0; font-size: 12px; }
         .meta-label { color: #444; white-space: nowrap; }
         .subject-line { font-size: 12px; margin-bottom: 20px; }
+        .intro { font-size: 12px; line-height: 1.6; color: #333; margin-bottom: 20px; white-space: pre-wrap; }
         table.lines { width: 100%; border-collapse: collapse; margin-bottom: 0; }
         table.lines th { text-align: left; padding: 7px 8px; font-size: 11px; font-weight: 700; border-bottom: 1px solid #333; border-top: 1px solid #333; }
         table.lines th.right, table.lines td.right { text-align: right; }
@@ -117,6 +118,7 @@ export function PrintQuote({ quote, settings, autoPrint = true }: Props) {
         </div>
 
         {quote.subject && <div className="subject-line">{quote.subject}</div>}
+        {quote.intro && <div className="intro">{quote.intro}</div>}
 
         <table className="lines">
           <thead>

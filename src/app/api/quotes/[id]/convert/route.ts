@@ -42,6 +42,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         total: quote.total,
         reference: quote.reference,
         subject: quote.subject,
+        intro: quote.intro,
         notes: quote.notes,
         // De factuur hoort in dezelfde taal als de offerte die eraan voorafging.
         language: quote.language,
