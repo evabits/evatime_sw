@@ -64,6 +64,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
   const [language, setLanguage] = useState(quote.language ?? "NL");
   const [reference, setReference] = useState(quote.reference ?? "");
   const [subject, setSubject] = useState(quote.subject ?? "");
+  const [intro, setIntro] = useState(quote.intro ?? "");
   const [lines, setLines] = useState<Line[]>(
     quote.lines.map((l: any) => ({ id: l.id, description: l.description, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), total: Number(l.total) }))
   );
@@ -107,6 +108,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     setAttention(quote.attention ?? quote.customer?.attention ?? "");
     setReference(quote.reference ?? "");
     setSubject(quote.subject ?? "");
+    setIntro(quote.intro ?? "");
   }
 
   async function saveEdit() {
@@ -115,7 +117,7 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
     const res = await fetch(`/api/quotes/${quote.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, attention, reference, subject, language, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, validUntil, vatRate, notes, attention, reference, subject, intro, language, lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
@@ -356,6 +358,25 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
                 <p className="text-sm">{quote.language === "EN" ? "Engels" : "Nederlands"}</p>
               )}
             </div>
+          </div>
+
+          {/* Inleiding — boven de regels op de offerte, dus hier onder kenmerk en
+              onderwerp. Volle breedte, want dit zijn zinnen. Niet in het onderwerp:
+              dat komt in de onderwerpregel van de mail. */}
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground mb-1">Inleiding</p>
+            {editing ? (
+              <Textarea
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
+                placeholder="Bijv. Naar aanleiding van ons gesprek bieden wij u het volgende aan."
+                className="text-sm field-sizing-content min-h-[4.5rem]"
+              />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">
+                {quote.intro || <span className="text-muted-foreground italic">—</span>}
+              </p>
+            )}
           </div>
 
           {(quote.sentAt || quote.approvedAt) && (

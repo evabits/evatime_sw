@@ -93,6 +93,11 @@ export function PublicQuoteView({ quote, settings }: { quote: any; settings: any
         </div>
 
         {quote.subject && <div style={{ marginBottom: 20, fontSize: 12 }}>{quote.subject}</div>}
+        {quote.intro && (
+          <div style={{ marginBottom: 20, fontSize: 12, lineHeight: 1.6, color: "#333", whiteSpace: "pre-wrap" }}>
+            {quote.intro}
+          </div>
+        )}
 
         <table className="lines">
           <thead>

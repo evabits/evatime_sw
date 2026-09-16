@@ -467,8 +467,9 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
                 value={intro}
                 onChange={(e) => setIntro(e.target.value)}
                 placeholder="Bijv. Hierbij ontvangt u de factuur voor de werkzaamheden van juli 2026."
-                rows={3}
-                className="text-sm"
+                // Groeit mee met de tekst in plaats van te scrollen. In browsers
+                // zonder field-sizing blijft het een gewoon vak van drie regels.
+                className="text-sm field-sizing-content min-h-[4.5rem]"
               />
             ) : (
               <p className="text-sm whitespace-pre-wrap">
