@@ -11,7 +11,8 @@ export default async function NewQuotePage() {
   const customers = await prisma.customer.findMany({
     where: { archivedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    // De taal bepaalt in welke taal de standaardcondities klaarstaan.
+    select: { id: true, name: true, language: true },
   });
 
   return <NewQuoteClient customers={serialize(customers)} />;
