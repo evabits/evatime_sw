@@ -18,6 +18,7 @@ import { kmRate } from "@/lib/report-totals";
 import { resolvePeriod } from "@/lib/periods";
 import { splitInvoicePeriod } from "@/lib/invoice-period";
 import { STANDAARD_BETALINGSTEKST } from "@/lib/invoice-defaults";
+import { standaardInTaal } from "@/lib/document-copy";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
@@ -202,6 +203,10 @@ export function NewInvoiceClient({ customers }: Props) {
     setSelectedKmIds(new Set());
     setSelectedExpenseIds(new Set());
     setCustomerId(nieuw);
+    // De betalingstekst wisselt mee naar de taal van de klant, zolang hij nog
+    // onaangeroerd is. Zie standaardInTaal.
+    const taal = customers.find((c) => c.id === nieuw)?.language;
+    setNotes((huidig) => standaardInTaal(huidig, (t) => t.betalingstekst, taal));
   }
 
   function addLinesFromSelection() {

@@ -67,3 +67,16 @@ describe("standaardInTaal", () => {
     expect(standaardInTaal(eigen, kies, "EN")).toBe(eigen);
   });
 });
+
+describe("standaardInTaal voor de betalingstekst", () => {
+  const kies = (t: ReturnType<typeof docCopy>) => t.betalingstekst;
+
+  it("wisselt de betalingstekst mee naar een Engelse klant", () => {
+    expect(standaardInTaal(docCopy("NL").betalingstekst, kies, "EN")).toBe(docCopy("EN").betalingstekst);
+  });
+
+  it("laat een aangepaste betalingstekst staan", () => {
+    const eigen = "Betaling binnen 14 dagen.";
+    expect(standaardInTaal(eigen, kies, "EN")).toBe(eigen);
+  });
+});
