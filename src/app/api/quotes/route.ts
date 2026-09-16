@@ -22,6 +22,7 @@ const schema = z.object({
   reference: z.string().optional().nullable(),
   subject: z.string().optional().nullable(),
   intro: z.string().optional().nullable(),
+  language: z.enum(["NL", "EN"]).optional(),
   notes: z.string().optional().nullable(),
   lines: z.array(lineSchema).min(1),
 });
@@ -81,7 +82,8 @@ export async function POST(req: Request) {
         subject: data.subject ?? null,
         intro: data.intro ?? null,
         notes: data.notes ?? null,
-        language: klant?.language ?? "NL",
+        // Op het scherm gekozen wint; anders die van de klant.
+        language: data.language ?? klant?.language ?? "NL",
         lines: {
           create: data.lines.map((l) => ({
             description: l.description,

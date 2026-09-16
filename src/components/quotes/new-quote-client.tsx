@@ -27,15 +27,22 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
   const [subject, setSubject] = useState("");
   const [intro, setIntro] = useState("");
   const [notes, setNotes] = useState(docCopy("NL").offerteCondities);
+  const [language, setLanguage] = useState<"NL" | "EN">("NL");
   const [lines, setLines] = useState<Line[]>([{ description: "", quantity: 1, unitPrice: 0 }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   function kiesKlant(id: string) {
     setCustomerId(id);
-    // De condities wisselen mee naar de taal van de klant, zolang ze nog
-    // onaangeroerd zijn. Zie standaardInTaal.
-    const taal = customers.find((c) => c.id === id)?.language;
+    // De taal van de klant is het voorstel; daarna kun je hem per offerte nog
+    // omzetten.
+    kiesTaal(customers.find((c) => c.id === id)?.language ?? "NL");
+  }
+
+  function kiesTaal(taal: "NL" | "EN") {
+    setLanguage(taal);
+    // De condities wisselen mee, zolang ze nog onaangeroerd zijn. Zie
+    // standaardInTaal.
     setNotes((huidig) => standaardInTaal(huidig, (t) => t.offerteCondities, taal));
   }
 
@@ -63,7 +70,7 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
     const res = await fetch("/api/quotes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customerId, issueDate, validUntil, vatRate, reference: reference || null, subject: subject || null, intro: intro || null, notes: notes || null, lines }),
+      body: JSON.stringify({ customerId, issueDate, validUntil, vatRate, reference: reference || null, subject: subject || null, intro: intro || null, language, notes: notes || null, lines }),
     });
     setSaving(false);
     if (res.ok) {
@@ -116,6 +123,17 @@ export function NewQuoteClient({ customers }: { customers: any[] }) {
             <div className="space-y-1">
               <Label>Onderwerp</Label>
               <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Optioneel" />
+            </div>
+            <div className="space-y-1">
+              <Label>Taal</Label>
+              <select
+                value={language}
+                onChange={(e) => kiesTaal(e.target.value as "NL" | "EN")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="NL">Nederlands</option>
+                <option value="EN">Engels</option>
+              </select>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Inleiding</Label>
