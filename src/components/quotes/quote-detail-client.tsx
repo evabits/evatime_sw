@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { customerAddressLines } from "@/lib/customer-address";
+import { standaardInTaal } from "@/lib/document-copy";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, Eye, Mail, Paperclip, Download, FileText } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -348,7 +349,11 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
               {editing ? (
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  onChange={(e) => {
+                    setLanguage(e.target.value);
+                    // Net als bij aanmaken: onaangeroerde condities gaan mee.
+                    setNotes((huidig: string) => standaardInTaal(huidig, (t) => t.offerteCondities, e.target.value));
+                  }}
                   className="flex h-7 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
                 >
                   <option value="NL">Nederlands</option>
