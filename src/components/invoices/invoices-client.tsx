@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { ExternalLink, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 const statusLabel: Record<string, string> = { DRAFT: "Concept", SENT: "Verzonden", PAID: "Betaald", CANCELLED: "Geannuleerd" };
@@ -17,9 +17,12 @@ const PAGE_SIZE = 25;
 
 interface Props {
   initialInvoices: any[];
+  /** Alleen wie facturen mag bewerken ziet de knop; de API eist het ook. */
+  canEdit?: boolean;
 }
 
-export function InvoicesClient({ initialInvoices }: Props) {
+export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
+  const [bezig, setBezig] = useState<string | null>(null);
   const [invoices, setInvoices] = useState(initialInvoices);
   const [page, setPage] = useState(0);
   const [filterStatus, setFilterStatus] = useState("all");
@@ -48,6 +51,25 @@ export function InvoicesClient({ initialInvoices }: Props) {
 
   function handleFilterChange() {
     setPage(0);
+  }
+
+  // Vanuit het overzicht op betaald zetten, zonder de factuur te openen. Geen
+  // bevestiging: het is terug te draaien op de factuur zelf, en het hele punt
+  // is dat het één klik is.
+  async function markeerBetaald(id: string) {
+    setBezig(id);
+    const res = await fetch(`/api/invoices/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "PAID" }),
+    });
+    setBezig(null);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Op betaald zetten is niet gelukt");
+      return;
+    }
+    setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status: "PAID" } : i)));
   }
 
   async function deleteInvoice(id: string) {
@@ -127,6 +149,19 @@ export function InvoicesClient({ initialInvoices }: Props) {
                 <TableCell className="text-right">{formatCurrency(Number(inv.total))}</TableCell>
                 <TableCell>
                   <div className="flex gap-1 justify-end">
+                    {canEdit && inv.status === "SENT" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        onClick={() => markeerBetaald(inv.id)}
+                        disabled={bezig === inv.id}
+                        title="Op betaald zetten"
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" />
+                        {bezig === inv.id ? "Bezig..." : "Betaald"}
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" asChild>
                       <Link href={`/invoices/${inv.id}`}><ExternalLink className="h-3.5 w-3.5" /></Link>
                     </Button>
