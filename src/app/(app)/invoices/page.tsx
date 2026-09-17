@@ -4,8 +4,12 @@ import { InvoicesClient } from "@/components/invoices/invoices-client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { canEditInvoices } from "@/lib/roles";
 
 export default async function InvoicesPage() {
+  const session = await auth();
+  const role = (session?.user as any)?.role ?? "EMPLOYEE";
   const invoices = await prisma.invoice.findMany({
     orderBy: { issueDate: "desc" },
     include: { customer: { select: { name: true } } },
@@ -22,7 +26,7 @@ export default async function InvoicesPage() {
           <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" /> Nieuwe factuur</Link>
         </Button>
       </div>
-      <InvoicesClient initialInvoices={serialize(invoices)} />
+      <InvoicesClient initialInvoices={serialize(invoices)} canEdit={canEditInvoices(role)} />
     </div>
   );
 }
