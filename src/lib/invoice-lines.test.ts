@@ -4,8 +4,7 @@ import {
   hourInvoiceLines,
   kmInvoiceLines,
   groupLinesByType,
-  type HourEntryForInvoice,
-} from "./invoice-lines";
+  type HourEntryForInvoice, invoiceLineChanged } from "./invoice-lines";
 
 function uur(over: Partial<HourEntryForInvoice> & { id: string }): HourEntryForInvoice {
   return {
@@ -202,5 +201,31 @@ describe("geen vreemde tekens in een factuurregel", () => {
       "07-JUL-2026 - Merlijn Kunst - ACQstacks 10x JUL26 - Full stack productie",
     );
     expect(regel.description).toMatch(/^[\x20-\x7E]*$/);
+  });
+});
+
+describe("invoiceLineChanged", () => {
+  const bestaand = {
+    description: "07-JUL-2026 - Merlijn Kunst - Productie",
+    quantity: "7.75",
+    unitPrice: "60.00",
+    lineType: "HOURS",
+    sortOrder: 3,
+  };
+  const zelfde = { description: bestaand.description, quantity: 7.75, unitPrice: 60, lineType: "HOURS" };
+
+  it("ziet een ongewijzigde regel als ongewijzigd, ook met Decimals als tekst", () => {
+    expect(invoiceLineChanged(bestaand, zelfde, 3)).toBe(false);
+  });
+
+  it("ziet een ander aantal, tarief, omschrijving of soort", () => {
+    expect(invoiceLineChanged(bestaand, { ...zelfde, quantity: 8 }, 3)).toBe(true);
+    expect(invoiceLineChanged(bestaand, { ...zelfde, unitPrice: 65 }, 3)).toBe(true);
+    expect(invoiceLineChanged(bestaand, { ...zelfde, description: "Anders" }, 3)).toBe(true);
+    expect(invoiceLineChanged(bestaand, { ...zelfde, lineType: "OTHER" }, 3)).toBe(true);
+  });
+
+  it("ziet een regel die van plek wisselt", () => {
+    expect(invoiceLineChanged(bestaand, zelfde, 4)).toBe(true);
   });
 });

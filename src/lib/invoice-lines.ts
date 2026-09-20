@@ -219,3 +219,50 @@ export function groupLinesByType<T extends { lineType?: string | null }>(
     lines: lines.filter((l) => (l.lineType ?? "OTHER") === soort),
   })).filter((g) => g.lines.length > 0);
 }
+
+/**
+ * Een factuurregel zoals hij in de database staat. De bedragen komen binnen als
+ * Prisma's Decimal-object, dus via `String()` naar een getal en niet met een
+ * rechtstreekse `Number()`.
+ */
+type Bedrag = number | string | { toString(): string };
+
+export type BewaardeRegel = {
+  description: string;
+  quantity: Bedrag;
+  unitPrice: Bedrag;
+  lineType: string;
+  sortOrder: number;
+};
+
+/** Dezelfde regel zoals het scherm hem terugstuurt. */
+export type IngestuurdeRegel = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineType: string;
+};
+
+/**
+ * Is deze regel werkelijk veranderd?
+ *
+ * Het opslaan van een factuur werkte elke regel bij, ook de regels waar niemand
+ * aan had gezeten. Op een factuur van vijftig regels zijn dat vijftig losse
+ * schrijfopdrachten binnen één transactie, en die transactie wordt na vijf
+ * seconden afgebroken. Pas je twee regels aan, dan horen er twee te vertrekken.
+ *
+ * `sortOrder` telt mee: een regel die van plek wisselt verandert ook.
+ */
+export function invoiceLineChanged(
+  bestaand: BewaardeRegel,
+  nieuw: IngestuurdeRegel,
+  positie: number,
+): boolean {
+  return (
+    bestaand.description !== nieuw.description ||
+    Number(String(bestaand.quantity)) !== nieuw.quantity ||
+    Number(String(bestaand.unitPrice)) !== nieuw.unitPrice ||
+    bestaand.lineType !== nieuw.lineType ||
+    bestaand.sortOrder !== positie
+  );
+}
