@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canViewInvoices, canEditInvoices } from "@/lib/roles";
+import { invoiceLineChanged } from "@/lib/invoice-lines";
 
 const lineSchema = z.object({
   id: z.string().optional(),
@@ -59,7 +60,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params;
 
     const data = updateSchema.parse(await req.json());
-    const existing = await prisma.invoice.findUnique({ where: { id }, select: { status: true, vatRate: true, lines: { select: { id: true } } } });
+    const existing = await prisma.invoice.findUnique({
+      where: { id },
+      select: {
+        status: true,
+        vatRate: true,
+        // De hele regel en niet alleen het id: hieronder wordt vergeleken wat er
+        // werkelijk veranderd is, zodat alleen die regels naar de database gaan.
+        lines: {
+          select: {
+            id: true, description: true, quantity: true, unitPrice: true,
+            lineType: true, sortOrder: true,
+          },
+        },
+      },
+    });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (data.lines !== undefined && existing.status !== "DRAFT") {
@@ -90,6 +105,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
       // Upsert lines
       if (data.lines) {
+        const bestaand = new Map(existing.lines.map((l) => [l.id, l]));
+        const nieuweRegels: any[] = [];
+
         // De volgorde uit het scherm is leidend. Zonder dit kreeg een regel die
         // je erbij typt sortOrder nul en sprong hij naar boven, tussen de eerste
         // regels van de factuur.
@@ -102,11 +120,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             lineType: line.lineType,
             sortOrder: positie,
           };
-          if (line.id) {
-            await tx.invoiceLine.update({ where: { id: line.id }, data: lineData });
-          } else {
-            await tx.invoiceLine.create({ data: { ...lineData, invoiceId: id } });
+          if (!line.id) {
+            nieuweRegels.push({ ...lineData, invoiceId: id });
+            continue;
           }
+          // Ongewijzigde regels overslaan. Een factuur van vijftig regels liep
+          // anders tegen de tijdslimiet van de transactie aan, ook als je maar
+          // één regel had aangepast.
+          const oud = bestaand.get(line.id);
+          if (oud && !invoiceLineChanged(oud, line, positie)) continue;
+          await tx.invoiceLine.update({ where: { id: line.id }, data: lineData });
+        }
+
+        // Alle nieuwe regels in één opdracht in plaats van één per stuk.
+        if (nieuweRegels.length > 0) {
+          await tx.invoiceLine.createMany({ data: nieuweRegels });
         }
       }
 
@@ -140,6 +168,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         },
         include: { lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }, customer: true, attachments: { orderBy: { createdAt: "asc" } } },
       });
+    }, {
+      // Ruimer dan de standaard vijf seconden. Het bijwerken hierboven is nu
+      // kort, maar een factuur waarop elke regel wél verandert blijft een reeks
+      // opdrachten naar een database die in een andere regio kan staan.
+      timeout: 20000,
+      maxWait: 10000,
     });
 
     return NextResponse.json(invoice);
