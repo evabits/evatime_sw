@@ -42,7 +42,8 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
         const q = filterSearch.toLowerCase();
         if (
           !inv.invoiceNumber.toLowerCase().includes(q) &&
-          !inv.customer.name.toLowerCase().includes(q)
+          !inv.customer.name.toLowerCase().includes(q) &&
+          !(inv.reference ?? "").toLowerCase().includes(q)
         ) return false;
       }
       return true;
@@ -86,7 +87,7 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
       {/* Filters */}
       <div className="flex flex-wrap gap-2 p-4 border-b">
         <Input
-          placeholder="Zoeken op nummer of klant..."
+          placeholder="Zoeken op nummer, klant of kenmerk..."
           value={filterSearch}
           onChange={(e) => { setFilterSearch(e.target.value); handleFilterChange(); }}
           className="h-8 text-sm w-56"
@@ -121,6 +122,7 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
             <TableRow>
               <TableHead>Factuurnummer</TableHead>
               <TableHead>Klant</TableHead>
+              <TableHead>Kenmerk</TableHead>
               <TableHead>Datum</TableHead>
               <TableHead>Vervaldatum</TableHead>
               <TableHead>Status</TableHead>
@@ -130,12 +132,13 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Geen facturen gevonden</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen facturen gevonden</TableCell></TableRow>
             )}
             {paged.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell className="font-mono font-medium">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.customer.name}</TableCell>
+                <TableCell className="text-sm">{inv.reference || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell>{formatDate(inv.issueDate)}</TableCell>
                 <TableCell>{formatDate(inv.dueDate)}</TableCell>
                 <TableCell>
