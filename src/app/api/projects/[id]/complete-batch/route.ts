@@ -6,6 +6,7 @@ import { canManageRecurringBatches } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { batchTotal, completeBatchDenial, recurringInvoiceDraft } from "@/lib/recurring";
 import { standaardBetalingstekst } from "@/lib/invoice-defaults";
+import { vandaagInAmsterdam } from "@/lib/quote-invoice";
 import { nextInvoiceNumber } from "@/lib/invoice-number";
 
 const schema = z.object({
@@ -67,9 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // tussen middernacht en 02:00 Nederlandse tijd dus de vórige dag op de
     // factuur zetten. Daarom eerst de Nederlandse kalenderdag bepalen en die
     // vastpinnen op UTC-middernacht, zoals de rest van de app het doet.
-    const vandaag = new Date(
-      `${new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" })}T00:00:00Z`,
-    );
+    const vandaag = vandaagInAmsterdam();
     const invoiceNumber = await nextInvoiceNumber();
 
     // Alles in één transactie: een halve uitvoering laat een voltooid project
