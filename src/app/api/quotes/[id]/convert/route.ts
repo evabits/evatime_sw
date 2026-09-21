@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
+import { nextInvoiceNumber } from "@/lib/invoice-number";
+import { invoiceFromQuote, quoteConvertDenial, vandaagInAmsterdam } from "@/lib/quote-invoice";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,45 +19,28 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       include: { lines: { orderBy: { createdAt: "asc" } } },
     });
     if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (quote.status !== "APPROVED") {
-      return NextResponse.json({ error: "Alleen goedgekeurde offertes kunnen worden omgezet" }, { status: 400 });
-    }
 
-    const year = new Date().getFullYear();
-    const count = await prisma.invoice.count({
-      where: { invoiceNumber: { startsWith: `${year}-` } },
-    });
-    const invoiceNumber = `${year}-${String(count + 1).padStart(4, "0")}`;
-    const today = new Date();
-    const dueDate = new Date(today);
-    dueDate.setDate(dueDate.getDate() + 30);
+    const weigering = quoteConvertDenial(quote.status);
+    if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId: quote.customerId,
-        issueDate: today,
-        dueDate,
-        vatRate: quote.vatRate,
-        vatAmount: quote.vatAmount,
-        subtotal: quote.subtotal,
-        total: quote.total,
-        reference: quote.reference,
-        subject: quote.subject,
-        intro: quote.intro,
-        notes: quote.notes,
-        // De factuur hoort in dezelfde taal als de offerte die eraan voorafging.
-        language: quote.language,
-        lines: {
-          create: quote.lines.map((l) => ({
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            total: l.total,
-            lineType: "OTHER" as const,
-          })),
-        },
-      },
+    // Het gedeelde nummer, dat naar het hoogste bestaande kijkt. Tellen hoeveel
+    // facturen er zijn gaf na een verwijderde factuur een nummer dat al bestond.
+    const invoiceNumber = await nextInvoiceNumber();
+    const { lines, ...factuur } = invoiceFromQuote(quote, vandaagInAmsterdam());
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      const inv = await tx.invoice.create({
+        data: { ...factuur, invoiceNumber, lines: { create: lines } },
+      });
+      // Wie factureert, heeft een akkoord. Staat de offerte nog op concept of
+      // verzonden, dan is dat akkoord buiten de goedkeurknop om gekomen.
+      if (quote.status !== "APPROVED") {
+        await tx.quote.update({
+          where: { id: quote.id },
+          data: { status: "APPROVED", approvedAt: new Date() },
+        });
+      }
+      return inv;
     });
 
     return NextResponse.json({ invoiceId: invoice.id }, { status: 201 });

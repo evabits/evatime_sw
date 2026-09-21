@@ -167,7 +167,10 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
   }
 
   async function convertToInvoice() {
-    if (!confirm("Maak een factuur aan op basis van deze offerte?")) return;
+    const zin = quote.status === "APPROVED"
+      ? "Een conceptfactuur maken van deze offerte?"
+      : "Een conceptfactuur maken van deze offerte? De offerte wordt daarbij op goedgekeurd gezet.";
+    if (!confirm(zin)) return;
     setConverting(true);
     const res = await fetch(`/api/quotes/${quote.id}/convert`, { method: "POST" });
     setConverting(false);
@@ -255,9 +258,11 @@ export function QuoteDetailClient({ quote: initialQuote, settings }: { quote: an
                   <Mail className="h-4 w-4 mr-2" /> {sending ? "Verzenden..." : "Verzenden"}
                 </Button>
               )}
-              {quote.status === "APPROVED" && (
+              {/* Niet alleen na goedkeuring: een akkoord per mail of telefoon zet de
+                  offerte niet op goedgekeurd, en dan was de knop onvindbaar. */}
+              {quote.status !== "CANCELLED" && !editing && (
                 <Button onClick={convertToInvoice} disabled={converting}>
-                  <FileText className="h-4 w-4 mr-2" /> {converting ? "Aanmaken..." : "Maak factuur aan"}
+                  <FileText className="h-4 w-4 mr-2" /> {converting ? "Aanmaken..." : "Factuur maken"}
                 </Button>
               )}
               <Button variant="outline" asChild>
