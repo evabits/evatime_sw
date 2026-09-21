@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect } from "react";
 import { groupLinesByType } from "@/lib/invoice-lines";
-import { customerAddressLines } from "@/lib/customer-address";
+import { customerAddressLines, invoiceCustomer } from "@/lib/customer-address";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 import { docCopy } from "@/lib/document-copy";
 
@@ -95,7 +95,7 @@ export function PrintInvoice({ invoice, settings, autoPrint = true }: Props) {
         )}
         <div className="top-header">
           <div className="address-block">
-            {customerAddressLines(invoice.customer, undefined, taal).map((regel, i) => (
+            {customerAddressLines(invoiceCustomer(invoice.customer, invoice), invoice.attention, taal).map((regel, i) => (
               <div key={i} className={i === 0 ? "customer-name" : undefined}>{regel}</div>
             ))}
           </div>

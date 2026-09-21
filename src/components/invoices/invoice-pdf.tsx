@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { groupLinesByType } from "@/lib/invoice-lines";
-import { customerAddressLines } from "@/lib/customer-address";
+import { customerAddressLines, invoiceCustomer } from "@/lib/customer-address";
 import { formatDate as fmt } from "@/lib/utils";
 import { docCopy } from "@/lib/document-copy";
 
@@ -66,7 +66,7 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
         {/* Klant links, bedrijf rechts */}
         <View style={s.row}>
           <View style={s.addressBlock}>
-            {customerAddressLines(invoice.customer, undefined, taal).map((regel, i) => (
+            {customerAddressLines(invoiceCustomer(invoice.customer, invoice), invoice.attention, taal).map((regel, i) => (
               <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
           </View>

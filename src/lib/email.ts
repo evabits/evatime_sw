@@ -7,6 +7,7 @@ import { QuotePdf } from "@/components/quotes/quote-pdf";
 import { customerMailCopy } from "@/lib/mail-copy";
 import { formatCurrency, formatDate as fmt } from "@/lib/utils";
 import { docCopy } from "@/lib/document-copy";
+import { invoiceCustomer } from "@/lib/customer-address";
 
 const transport = nodemailer.createTransport(
   MailtrapTransport({ token: process.env.MAILTRAP_API_TOKEN! })
@@ -58,7 +59,7 @@ function invoiceHtml(invoice: any, settings: any, publicUrl: string): string {
   <p style="font-size:20px;font-weight:700;margin:0 0 4px;">${settings?.name ?? ""}</p>
   <p style="color:#666;margin:0 0 32px;">${settings?.email ?? ""}</p>
 
-  <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
+  <p style="margin:0 0 8px;">${t.aanhef(invoiceCustomer(invoice.customer, invoice).name ?? "")}</p>
   <p style="margin:0 0 24px;">${t.mailFactuurZin(invoice.invoiceNumber, invoice.subject ? ` - ${invoice.subject}` : "")}</p>
   ${invoice.intro ? `<p style="margin:0 0 24px;white-space:pre-wrap;">${invoice.intro}</p>` : ""}
 
@@ -138,7 +139,7 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
 <div style="max-width:640px;margin:0 auto;padding:40px 24px;">
   <p style="font-size:20px;font-weight:700;margin:0 0 32px;">${settings?.name ?? ""}</p>
 
-  <p style="margin:0 0 8px;">${t.aanhef(invoice.customer.name)}</p>
+  <p style="margin:0 0 8px;">${t.aanhef(invoiceCustomer(invoice.customer, invoice).name ?? "")}</p>
   <p style="margin:0 0 16px;">${t.herinneringZin(invoice.invoiceNumber, fmt(invoice.issueDate, taal), fmt(invoice.dueDate, taal))}</p>
   <p style="margin:0 0 16px;">${t.herinneringBedrag(formatCurrency(Number(invoice.total), taal))}</p>
   <p style="margin:0 0 24px;">${t.herinneringVerzoek}</p>

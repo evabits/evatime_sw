@@ -385,32 +385,43 @@ model KmTemplate {
 }
 
 model Invoice {
-  id             String              @id @default(cuid())
-  invoiceNumber  String              @unique
-  customerId     String
-  customer       Customer            @relation(fields: [customerId], references: [id])
-  issueDate      DateTime            @db.Date
-  dueDate        DateTime            @db.Date
-  status         InvoiceStatus       @default(DRAFT)
-  language       DocumentLanguage    @default(NL)
-  reference      String?
-  subject        String?
-  intro          String?
-  notes          String?
-  subtotal       Decimal             @db.Decimal(10, 2)
-  vatRate        Decimal             @default(21) @db.Decimal(5, 2)
-  vatAmount      Decimal             @db.Decimal(10, 2)
-  total          Decimal             @db.Decimal(10, 2)
-  viewToken      String              @unique @default(dbgenerated("gen_random_uuid()"))
-  sentAt         DateTime?
-  reminderSentAt DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  lines          InvoiceLine[]
-  attachments    InvoiceAttachment[]
+  id                String              @id @default(cuid())
+  invoiceNumber     String              @unique
+  customerId        String
+  customer          Customer            @relation(fields: [customerId], references: [id])
+  issueDate         DateTime            @db.Date
+  dueDate           DateTime            @db.Date
+  status            InvoiceStatus       @default(DRAFT)
+  language          DocumentLanguage    @default(NL)
+  /// Het adresblok van de klant op deze ene factuur, voor een ander
+  /// vestigingsadres of een andere afdeling zonder de klantkaart te wijzigen.
+  /// Null betekent "neem die van de klant" — zo blijven bestaande facturen de
+  /// klantkaart volgen. Bij attention betekent een lege string "geen t.a.v.".
+  customerName      String?
+  attention         String?
+  address           String?
+  postalCode        String?
+  city              String?
+  country           String?
+  customerVatNumber String?
+  reference         String?
+  subject           String?
+  intro             String?
+  notes             String?
+  subtotal          Decimal             @db.Decimal(10, 2)
+  vatRate           Decimal             @default(21) @db.Decimal(5, 2)
+  vatAmount         Decimal             @db.Decimal(10, 2)
+  total             Decimal             @db.Decimal(10, 2)
+  viewToken         String              @unique @default(dbgenerated("gen_random_uuid()"))
+  sentAt            DateTime?
+  reminderSentAt    DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  lines             InvoiceLine[]
+  attachments       InvoiceAttachment[]
   /// Tegenveld van Project.generatedInvoice. Wordt nergens gelezen; Prisma
   /// eist hem voor de een-op-een-relatie.
-  batch          Project?            @relation("BatchInvoice")
+  batch             Project?            @relation("BatchInvoice")
 }
 
 model InvoiceAttachment {
