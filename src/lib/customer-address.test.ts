@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { customerAddressLines } from "./customer-address";
+import { customerAddressLines, invoiceCustomer, addressOverrideToSave } from "./customer-address";
 
 const klant = {
   name: "Acquaint B.V.",
@@ -84,5 +84,56 @@ describe("customerAddressLines", () => {
   it("gives nothing without a customer", () => {
     expect(customerAddressLines(null)).toEqual([]);
     expect(customerAddressLines(undefined)).toEqual([]);
+  });
+});
+
+describe("invoiceCustomer", () => {
+  const klant = {
+    name: "Zonneplan BV",
+    attention: "Inkoop",
+    address: "Hoofdstraat 1",
+    postalCode: "1234 AB",
+    city: "Arnhem",
+    country: "Nederland",
+    vatNumber: "NL001",
+  };
+
+  it("volgt de klantkaart als de factuur niets eigens heeft", () => {
+    expect(invoiceCustomer(klant, {})).toMatchObject(klant);
+  });
+
+  it("neemt per veld over wat de factuur zelf invult", () => {
+    const k = invoiceCustomer(klant, { address: "Zijstraat 9", city: "Nijmegen" });
+    expect([k.name, k.address, k.city, k.postalCode]).toEqual([
+      "Zonneplan BV", "Zijstraat 9", "Nijmegen", "1234 AB",
+    ]);
+  });
+
+  it("zet het afwijkende adres ook echt in het adresblok", () => {
+    const regels = customerAddressLines(invoiceCustomer(klant, { address: "Zijstraat 9" }), "Afdeling X");
+    expect(regels).toContain("Zijstraat 9");
+    expect(regels).toContain("T.a.v. Afdeling X");
+  });
+});
+
+describe("addressOverrideToSave", () => {
+  const klant = { name: "Zonneplan BV", attention: "Inkoop", address: "Hoofdstraat 1", postalCode: "1234 AB", city: "Arnhem", country: "Nederland", vatNumber: "NL001" };
+  const ongewijzigd = {
+    customerName: "Zonneplan BV", attention: "Inkoop", address: "Hoofdstraat 1",
+    postalCode: "1234 AB", city: "Arnhem", country: "Nederland", customerVatNumber: "NL001",
+  };
+
+  it("slaat niets vast als je niets hebt veranderd", () => {
+    expect(Object.values(addressOverrideToSave(klant, ongewijzigd)).every((v) => v === null)).toBe(true);
+  });
+
+  it("bewaart alleen het veld dat afwijkt", () => {
+    const s = addressOverrideToSave(klant, { ...ongewijzigd, city: "Nijmegen " });
+    expect(s.city).toBe("Nijmegen");
+    expect(s.address).toBeNull();
+  });
+
+  it("bewaart een bewust leeggemaakte t.a.v. als lege tekst", () => {
+    expect(addressOverrideToSave(klant, { ...ongewijzigd, attention: "" }).attention).toBe("");
   });
 });

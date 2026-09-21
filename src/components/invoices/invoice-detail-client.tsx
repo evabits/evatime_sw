@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
-import { customerAddressLines } from "@/lib/customer-address";
+import { customerAddressLines, invoiceCustomer, addressOverrideToSave } from "@/lib/customer-address";
 import { ArrowLeft, Printer, Pencil, Plus, Trash2, Check, X, ExternalLink, Mail, Bell, Paperclip, Download, Eye, BookOpen, Copy } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import Link from "next/link";
@@ -74,6 +74,21 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
   const [language, setLanguage] = useState(invoice.language ?? "NL");
   const [subject, setSubject] = useState(invoice.subject ?? "");
   const [intro, setIntro] = useState(invoice.intro ?? "");
+  // Voorgevuld met wat er nu op de factuur staat: eigen velden waar die er zijn,
+  // anders de klantkaart. Bij opslaan gaat alleen wat afwijkt mee.
+  const adresVan = (inv: any) => {
+    const k = invoiceCustomer(inv.customer, inv);
+    return {
+      customerName: k.name ?? "",
+      attention: inv.attention ?? inv.customer?.attention ?? "",
+      address: k.address ?? "",
+      postalCode: k.postalCode ?? "",
+      city: k.city ?? "",
+      country: k.country ?? "",
+      customerVatNumber: k.vatNumber ?? "",
+    };
+  };
+  const [adres, setAdres] = useState(() => adresVan(invoice));
   const [lines, setLines] = useState<Line[]>(
     invoice.lines.map((l: any) => ({
       id: l.id,
@@ -142,6 +157,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     setLanguage(invoice.language ?? "NL");
     setSubject(invoice.subject ?? "");
     setIntro(invoice.intro ?? "");
+    setAdres(adresVan(invoice));
   }
 
   async function saveEdit() {
@@ -150,12 +166,13 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
     const res = await fetch(`/api/invoices/${invoice.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, intro, language, lines, lineIdsToDelete }),
+      body: JSON.stringify({ issueDate, dueDate, vatRate, notes, reference, subject, intro, language, ...addressOverrideToSave(invoice.customer, adres), lines, lineIdsToDelete }),
     });
     setSaving(false);
     if (res.ok) {
       const updated = await res.json();
       setInvoice(updated);
+      setAdres(adresVan(updated));
       setLines(
         updated.lines.map((l: any) => ({
           id: l.id,
@@ -387,12 +404,40 @@ export function InvoiceDetailClient({ invoice: initialInvoice, settings }: Props
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Aan</p>
-              <div className="text-sm space-y-0.5">
-                {customerAddressLines(invoice.customer).map((regel, i) => (
-                  <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{regel}</p>
-                ))}
-                {invoice.customer?.vatNumber && <p className="text-muted-foreground">BTW: {invoice.customer.vatNumber}</p>}
-              </div>
+              {editing ? (
+                <div className="grid gap-1.5 text-sm">
+                  {([
+                    ["customerName", "Naam"],
+                    ["attention", "T.a.v."],
+                    ["address", "Adres"],
+                    ["postalCode", "Postcode"],
+                    ["city", "Plaats"],
+                    ["country", "Land"],
+                    ["customerVatNumber", "Btw-nummer"],
+                  ] as const).map(([veld, label]) => (
+                    <Input
+                      key={veld}
+                      value={adres[veld]}
+                      onChange={(e) => setAdres((a) => ({ ...a, [veld]: e.target.value }))}
+                      placeholder={label}
+                      aria-label={label}
+                      className="h-7 text-sm"
+                    />
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Geldt alleen voor deze factuur; de klantkaart blijft zoals hij is.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-sm space-y-0.5">
+                  {customerAddressLines(invoiceCustomer(invoice.customer, invoice), invoice.attention).map((regel, i) => (
+                    <p key={i} className={i === 0 ? "font-medium" : "text-muted-foreground"}>{regel}</p>
+                  ))}
+                  {invoiceCustomer(invoice.customer, invoice).vatNumber && (
+                    <p className="text-muted-foreground">BTW: {invoiceCustomer(invoice.customer, invoice).vatNumber}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

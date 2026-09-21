@@ -53,3 +53,69 @@ export function customerAddressLines(
 
   return regels.filter(Boolean);
 }
+
+/** De velden waarmee één factuur het adresblok van de klant kan overschrijven. */
+export type InvoiceAddressOverride = {
+  customerName?: string | null;
+  attention?: string | null;
+  address?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  country?: string | null;
+  customerVatNumber?: string | null;
+};
+
+type KlantMetBtw = CustomerForAddress & { vatNumber?: string | null };
+
+/**
+ * De klant zoals hij op deze factuur staat: wat de factuur zelf heeft ingevuld,
+ * en voor de rest de klantkaart.
+ *
+ * Null betekent "niets ingevuld, neem die van de klant". Daardoor volgen alle
+ * facturen van vóór deze velden gewoon de klantkaart, zoals ze altijd deden.
+ * De t.a.v. zit hier bewust niet in: die gaat als eigen parameter naar
+ * `customerAddressLines`, dat het onderscheid tussen null en een lege string
+ * al kent.
+ */
+export function invoiceCustomer<K extends KlantMetBtw>(
+  klant: K | null | undefined,
+  factuur: InvoiceAddressOverride,
+): K & KlantMetBtw {
+  const k = (klant ?? {}) as K;
+  const of = <T,>(eigen: T | null | undefined, uitKaart: T) => (eigen ?? uitKaart);
+  return {
+    ...k,
+    name: of(factuur.customerName, k.name ?? null),
+    address: of(factuur.address, k.address ?? null),
+    postalCode: of(factuur.postalCode, k.postalCode ?? null),
+    city: of(factuur.city, k.city ?? null),
+    country: of(factuur.country, k.country ?? null),
+    vatNumber: of(factuur.customerVatNumber, k.vatNumber ?? null),
+  };
+}
+
+/**
+ * Wat er van een bewerkt adresblok opgeslagen moet worden.
+ *
+ * Het scherm vult de velden voor met wat er nu staat. Sla je dat ongewijzigd
+ * op, dan hoort de factuur de klantkaart te blijven volgen — en niet ineens
+ * vast te zitten aan een adres dat je nooit hebt aangeraakt. Daarom wordt een
+ * veld dat gelijk is aan de klantkaart null.
+ */
+export function addressOverrideToSave(
+  klant: KlantMetBtw | null | undefined,
+  ingevuld: Required<InvoiceAddressOverride>,
+): Required<InvoiceAddressOverride> {
+  const k = klant ?? {};
+  const alleenAfwijkend = (waarde: string | null, uitKaart: string | null | undefined) =>
+    (waarde ?? "").trim() === (uitKaart ?? "").trim() ? null : (waarde ?? "").trim();
+  return {
+    customerName: alleenAfwijkend(ingevuld.customerName, k.name),
+    attention: alleenAfwijkend(ingevuld.attention, k.attention),
+    address: alleenAfwijkend(ingevuld.address, k.address),
+    postalCode: alleenAfwijkend(ingevuld.postalCode, k.postalCode),
+    city: alleenAfwijkend(ingevuld.city, k.city),
+    country: alleenAfwijkend(ingevuld.country, k.country),
+    customerVatNumber: alleenAfwijkend(ingevuld.customerVatNumber, k.vatNumber),
+  };
+}
