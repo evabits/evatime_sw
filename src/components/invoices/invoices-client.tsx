@@ -147,6 +147,13 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
                     {inv.status === "SENT" && new Date(inv.dueDate) < new Date() && (
                       <Badge variant="destructive">Achterstallig</Badge>
                     )}
+                    {/* Alleen zolang de factuur openstaat: na betaling is een
+                        verstuurde herinnering geschiedenis en hier ruis. */}
+                    {inv.status === "SENT" && inv.reminderSentAt && (
+                      <Badge variant="outline" className="font-normal">
+                        Herinnerd {formatDate(inv.reminderSentAt)}
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{formatCurrency(Number(inv.total))}</TableCell>
