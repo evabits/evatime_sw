@@ -28,6 +28,8 @@ const EMPTY_TEMPLATE_FORM = {
   invoiceSubject: "",
   referencePrefix: "",
   tracksQuality: false,
+  /** Lege id = nieuw. De volgorde in deze lijst is de volgorde op de factuur. */
+  variants: [] as { id?: string; name: string }[],
 };
 
 // Lokale dag, niet UTC: toISOString() zou tussen middernacht en 02:00 zomertijd
@@ -81,6 +83,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       invoiceSubject: t.invoiceSubject ?? "",
       referencePrefix: t.referencePrefix ?? "",
       tracksQuality: t.tracksQuality,
+      variants: (t.variants ?? []).map((v: any) => ({ id: v.id, name: v.name })),
     });
     setEditingTemplate(t);
     setTemplateError("");
@@ -110,6 +113,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
           invoiceSubject: templateForm.invoiceSubject.trim() || null,
           referencePrefix: templateForm.referencePrefix.trim() || null,
           tracksQuality: templateForm.tracksQuality,
+          variants: templateForm.variants.filter((v) => v.name.trim() !== ""),
         }),
       });
       if (res.ok) {
@@ -172,6 +176,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
   // ─── Batch voltooien ──────────────────────────────────────────────────────
   const [completing, setCompleting] = useState<any>(null);
   const [completeForm, setCompleteForm] = useState({ deliveredAt: "", quantity: "", approved: "", rejected: "", projectCode: "" });
+  const [variantAantallen, setVariantAantallen] = useState<Record<string, string>>({});
   const [completeError, setCompleteError] = useState("");
   const [completeBusy, setCompleteBusy] = useState(false);
   const [completedInvoiceNumber, setCompletedInvoiceNumber] = useState<string | null>(null);
@@ -188,15 +193,22 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       // Wat er bij het aanmaken is ingevuld; vaak is de code pas nu bekend.
       projectCode: batch.projectCode ?? "",
     });
+    // Eén veld per variant van het sjabloon, leeg te beginnen.
+    setVariantAantallen(
+      Object.fromEntries(((batch.template?.variants ?? []) as any[]).map((v) => [v.id, ""])),
+    );
     setCompleteError("");
     setCompletedInvoiceNumber(null);
   }
 
   const tracksQuality = !!completing?.template?.tracksQuality;
   const isFixed = completing?.template?.billing === "FIXED";
+  const varianten: { id: string; name: string }[] = completing?.template?.variants ?? [];
   const invoer = tracksQuality
     ? { approved: Number(completeForm.approved || 0), rejected: Number(completeForm.rejected || 0) }
-    : { quantity: isFixed ? 1 : Number(completeForm.quantity || 0) };
+    : varianten.length > 0
+      ? { variants: varianten.map((v) => ({ id: v.id, name: v.name, quantity: Number(variantAantallen[v.id] || 0) })) }
+      : { quantity: isFixed ? 1 : Number(completeForm.quantity || 0) };
   // Dezelfde functies als de server: wat hier staat is wat er op de factuur komt.
   const totaal = completing ? batchTotal(invoer, tracksQuality) : 0;
   const draft = completing
@@ -228,6 +240,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       if (tracksQuality) {
         body.approved = Number(completeForm.approved || 0);
         body.rejected = Number(completeForm.rejected || 0);
+      } else if (varianten.length > 0) {
+        body.variants = varianten.map((v) => ({ id: v.id, quantity: Number(variantAantallen[v.id] || 0) }));
       } else {
         body.quantity = isFixed ? 1 : Number(completeForm.quantity || 0);
       }
@@ -295,6 +309,9 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                   <TableCell>
                     {BILLING_LABELS[t.billing] ?? t.billing}
                     {t.tracksQuality && <span className="text-xs text-muted-foreground"> (goed-/afkeur)</span>}
+                    {(t.variants?.length ?? 0) > 0 && (
+                      <span className="text-xs text-muted-foreground"> ({t.variants.length} varianten)</span>
+                    )}
                   </TableCell>
                   {toonBedragen && (
                     <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
@@ -465,6 +482,52 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                 Houdt goed- en afkeur bij
               </label>
             </div>
+
+            {/* Varianten: alleen bij een stuksprijs zonder goed- en afkeur. Beide
+                tellen hetzelfde werk, en twee tellingen naast elkaar spreken
+                elkaar vroeg of laat tegen. */}
+            {templateForm.billing === "PER_UNIT" && !templateForm.tracksQuality && (
+              <div className="sm:col-span-2 space-y-2">
+                <Label>Varianten <span className="text-muted-foreground font-normal">(optioneel)</span></Label>
+                {templateForm.variants.map((v, i) => (
+                  <div key={v.id ?? `nieuw-${i}`} className="flex gap-2">
+                    <Input
+                      value={v.name}
+                      placeholder="bijv. SaltBuddies"
+                      onChange={(e) =>
+                        setTemplateForm((f) => ({
+                          ...f,
+                          variants: f.variants.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)),
+                        }))
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Variant verwijderen"
+                      onClick={() =>
+                        setTemplateForm((f) => ({ ...f, variants: f.variants.filter((_, j) => j !== i) }))
+                      }
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTemplateForm((f) => ({ ...f, variants: [...f.variants, { name: "" }] }))}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Variant toevoegen
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Met varianten vul je bij het voltooien een aantal per variant in, en krijgt elke
+                  variant een eigen factuurregel met hetzelfde tarief.
+                </p>
+              </div>
+            )}
             {templateError && <p className="sm:col-span-2 text-sm text-destructive">{templateError}</p>}
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={() => setTemplateDialogOpen(false)}>Annuleren</Button>
@@ -533,6 +596,25 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                       onChange={(e) => setCompleteForm((f) => ({ ...f, rejected: e.target.value }))} />
                   </div>
                 </div>
+              ) : varianten.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Aantal per variant</Label>
+                  {varianten.map((v) => (
+                    <div key={v.id} className="flex items-center gap-2">
+                      <span className="flex-1 text-sm">{v.name}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        className="w-28"
+                        value={variantAantallen[v.id] ?? ""}
+                        onChange={(e) => setVariantAantallen((a) => ({ ...a, [v.id]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Totaal {totaal} stuks. Een variant zonder aantal komt niet op de factuur.
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-1">
                   <Label>Aantal</Label>
@@ -558,7 +640,23 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                   placeholder="Optioneel, bijv. PROJ-441"
                   onChange={(e) => setCompleteForm((f) => ({ ...f, projectCode: e.target.value }))} />
               </div>
-              {draft && (
+              {/* Met varianten is de optelsom een regel per variant: precies de
+                  regels die straks op de factuur staan. */}
+              {draft && varianten.length > 0 && (
+                <div className="text-sm font-mono bg-muted rounded-md px-3 py-2 space-y-0.5">
+                  {draft.lines.map((r, i) => (
+                    <p key={i}>
+                      {r.description} — {r.quantity} stuks
+                      {toonBedragen ? ` × ${formatCurrency(r.unitPrice)} = ${formatCurrency(r.total)}` : ""}
+                    </p>
+                  ))}
+                  {draft.lines.length === 0 && <p>Nog geen aantallen ingevuld.</p>}
+                  <p className="font-medium">
+                    Totaal {totaal} stuks{toonBedragen ? ` = ${formatCurrency(draft.subtotal)}` : ""}
+                  </p>
+                </div>
+              )}
+              {draft && varianten.length === 0 && (
                 <p className="text-sm font-mono bg-muted rounded-md px-3 py-2">
                   {/* Zonder de bedragen blijft de optelsom staan: die is de
                       controle op wat er is ingevuld, en daar gaat het bij het
@@ -568,8 +666,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                       ? `Vast bedrag: ${formatCurrency(draft.subtotal)}`
                       : "Vast bedrag"
                     : tracksQuality
-                      ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`
-                      : `${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.line.unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`}
+                      ? `${Number(completeForm.approved || 0)} + ${Number(completeForm.rejected || 0)} = ${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.lines[0].unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`
+                      : `${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.lines[0].unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`}
                 </p>
               )}
               {draft?.reference && (

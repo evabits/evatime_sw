@@ -15,6 +15,8 @@ const schema = z.object({
   approved: z.number().optional().nullable(),
   rejected: z.number().optional().nullable(),
   projectCode: z.string().trim().optional().nullable(),
+  // De aantallen per variant, als het sjabloon varianten heeft.
+  variants: z.array(z.object({ id: z.string().min(1), quantity: z.number() })).optional(),
 });
 
 /** Sein dat de grendel dichtsloeg; alleen bedoeld om de transactie terug te draaien. */
@@ -34,7 +36,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       // De taal van de klant bepaalt de inleiding en de betalingstekst die
       // hieronder worden opgesteld; die staan straks als tekst op de factuur.
-      include: { template: { include: { customer: { select: { language: true } } } } },
+      include: {
+        template: {
+          include: {
+            customer: { select: { language: true } },
+            variants: { orderBy: { sortOrder: "asc" } },
+          },
+        },
+      },
     });
     if (!batch) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!batch.template) {
@@ -42,7 +51,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const opgeleverd = new Date(`${data.deliveredAt}T00:00:00Z`);
-    const invoer = { quantity: data.quantity, approved: data.approved, rejected: data.rejected };
+    // De namen komen van het sjabloon en niet uit het verzoek: het scherm mag
+    // wel zeggen hoeveel er van een variant waren, niet hoe die heet.
+    const varianten = batch.template.variants.length > 0
+      ? batch.template.variants.map((v) => ({
+          id: v.id,
+          name: v.name,
+          quantity: Number(data.variants?.find((x) => x.id === v.id)?.quantity ?? 0),
+        }))
+      : null;
+    const invoer = {
+      quantity: data.quantity,
+      approved: data.approved,
+      rejected: data.rejected,
+      variants: varianten,
+    };
     // Een meegegeven code wint van wat er bij het aanmaken is ingevuld: bij het
     // voltooien is hij vaak pas bekend.
     const projectCode = data.projectCode !== undefined ? data.projectCode || null : batch.projectCode;
@@ -97,7 +120,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           subtotal: draft.subtotal,
           vatAmount: btwBedrag,
           total: draft.subtotal + btwBedrag,
-          lines: { create: [{ ...draft.line, sortOrder: 0 }] },
+          lines: { create: draft.lines.map((r, i) => ({ ...r, sortOrder: i })) },
         },
       });
 
@@ -119,6 +142,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       });
       if (bijgewerkt.count === 0) throw new Error(INGEHAALD);
+
+      // De telling per variant bewaren: dat is de verantwoording onder de
+      // regels van deze factuur. Opnieuw voltooien kan niet, maar een eerdere
+      // poging kan rijen hebben achtergelaten.
+      if (varianten) {
+        await tx.batchVariantQuantity.deleteMany({ where: { projectId: batch.id } });
+        await tx.batchVariantQuantity.createMany({
+          data: varianten.map((v) => ({ projectId: batch.id, variantId: v.id, quantity: v.quantity })),
+        });
+      }
 
       return inv;
       });

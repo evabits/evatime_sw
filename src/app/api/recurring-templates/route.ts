@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canManageRecurringTemplates } from "@/lib/roles";
+import { variantDenial } from "@/lib/recurring-variants";
 
 const schema = z.object({
   name: z.string().trim().min(1),
@@ -15,6 +16,7 @@ const schema = z.object({
   invoiceSubject: z.string().trim().optional().nullable(),
   tracksQuality: z.boolean().default(false),
   referencePrefix: z.string().trim().optional().nullable(),
+  variants: z.array(z.object({ id: z.string().optional().nullable(), name: z.string() })).optional(),
 });
 
 export async function GET() {
@@ -28,7 +30,10 @@ export async function GET() {
 
     const templates = await prisma.recurringTemplate.findMany({
       where: { archivedAt: null },
-      include: { customer: { select: { id: true, name: true } } },
+      include: {
+        customer: { select: { id: true, name: true } },
+        variants: { orderBy: { sortOrder: "asc" } },
+      },
       orderBy: { name: "asc" },
     });
     return NextResponse.json(templates);
@@ -44,8 +49,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const data = schema.parse(await req.json());
-    const template = await prisma.recurringTemplate.create({ data });
+    const { variants, ...data } = schema.parse(await req.json());
+    const weigering = variantDenial(variants ?? [], data.billing, data.tracksQuality);
+    if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
+
+    const template = await prisma.recurringTemplate.create({
+      data: {
+        ...data,
+        variants: {
+          create: (variants ?? [])
+            .map((v, i) => ({ name: v.name.trim(), sortOrder: i }))
+            .filter((v) => v.name !== ""),
+        },
+      },
+      include: { variants: { orderBy: { sortOrder: "asc" } } },
+    });
     return NextResponse.json(template, { status: 201 });
   } catch (e) { return handleError(e); }
 }
