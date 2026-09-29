@@ -135,6 +135,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
   // ─── Nieuwe batch starten ────────────────────────────────────────────────
   const [startingFor, setStartingFor] = useState<any>(null);
   const [batchName, setBatchName] = useState("");
+  const [batchCode, setBatchCode] = useState("");
   const [batchStartError, setBatchStartError] = useState("");
   const [batchStarting, setBatchStarting] = useState(false);
 
@@ -152,7 +153,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       const res = await fetch(`/api/recurring-templates/${startingFor.id}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: batchName.trim() || undefined }),
+        body: JSON.stringify({ name: batchName.trim() || undefined, projectCode: batchCode.trim() || null }),
       });
       if (res.ok) {
         setStartingFor(null);
@@ -170,7 +171,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
 
   // ─── Batch voltooien ──────────────────────────────────────────────────────
   const [completing, setCompleting] = useState<any>(null);
-  const [completeForm, setCompleteForm] = useState({ deliveredAt: "", quantity: "", approved: "", rejected: "" });
+  const [completeForm, setCompleteForm] = useState({ deliveredAt: "", quantity: "", approved: "", rejected: "", projectCode: "" });
   const [completeError, setCompleteError] = useState("");
   const [completeBusy, setCompleteBusy] = useState(false);
   const [completedInvoiceNumber, setCompletedInvoiceNumber] = useState<string | null>(null);
@@ -184,6 +185,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       quantity: batch.template?.defaultQuantity != null ? String(batch.template.defaultQuantity) : "",
       approved: "",
       rejected: "",
+      // Wat er bij het aanmaken is ingevuld; vaak is de code pas nu bekend.
+      projectCode: batch.projectCode ?? "",
     });
     setCompleteError("");
     setCompletedInvoiceNumber(null);
@@ -199,7 +202,13 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
   const draft = completing
     ? recurringInvoiceDraft(
         completing.template,
-        { id: completing.id, name: completing.name, generatedInvoiceId: completing.generatedInvoiceId, deliveredAt: completeForm.deliveredAt || vandaagIso() },
+        {
+          id: completing.id,
+          name: completing.name,
+          generatedInvoiceId: completing.generatedInvoiceId,
+          deliveredAt: completeForm.deliveredAt || vandaagIso(),
+          projectCode: completeForm.projectCode,
+        },
         invoer,
         // Het voorbeeld hoort te tonen wat er straks werkelijk op de factuur
         // komt, dus in de taal van de klant.
@@ -212,7 +221,10 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
     setCompleteBusy(true);
     setCompleteError("");
     try {
-      const body: Record<string, unknown> = { deliveredAt: completeForm.deliveredAt };
+      const body: Record<string, unknown> = {
+        deliveredAt: completeForm.deliveredAt,
+        projectCode: completeForm.projectCode.trim() || null,
+      };
       if (tracksQuality) {
         body.approved = Number(completeForm.approved || 0);
         body.rejected = Number(completeForm.rejected || 0);
@@ -320,6 +332,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
             <TableHeader>
               <TableRow>
                 <TableHead>Naam</TableHead>
+                <TableHead>Projectcode</TableHead>
                 <TableHead>Klant</TableHead>
                 <TableHead>Startdatum</TableHead>
                 <TableHead></TableHead>
@@ -328,12 +341,13 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
             <TableBody>
               {activeBatches.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">Geen lopende batches</TableCell>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen lopende batches</TableCell>
                 </TableRow>
               )}
               {activeBatches.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.name}</TableCell>
+                  <TableCell className="text-sm">{b.projectCode || <span className="text-muted-foreground">—</span>}</TableCell>
                   {/* De klant van het sjabloon, niet die van het project: de
                       factuur gaat naar de klant van het sjabloon, en die twee
                       lopen uiteen zodra iemand het sjabloon aanpast. */}
@@ -359,6 +373,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
               <TableHeader>
                 <TableRow>
                   <TableHead>Naam</TableHead>
+                  <TableHead>Projectcode</TableHead>
                   <TableHead>Klant</TableHead>
                   <TableHead>Opgeleverd</TableHead>
                   <TableHead>Factuurnummer</TableHead>
@@ -368,6 +383,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                 {completedBatches.map((b) => (
                   <TableRow key={b.id}>
                     <TableCell className="font-medium">{b.name}</TableCell>
+                    <TableCell className="text-sm">{b.projectCode || <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>{b.customer?.name}</TableCell>
                     <TableCell>{formatDate(b.deliveredAt)}</TableCell>
                     <TableCell>{b.generatedInvoice?.invoiceNumber ?? "—"}</TableCell>
@@ -467,6 +483,15 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
           <div className="space-y-2">
             <Label>Naam</Label>
             <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} autoFocus />
+            <Label>Projectcode</Label>
+            <Input
+              value={batchCode}
+              onChange={(e) => setBatchCode(e.target.value)}
+              placeholder="Optioneel, bijv. PROJ-441"
+            />
+            <p className="text-xs text-muted-foreground">
+              De code van de klant. Komt achter het onderwerp van de factuur te staan.
+            </p>
             {batchStartError && <p className="text-xs text-destructive">{batchStartError}</p>}
           </div>
           <DialogFooter>
@@ -526,6 +551,12 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                 <Label>Opleverdatum</Label>
                 <Input type="date" value={completeForm.deliveredAt}
                   onChange={(e) => setCompleteForm((f) => ({ ...f, deliveredAt: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Projectcode</Label>
+                <Input value={completeForm.projectCode}
+                  placeholder="Optioneel, bijv. PROJ-441"
+                  onChange={(e) => setCompleteForm((f) => ({ ...f, projectCode: e.target.value }))} />
               </div>
               {draft && (
                 <p className="text-sm font-mono bg-muted rounded-md px-3 py-2">
