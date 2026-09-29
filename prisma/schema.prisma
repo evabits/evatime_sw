@@ -120,42 +120,43 @@ model Customer {
 }
 
 model Project {
-  id                 String             @id @default(cuid())
+  id                 String                 @id @default(cuid())
   customerId         String?
-  customer           Customer?          @relation(fields: [customerId], references: [id])
-  name               String             @unique
+  customer           Customer?              @relation(fields: [customerId], references: [id])
+  name               String                 @unique
   /// De code die de klant aan deze opdracht geeft. Optioneel en niet uniek: twee
   /// opdrachten kunnen bij de klant dezelfde code hebben. Bij een batch uit een
   /// herhaalsjabloon komt hij achter het onderwerp van de factuur te staan.
   projectCode        String?
   description        String?
-  status             ProjectStatus      @default(ACTIVE)
-  billable           Boolean            @default(true)
-  defaultKmRate      Decimal?           @db.Decimal(10, 2)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  status             ProjectStatus          @default(ACTIVE)
+  billable           Boolean                @default(true)
+  defaultKmRate      Decimal?               @db.Decimal(10, 2)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
   archivedAt         DateTime?
   // Grof geplande doorlooptijd, ingevuld door een beheerder op /planning.
   // Allebei of geen van beide: één losse datum levert geen balk op en wordt
   // door de API geweigerd. Zijn ze leeg, dan spant de balk zich om de taken.
-  plannedStart       DateTime?          @db.Date
-  plannedEnd         DateTime?          @db.Date
+  plannedStart       DateTime?              @db.Date
+  plannedEnd         DateTime?              @db.Date
   /// Uit welk sjabloon deze batch komt. Leeg voor een gewoon project: een batch
   /// is een project, want dan houdt hij vanzelf zijn eigen uren en planning.
   templateId         String?
-  template           RecurringTemplate? @relation(fields: [templateId], references: [id])
+  template           RecurringTemplate?     @relation(fields: [templateId], references: [id])
   /// Het gefactureerde aantal. Altijd gevuld bij een voltooide batch, ook als
   /// er geen goed- en afkeur wordt bijgehouden — dit is wat op de factuur komt.
-  quantity           Decimal?           @db.Decimal(10, 2)
+  quantity           Decimal?               @db.Decimal(10, 2)
   /// De uitsplitsing, alleen bij testwerk. Samen zijn ze gelijk aan quantity;
   /// de route rekent quantity daaruit en gelooft geen totaal van de client.
-  approvedCount      Decimal?           @db.Decimal(10, 2)
-  rejectedCount      Decimal?           @db.Decimal(10, 2)
-  deliveredAt        DateTime?          @db.Date
+  approvedCount      Decimal?               @db.Decimal(10, 2)
+  rejectedCount      Decimal?               @db.Decimal(10, 2)
+  deliveredAt        DateTime?              @db.Date
   /// De conceptfactuur die uit deze batch is voortgekomen. Uniek: één batch
   /// levert er hoogstens één op.
-  generatedInvoiceId String?            @unique
-  generatedInvoice   Invoice?           @relation("BatchInvoice", fields: [generatedInvoiceId], references: [id])
+  variantQuantities  BatchVariantQuantity[]
+  generatedInvoiceId String?                @unique
+  generatedInvoice   Invoice?               @relation("BatchInvoice", fields: [generatedInvoiceId], references: [id])
   timeEntries        TimeEntry[]
   kmEntries          KmEntry[]
   kmTemplates        KmTemplate[]
@@ -182,29 +183,58 @@ enum BillingMode {
 }
 
 model RecurringTemplate {
-  id              String      @id @default(cuid())
+  id              String             @id @default(cuid())
   name            String
   customerId      String
-  customer        Customer    @relation(fields: [customerId], references: [id])
-  billing         BillingMode @default(PER_UNIT)
+  customer        Customer           @relation(fields: [customerId], references: [id])
+  billing         BillingMode        @default(PER_UNIT)
   /// Prijs per stuk, of het vaste bedrag bij FIXED.
-  unitPrice       Decimal?    @db.Decimal(10, 2)
+  unitPrice       Decimal?           @db.Decimal(10, 2)
   /// Voorgesteld aantal bij een nieuwe batch. Voor H3X: 120.
-  defaultQuantity Decimal?    @db.Decimal(10, 2)
+  defaultQuantity Decimal?           @db.Decimal(10, 2)
   /// De omschrijving van de factuurregel: "Testen H3X batterij omvormers".
   lineDescription String
   /// Het onderwerp van de factuur: "Factuur H3X testen".
   invoiceSubject  String?
   /// Testwerk telt goedkeur en afkeur; een vast bedrag niet.
-  tracksQuality   Boolean     @default(false)
+  tracksQuality   Boolean            @default(false)
   /// Het vaste deel van het kenmerk op de factuur: "ZP-H3X". De opleverdatum
   /// komt er bij het voltooien achter, dus "ZP-H3X-12AUG26". Leeg betekent geen
   /// kenmerk, zoals bij elke andere factuur.
   referencePrefix String?
   archivedAt      DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   projects        Project[]
+  variants        RecurringVariant[]
+}
+
+/// Een productvariant binnen een herhaalsjabloon: SaltBuddies naast Slim Smart
+/// Watches. Alleen de naam en de volgorde; de prijs staat op het sjabloon, want
+/// varianten delen het tarief en verschillen alleen in aantal.
+model RecurringVariant {
+  id         String                 @id @default(cuid())
+  templateId String
+  template   RecurringTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name       String
+  sortOrder  Int                    @default(0)
+  quantities BatchVariantQuantity[]
+  createdAt  DateTime               @default(now())
+
+  @@index([templateId])
+}
+
+/// Hoeveel er van een variant in deze batch zat. Eén rij per variant per batch;
+/// een variant zonder rij is er niet geweest en komt niet op de factuur.
+model BatchVariantQuantity {
+  id        String           @id @default(cuid())
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   RecurringVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Decimal          @db.Decimal(10, 2)
+
+  @@unique([projectId, variantId])
 }
 
 model ProjectTask {

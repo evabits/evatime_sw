@@ -15,6 +15,12 @@ export type BatchInput = {
   quantity?: number | null;
   approved?: number | null;
   rejected?: number | null;
+  /**
+   * De aantallen per variant, als het sjabloon varianten heeft. Ze vervangen
+   * `quantity`: het totaal is hun som, en elke variant wordt een eigen
+   * factuurregel.
+   */
+  variants?: { id: string; name: string; quantity: number }[] | null;
 };
 
 /**
@@ -29,6 +35,8 @@ export type BatchInput = {
  */
 export function batchTotal(invoer: BatchInput, tracksQuality: boolean): number {
   if (tracksQuality) return Number(invoer.approved ?? 0) + Number(invoer.rejected ?? 0);
+  // Met varianten is het totaal hun som; het losse aantalveld bestaat dan niet.
+  if (invoer.variants) return invoer.variants.reduce((som, v) => som + Number(v.quantity || 0), 0);
   return Number(invoer.quantity ?? 0);
 }
 
@@ -112,6 +120,8 @@ export type RecurringTemplateData = {
   tracksQuality: boolean;
   /** Het vaste deel van het kenmerk, bijvoorbeeld "ZP-H3X". */
   referencePrefix?: string | null;
+  /** De varianten, leeg of afwezig bij een sjabloon zonder varianten. */
+  variants?: { id: string; name: string }[] | null;
 };
 
 export type BatchData = {
@@ -123,19 +133,22 @@ export type BatchData = {
   projectCode?: string | null;
 };
 
-/** Eén factuurregel plus de bijbehorende kopteksten. */
+export type RecurringLine = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  lineType: "OTHER";
+};
+
+/** De factuurregels plus de bijbehorende kopteksten. */
 export type RecurringDraft = {
   subject: string;
   /** Het kenmerk, of null als het sjabloon er geen heeft. */
   reference: string | null;
   intro: string;
-  line: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-    lineType: "OTHER";
-  };
+  /** Eén regel, of één regel per variant met een aantal boven nul. */
+  lines: RecurringLine[];
   subtotal: number;
 };
 
@@ -180,6 +193,34 @@ export function recurringInvoiceDraft(
   const aantal = sjabloon.billing === "FIXED" ? 1 : totaal;
   const bedrag = Math.round(aantal * prijs * 100) / 100;
 
+  // Met varianten wordt het één regel per variant, met de naam van de variant
+  // achter de omschrijving van het sjabloon. Een variant zonder aantal komt er
+  // niet op: die is er deze batch niet geweest. Varianten bestaan alleen bij
+  // een stuksprijs, dus het vaste bedrag hierboven speelt hier niet.
+  const perVariant = (invoer.variants ?? []).filter((v) => Number(v.quantity || 0) > 0);
+  const regels: RecurringLine[] = perVariant.length > 0
+    ? perVariant.map((v) => {
+        const n = Number(v.quantity);
+        return {
+          description: `${sjabloon.lineDescription} - ${v.name}`,
+          quantity: n,
+          unitPrice: prijs,
+          total: Math.round(n * prijs * 100) / 100,
+          lineType: "OTHER" as const,
+        };
+      })
+    : [{
+        description: sjabloon.lineDescription,
+        quantity: aantal,
+        unitPrice: prijs,
+        total: bedrag,
+        lineType: "OTHER" as const,
+      }];
+
+  // Het totaal van de regels wint van de losse berekening: wat er op de factuur
+  // staat en wat eronder staat horen per definitie gelijk te zijn.
+  const subtotaal = regels.reduce((som, r) => som + r.total, 0);
+
   return {
     subject: batchSubject(sjabloon.invoiceSubject, batch.name, batch.projectCode),
     reference: batchReference(sjabloon.referencePrefix, batch.deliveredAt),
@@ -192,14 +233,8 @@ export function recurringInvoiceDraft(
       rejected: invoer.rejected,
       taal,
     }),
-    line: {
-      description: sjabloon.lineDescription,
-      quantity: aantal,
-      unitPrice: prijs,
-      total: bedrag,
-      lineType: "OTHER",
-    },
-    subtotal: bedrag,
+    lines: regels,
+    subtotal: Math.round(subtotaal * 100) / 100,
   };
 }
 
@@ -225,10 +260,16 @@ export function completeBatchDenial(
     return "Stel eerst een tarief in op het sjabloon.";
   }
 
-  const getallen = [invoer.quantity, invoer.approved, invoer.rejected]
+  const getallen = [
+    invoer.quantity,
+    invoer.approved,
+    invoer.rejected,
+    ...(invoer.variants ?? []).map((v) => v.quantity),
+  ]
     .filter((n) => n !== null && n !== undefined)
     .map(Number);
   if (getallen.some((n) => n < 0)) return "Een aantal kan niet negatief zijn.";
+  if (getallen.some((n) => Number.isNaN(n))) return "Vul bij elk aantal een getal in.";
 
   if (batchTotal(invoer, sjabloon.tracksQuality) <= 0) return "Vul een aantal groter dan nul in.";
   return null;

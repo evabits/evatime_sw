@@ -98,17 +98,17 @@ describe("recurringInvoiceDraft", () => {
     // De twee handmatige voorlopers, 2026-0007 en 2026-0008, waren precies dit:
     // 120 x € 20,00 = € 2.400,00.
     const d = recurringInvoiceDraft(sjabloon(), batch(), invoer);
-    expect(d.line.quantity).toBe(120);
-    expect(d.line.unitPrice).toBe(20);
-    expect(d.line.total).toBe(2400);
+    expect(d.lines[0].quantity).toBe(120);
+    expect(d.lines[0].unitPrice).toBe(20);
+    expect(d.lines[0].total).toBe(2400);
     expect(d.subtotal).toBe(2400);
   });
 
   it("takes subject and line description from the template", () => {
     const d = recurringInvoiceDraft(sjabloon(), batch(), invoer);
     expect(d.subject).toBe("Factuur H3X testen");
-    expect(d.line.description).toBe("Testen H3X batterij omvormers");
-    expect(d.line.lineType).toBe("OTHER");
+    expect(d.lines[0].description).toBe("Testen H3X batterij omvormers");
+    expect(d.lines[0].lineType).toBe("OTHER");
   });
 
   it("falls back to the batch name when the template has no subject", () => {
@@ -136,8 +136,8 @@ describe("recurringInvoiceDraft", () => {
   it("bills a fixed amount as one unit", () => {
     const vast = sjabloon({ billing: "FIXED", tracksQuality: false, unitPrice: "750.00" });
     const d = recurringInvoiceDraft(vast, batch(), { quantity: 1 });
-    expect(d.line.quantity).toBe(1);
-    expect(d.line.total).toBe(750);
+    expect(d.lines[0].quantity).toBe(1);
+    expect(d.lines[0].total).toBe(750);
   });
 
   it("does not multiply a fixed amount by the number of items tested", () => {
@@ -147,8 +147,8 @@ describe("recurringInvoiceDraft", () => {
     // inleiding, niet in de rekensom.
     const vast = sjabloon({ billing: "FIXED", tracksQuality: true, unitPrice: "750.00" });
     const d = recurringInvoiceDraft(vast, batch(), { approved: 118, rejected: 2 });
-    expect(d.line.quantity).toBe(1);
-    expect(d.line.total).toBe(750);
+    expect(d.lines[0].quantity).toBe(1);
+    expect(d.lines[0].total).toBe(750);
     expect(d.subtotal).toBe(750);
     expect(d.intro).toContain("118 goedgekeurd en 2 afgekeurd");
   });
@@ -273,5 +273,62 @@ describe("batchSubject", () => {
   it("laat het onderwerp heel zonder projectcode", () => {
     expect(batchSubject("Factuur H3X testen", "H3X AUG26", null)).toBe("Factuur H3X testen");
     expect(batchSubject("Factuur H3X testen", "H3X AUG26", "   ")).toBe("Factuur H3X testen");
+  });
+});
+
+describe("varianten", () => {
+  const sjabloon = {
+    id: "s1", name: "SaltBuddies en SSW", customerId: "k1", billing: "PER_UNIT" as const,
+    unitPrice: 4, defaultQuantity: 200, lineDescription: "Testen en inpakken",
+    invoiceSubject: "Factuur SaltBuddies en SSWs", tracksQuality: false, referencePrefix: null,
+    variants: [{ id: "v1", name: "SaltBuddies" }, { id: "v2", name: "Slim Smart Watches" }],
+  };
+  const batch = { id: "b1", name: "SaltBuddies en SSW SEP26", generatedInvoiceId: null, deliveredAt: "2026-09-30" };
+  const invoer = {
+    variants: [
+      { id: "v1", name: "SaltBuddies", quantity: 120 },
+      { id: "v2", name: "Slim Smart Watches", quantity: 80 },
+    ],
+  };
+
+  it("telt het totaal op uit de varianten", () => {
+    expect(batchTotal(invoer, false)).toBe(200);
+  });
+
+  it("maakt een regel per variant met het gedeelde tarief", () => {
+    const d = recurringInvoiceDraft(sjabloon, batch, invoer);
+    expect(d.lines).toEqual([
+      { description: "Testen en inpakken - SaltBuddies", quantity: 120, unitPrice: 4, total: 480, lineType: "OTHER" },
+      { description: "Testen en inpakken - Slim Smart Watches", quantity: 80, unitPrice: 4, total: 320, lineType: "OTHER" },
+    ]);
+    expect(d.subtotal).toBe(800);
+  });
+
+  it("laat een variant zonder aantal van de factuur", () => {
+    const d = recurringInvoiceDraft(sjabloon, batch, {
+      variants: [
+        { id: "v1", name: "SaltBuddies", quantity: 120 },
+        { id: "v2", name: "Slim Smart Watches", quantity: 0 },
+      ],
+    });
+    expect(d.lines.map((r) => r.description)).toEqual(["Testen en inpakken - SaltBuddies"]);
+    expect(d.subtotal).toBe(480);
+  });
+
+  it("weigert een batch waarin geen enkele variant een aantal heeft", () => {
+    const leeg = { variants: [{ id: "v1", name: "SaltBuddies", quantity: 0 }] };
+    expect(completeBatchDenial(sjabloon, batch, leeg)).toBe("Vul een aantal groter dan nul in.");
+  });
+
+  it("weigert een negatief aantal bij een variant", () => {
+    const fout = { variants: [{ id: "v1", name: "SaltBuddies", quantity: -1 }] };
+    expect(completeBatchDenial(sjabloon, batch, fout)).toBe("Een aantal kan niet negatief zijn.");
+  });
+
+  it("houdt het gedrag van een sjabloon zonder varianten gelijk", () => {
+    const d = recurringInvoiceDraft({ ...sjabloon, variants: [] }, batch, { quantity: 200 });
+    expect(d.lines).toHaveLength(1);
+    expect(d.lines[0].description).toBe("Testen en inpakken");
+    expect(d.subtotal).toBe(800);
   });
 });
