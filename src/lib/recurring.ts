@@ -119,6 +119,8 @@ export type BatchData = {
   name: string;
   generatedInvoiceId: string | null;
   deliveredAt: Date | string;
+  /** De projectcode van de klant, als die er is. */
+  projectCode?: string | null;
 };
 
 /** Eén factuurregel plus de bijbehorende kopteksten. */
@@ -143,6 +145,25 @@ export type RecurringDraft = {
  * Eén regel van het type OTHER: dit is geen tijd- of kilometerregistratie maar
  * een afgesproken stukprijs, en die hoort niet aan uren gekoppeld te worden.
  */
+/**
+ * Het onderwerp van de batchfactuur, met de projectcode van de klant erachter.
+ *
+ * De code hoort in het onderwerp en niet in het kenmerk: dat heeft al het vaste
+ * format `ZP-H3X-12AUG26` dat de klant gewend is. Het onderwerp komt ook in de
+ * onderwerpregel van de mail, dus de klant ziet de code al in zijn inbox.
+ */
+export function batchSubject(
+  invoiceSubject: string | null | undefined,
+  batchnaam: string,
+  projectCode?: string | null,
+): string {
+  // Een factuur zonder onderwerp leest als een fout; de batchnaam is altijd
+  // beter dan niets.
+  const basis = invoiceSubject?.trim() || batchnaam;
+  const code = (projectCode ?? "").trim();
+  return code ? `${basis} - ${code}` : basis;
+}
+
 export function recurringInvoiceDraft(
   sjabloon: RecurringTemplateData,
   batch: BatchData,
@@ -160,9 +181,7 @@ export function recurringInvoiceDraft(
   const bedrag = Math.round(aantal * prijs * 100) / 100;
 
   return {
-    // Een factuur zonder onderwerp leest als een fout; de batchnaam is altijd
-    // beter dan niets.
-    subject: sjabloon.invoiceSubject?.trim() || batch.name,
+    subject: batchSubject(sjabloon.invoiceSubject, batch.name, batch.projectCode),
     reference: batchReference(sjabloon.referencePrefix, batch.deliveredAt),
     intro: recurringInvoiceIntro({
       batchnaam: batch.name,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, batchReference } from "./recurring";
+import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, batchReference, batchSubject } from "./recurring";
 
 describe("batchTotal", () => {
   it("adds up approved and rejected for test work — everything tested is billed", () => {
@@ -256,5 +256,22 @@ describe("recurringInvoiceIntro in het Engels", () => {
         tracksQuality: false,
       }),
     ).toBe("Hierbij ontvangt u de factuur voor H3X AUG26, opgeleverd op 12-MRT-2026.");
+  });
+});
+
+describe("batchSubject", () => {
+  it("zet de projectcode achter het onderwerp", () => {
+    expect(batchSubject("Factuur H3X testen", "H3X AUG26", "PROJ-441")).toBe(
+      "Factuur H3X testen - PROJ-441",
+    );
+  });
+
+  it("valt terug op de batchnaam als het sjabloon geen onderwerp heeft", () => {
+    expect(batchSubject(null, "H3X AUG26", "PROJ-441")).toBe("H3X AUG26 - PROJ-441");
+  });
+
+  it("laat het onderwerp heel zonder projectcode", () => {
+    expect(batchSubject("Factuur H3X testen", "H3X AUG26", null)).toBe("Factuur H3X testen");
+    expect(batchSubject("Factuur H3X testen", "H3X AUG26", "   ")).toBe("Factuur H3X testen");
   });
 });

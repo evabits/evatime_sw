@@ -14,6 +14,7 @@ const schema = z.object({
   quantity: z.number().optional().nullable(),
   approved: z.number().optional().nullable(),
   rejected: z.number().optional().nullable(),
+  projectCode: z.string().trim().optional().nullable(),
 });
 
 /** Sein dat de grendel dichtsloeg; alleen bedoeld om de transactie terug te draaien. */
@@ -42,11 +43,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const opgeleverd = new Date(`${data.deliveredAt}T00:00:00Z`);
     const invoer = { quantity: data.quantity, approved: data.approved, rejected: data.rejected };
+    // Een meegegeven code wint van wat er bij het aanmaken is ingevuld: bij het
+    // voltooien is hij vaak pas bekend.
+    const projectCode = data.projectCode !== undefined ? data.projectCode || null : batch.projectCode;
     const batchData = {
       id: batch.id,
       name: batch.name,
       generatedInvoiceId: batch.generatedInvoiceId,
       deliveredAt: data.deliveredAt,
+      projectCode,
     };
 
     const weigering = completeBatchDenial(batch.template as any, batchData, invoer);
@@ -110,6 +115,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           approvedCount: batch.template!.tracksQuality ? Number(data.approved ?? 0) : null,
           rejectedCount: batch.template!.tracksQuality ? Number(data.rejected ?? 0) : null,
           generatedInvoiceId: inv.id,
+          projectCode,
         },
       });
       if (bijgewerkt.count === 0) throw new Error(INGEHAALD);

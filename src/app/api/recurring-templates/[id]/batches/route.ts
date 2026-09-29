@@ -8,6 +8,7 @@ import { suggestBatchName } from "@/lib/recurring";
 
 const schema = z.object({
   name: z.string().trim().min(1).optional(),
+  projectCode: z.string().trim().optional().nullable(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const batch = await prisma.project.create({
       data: {
         name: naam,
+        projectCode: data.projectCode || null,
         customerId: sjabloon.customerId,
         status: "ACTIVE",
         templateId: sjabloon.id,

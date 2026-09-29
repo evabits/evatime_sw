@@ -124,6 +124,10 @@ model Project {
   customerId         String?
   customer           Customer?          @relation(fields: [customerId], references: [id])
   name               String             @unique
+  /// De code die de klant aan deze opdracht geeft. Optioneel en niet uniek: twee
+  /// opdrachten kunnen bij de klant dezelfde code hebben. Bij een batch uit een
+  /// herhaalsjabloon komt hij achter het onderwerp van de factuur te staan.
+  projectCode        String?
   description        String?
   status             ProjectStatus      @default(ACTIVE)
   billable           Boolean            @default(true)
