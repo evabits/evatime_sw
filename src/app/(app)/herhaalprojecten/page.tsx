@@ -12,7 +12,7 @@ export default async function HerhaalprojectenPage() {
   // mag dat ook. Wie geen van beide mag, hoort hier niet.
   if (!canManageRecurringBatches(role)) redirect("/");
 
-  const [templates, batches, customers] = await Promise.all([
+  const [templates, batches, customers, users] = await Promise.all([
     prisma.recurringTemplate.findMany({
       where: { archivedAt: null },
       include: {
@@ -37,12 +37,15 @@ export default async function HerhaalprojectenPage() {
           },
         },
         generatedInvoice: { select: { id: true, invoiceNumber: true } },
+        members: { select: { userId: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
     // Voor het klantveld in het sjabloonvenster; een teamleider ziet dit veld
     // toch niet, maar de query is goedkoop genoeg om niet apart te schermen.
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // Voor het kiezen van de deelnemers van een batch.
+    prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   return (
@@ -50,6 +53,7 @@ export default async function HerhaalprojectenPage() {
       initialTemplates={serialize(templates)}
       initialBatches={serialize(batches)}
       customers={serialize(customers)}
+      users={users}
       canManageTemplates={canManageRecurringTemplates(role)}
       // Een teamleider draait het werk, de beheerder doet de facturatie. Wat er
       // aan de klant in rekening wordt gebracht hoort dus niet op zijn scherm.
