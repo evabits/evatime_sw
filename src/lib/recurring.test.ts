@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, batchReference, batchSubject } from "./recurring";
+import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, deleteBatchDenial, batchReference, batchSubject } from "./recurring";
 
 describe("batchTotal", () => {
   it("adds up approved and rejected for test work — everything tested is billed", () => {
@@ -330,5 +330,29 @@ describe("varianten", () => {
     expect(d.lines).toHaveLength(1);
     expect(d.lines[0].description).toBe("Testen en inpakken");
     expect(d.subtotal).toBe(800);
+  });
+});
+
+describe("deleteBatchDenial", () => {
+  const lopend = { templateId: "t1", status: "ACTIVE", generatedInvoiceId: null };
+  const leeg = { timeEntries: 0, kmEntries: 0, expenses: 0 };
+
+  it("allows a running batch without bookings", () => {
+    expect(deleteBatchDenial(lopend, leeg)).toBeNull();
+  });
+
+  it("refuses an ordinary project", () => {
+    expect(deleteBatchDenial({ ...lopend, templateId: null }, leeg)).not.toBeNull();
+  });
+
+  it("refuses a completed or invoiced batch", () => {
+    expect(deleteBatchDenial({ ...lopend, status: "COMPLETED" }, leeg)).not.toBeNull();
+    expect(deleteBatchDenial({ ...lopend, generatedInvoiceId: "f1" }, leeg)).not.toBeNull();
+  });
+
+  it("refuses when anything is booked on it, so no hours vanish", () => {
+    expect(deleteBatchDenial(lopend, { ...leeg, timeEntries: 1 })).not.toBeNull();
+    expect(deleteBatchDenial(lopend, { ...leeg, kmEntries: 1 })).not.toBeNull();
+    expect(deleteBatchDenial(lopend, { ...leeg, expenses: 1 })).not.toBeNull();
   });
 });

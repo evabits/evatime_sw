@@ -136,6 +136,17 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
     if (res.ok) router.refresh();
   }
 
+  async function deleteBatch(b: any) {
+    if (!confirm(`Batch "${b.name}" verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+    const res = await fetch(`/api/projects/${b.id}/batch`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Verwijderen is niet gelukt");
+      return;
+    }
+    router.refresh();
+  }
+
   // ─── Nieuwe batch starten ────────────────────────────────────────────────
   const [startingFor, setStartingFor] = useState<any>(null);
   const [batchName, setBatchName] = useState("");
@@ -371,7 +382,12 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                   <TableCell>{b.template?.customer?.name ?? b.customer?.name}</TableCell>
                   <TableCell>{formatDate(b.createdAt)}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" onClick={() => openComplete(b)}>Voltooien</Button>
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" onClick={() => openComplete(b)}>Voltooien</Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteBatch(b)} title="Batch verwijderen">
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

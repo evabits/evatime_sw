@@ -239,6 +239,25 @@ export function recurringInvoiceDraft(
 }
 
 /**
+ * Waarom een batch niet verwijderd mag worden, of `null` als het mag. Bedoeld
+ * voor een verkeerd aangemaakte batch: alleen lopend en zonder boekingen, want
+ * uren, kilometers en onkosten zouden anders stilletjes verdwijnen.
+ */
+export function deleteBatchDenial(
+  batch: { templateId: string | null; status: string; generatedInvoiceId: string | null },
+  geboekt: { timeEntries: number; kmEntries: number; expenses: number },
+): string | null {
+  if (!batch.templateId) return "Dit is geen batch uit een herhaalsjabloon.";
+  if (batch.status !== "ACTIVE" || batch.generatedInvoiceId) {
+    return "Alleen een lopende batch kan worden verwijderd.";
+  }
+  if (geboekt.timeEntries + geboekt.kmEntries + geboekt.expenses > 0) {
+    return "Op deze batch is al geboekt. Verplaats of verwijder eerst de uren, kilometers en onkosten.";
+  }
+  return null;
+}
+
+/**
  * Waarom een batch niet voltooid mag worden, of `null` als het mag.
  *
  * De volgorde is bewust: eerst wat er niet aan te doen is (al gefactureerd, een
