@@ -56,10 +56,18 @@ export async function projectMembershipError(
   ownerId: string,
 ): Promise<NextResponse | null> {
   if (!projectId) return null;
-  const members = await prisma.projectMember.findMany({
-    where: { projectId },
-    select: { userId: true },
-  });
+  const [members, project] = await Promise.all([
+    prisma.projectMember.findMany({ where: { projectId }, select: { userId: true } }),
+    prisma.project.findUnique({ where: { id: projectId }, select: { templateId: true, status: true } }),
+  ]);
+  // Een batch is af zodra hij voltooid is: de factuur is dan al gemaakt, dus
+  // wat er nog bij komt wordt nergens meer verrekend.
+  if (project?.templateId && project.status !== "ACTIVE") {
+    return NextResponse.json(
+      { error: "Deze batch is voltooid; er kan niet meer op worden geboekt" },
+      { status: 400 },
+    );
+  }
   if (isProjectMember(members.map((m) => m.userId), ownerId)) return null;
   return NextResponse.json(
     { error: "Deze medewerker is geen deelnemer van dit project" },

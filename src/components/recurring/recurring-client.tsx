@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Repeat } from "lucide-react";
+import { Plus, Pencil, Trash2, Repeat, Users } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { batchReference, batchTotal, recurringInvoiceDraft, suggestBatchName } from "@/lib/recurring";
 
@@ -43,12 +43,13 @@ interface Props {
   initialTemplates: any[];
   initialBatches: any[];
   customers: { id: string; name: string }[];
+  users: { id: string; name: string }[];
   canManageTemplates: boolean;
   /** Of deze rol de tarieven en factuurbedragen mag zien. */
   toonBedragen: boolean;
 }
 
-export function RecurringClient({ initialTemplates, initialBatches, customers, canManageTemplates, toonBedragen }: Props) {
+export function RecurringClient({ initialTemplates, initialBatches, customers, users, canManageTemplates, toonBedragen }: Props) {
   const router = useRouter();
   const templates = initialTemplates;
   const batches = initialBatches;
@@ -136,6 +137,33 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
     if (res.ok) router.refresh();
   }
 
+  const [membersFor, setMembersFor] = useState<any>(null);
+  const [editMembers, setEditMembers] = useState<string[]>([]);
+  const [membersError, setMembersError] = useState("");
+
+  function openMembers(b: any) {
+    setMembersFor(b);
+    setEditMembers(b.members.map((m: any) => m.userId));
+    setMembersError("");
+  }
+
+  async function saveMembers() {
+    const res = await fetch(`/api/projects/${membersFor.id}/batch`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberIds: editMembers }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setMembersError(err.error ?? `Fout ${res.status}`);
+      return;
+    }
+    setMembersFor(null);
+    router.refresh();
+  }
+
+  const naamVan = (id: string) => users.find((u) => u.id === id)?.name ?? "?";
+
   async function deleteBatch(b: any) {
     if (!confirm(`Batch "${b.name}" verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     const res = await fetch(`/api/projects/${b.id}/batch`, { method: "DELETE" });
@@ -153,9 +181,13 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
   const [batchCode, setBatchCode] = useState("");
   const [batchStartError, setBatchStartError] = useState("");
   const [batchStarting, setBatchStarting] = useState(false);
+  const [batchMembers, setBatchMembers] = useState<string[]>([]);
 
   function openStartBatch(t: any) {
     setStartingFor(t);
+    // Voorgevuld met de vorige batch uit dit sjabloon: meestal hetzelfde clubje.
+    const vorige = batches.find((b) => b.templateId === t.id);
+    setBatchMembers((vorige?.members ?? []).map((m: any) => m.userId));
     setBatchName(suggestBatchName(t.name, new Date()));
     setBatchStartError("");
   }
@@ -168,7 +200,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
       const res = await fetch(`/api/recurring-templates/${startingFor.id}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: batchName.trim() || undefined, projectCode: batchCode.trim() || null }),
+        body: JSON.stringify({ name: batchName.trim() || undefined, projectCode: batchCode.trim() || null, memberIds: batchMembers }),
       });
       if (res.ok) {
         setStartingFor(null);
@@ -363,13 +395,14 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                 <TableHead>Projectcode</TableHead>
                 <TableHead>Klant</TableHead>
                 <TableHead>Startdatum</TableHead>
+                <TableHead>Deelnemers</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activeBatches.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Geen lopende batches</TableCell>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Geen lopende batches</TableCell>
                 </TableRow>
               )}
               {activeBatches.map((b) => (
@@ -381,8 +414,14 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
                       lopen uiteen zodra iemand het sjabloon aanpast. */}
                   <TableCell>{b.template?.customer?.name ?? b.customer?.name}</TableCell>
                   <TableCell>{formatDate(b.createdAt)}</TableCell>
+                  <TableCell className="text-sm">
+                    {b.members.length ? b.members.map((m: any) => naamVan(m.userId)).join(", ") : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex gap-1 justify-end">
+                      <Button variant="ghost" size="icon" onClick={() => openMembers(b)} title="Deelnemers wijzigen">
+                        <Users className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" onClick={() => openComplete(b)}>Voltooien</Button>
                       <Button variant="ghost" size="icon" onClick={() => deleteBatch(b)} title="Batch verwijderen">
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -571,6 +610,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
             <p className="text-xs text-muted-foreground">
               De code van de klant. Komt achter het onderwerp van de factuur te staan.
             </p>
+            <Label>Deelnemers</Label>
+            <DeelnemersKiezer users={users} value={batchMembers} onChange={setBatchMembers} />
             {batchStartError && <p className="text-xs text-destructive">{batchStartError}</p>}
           </div>
           <DialogFooter>
@@ -578,6 +619,23 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
             <Button type="button" onClick={confirmStartBatch} disabled={batchStarting}>
               {batchStarting ? "Bezig..." : "Starten"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deelnemers van een lopende batch */}
+      <Dialog open={!!membersFor} onOpenChange={(open) => { if (!open) setMembersFor(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deelnemers — {membersFor?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <DeelnemersKiezer users={users} value={editMembers} onChange={setEditMembers} />
+            {membersError && <p className="text-xs text-destructive">{membersError}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setMembersFor(null)}>Annuleren</Button>
+            <Button type="button" onClick={saveMembers}>Opslaan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -700,6 +758,34 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, c
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Wie er op een batch mag boeken; dezelfde lijst als bij een gewoon project. */
+function DeelnemersKiezer({ users, value, onChange }: {
+  users: { id: string; name: string }[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">
+        Alleen deze medewerkers zien de batch bij hun projecten en kunnen erop boeken, zolang hij loopt.
+      </p>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {users.map((u) => (
+          <label key={u.id} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-primary"
+              checked={value.includes(u.id)}
+              onChange={(e) => onChange(e.target.checked ? [...value, u.id] : value.filter((id) => id !== u.id))}
+            />
+            {u.name}
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

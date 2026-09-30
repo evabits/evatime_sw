@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { canManageRecurringBatches } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { deleteBatchDenial } from "@/lib/recurring";
@@ -36,6 +37,37 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     await prisma.$transaction([
       prisma.kmTemplate.deleteMany({ where: { projectId: id } }),
       prisma.project.delete({ where: { id } }),
+    ]);
+    return NextResponse.json({ success: true });
+  } catch (e) { return handleError(e); }
+}
+
+const deelnemersSchema = z.object({
+  memberIds: z.array(z.string().min(1)).min(1, "Kies minstens één deelnemer"),
+});
+
+/**
+ * De deelnemers van een lopende batch wijzigen. Apart van de projectroute, want
+ * die is alleen voor admins en de teamleider draait de batches.
+ */
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await auth();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session.user as any)?.role ?? "EMPLOYEE";
+    if (!canManageRecurringBatches(role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { id } = await params;
+    const { memberIds } = deelnemersSchema.parse(await req.json());
+    const batch = await prisma.project.findUnique({ where: { id }, select: { templateId: true, status: true } });
+    if (!batch?.templateId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (batch.status !== "ACTIVE") {
+      return NextResponse.json({ error: "Alleen bij een lopende batch kunnen de deelnemers worden gewijzigd" }, { status: 400 });
+    }
+
+    await prisma.$transaction([
+      prisma.projectMember.deleteMany({ where: { projectId: id } }),
+      prisma.projectMember.createMany({ data: memberIds.map((userId) => ({ projectId: id, userId })) }),
     ]);
     return NextResponse.json({ success: true });
   } catch (e) { return handleError(e); }

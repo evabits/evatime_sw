@@ -9,6 +9,8 @@ import { suggestBatchName } from "@/lib/recurring";
 const schema = z.object({
   name: z.string().trim().min(1).optional(),
   projectCode: z.string().trim().optional().nullable(),
+  // Wie er op mag boeken. Weglaten betekent: zoals de vorige batch.
+  memberIds: z.array(z.string().min(1)).min(1, "Kies minstens één deelnemer").optional(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const conflict = await projectNameTakenError(naam);
     if (conflict) return conflict;
 
-    // De deelnemers van de vorige batch uit hetzelfde sjabloon overnemen: het is
+    // Zonder eigen keuze: de deelnemers van de vorige batch uit hetzelfde sjabloon overnemen: het is
     // elke keer hetzelfde clubje dat het werk doet. Zonder deelnemers is het
     // project onboekbaar — het urenscherm toont alleen projecten waar je lid van
     // bent, en de urenroute weigert een niet-deelnemer, ook een beheerder. Is er
@@ -51,7 +53,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       orderBy: { createdAt: "desc" },
       select: { members: { select: { userId: true } } },
     });
-    const leden = vorige?.members.length
+    const leden = data.memberIds?.length
+      ? data.memberIds
+      : vorige?.members.length
       ? vorige.members.map((m) => m.userId)
       : [session.user!.id!];
 
