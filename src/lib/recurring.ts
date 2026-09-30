@@ -8,7 +8,7 @@ import { docCopy, type Taal } from "./document-copy";
  * Geen React en geen Prisma, zodat het te testen is zonder database en zonder
  * scherm — de conventie van dit project.
  */
-export type BillingMode = "PER_UNIT" | "FIXED" | "HOURS";
+export type BillingMode = "PER_UNIT" | "FIXED" | "HOURS" | "NONE";
 
 export type BatchInput = {
   /** Bij een sjabloon dat geen goed- en afkeur bijhoudt. */
@@ -238,6 +238,12 @@ export function recurringInvoiceDraft(
   };
 }
 
+/** Een facturabel sjabloon heeft een regelomschrijving nodig; een intern niet. */
+export function invoiceFieldsDenial(billing: string, lineDescription: string): string | null {
+  if (billing !== "NONE" && !lineDescription) return "Vul de omschrijving van de factuurregel in.";
+  return null;
+}
+
 /**
  * Waarom een batch niet verwijderd mag worden, of `null` als het mag. Bedoeld
  * voor een verkeerd aangemaakte batch: alleen lopend en zonder boekingen, want
@@ -275,7 +281,7 @@ export function completeBatchDenial(
   if (sjabloon.billing === "HOURS") {
     return "Factureren op uren is nog niet beschikbaar voor herhaalprojecten.";
   }
-  if (Number(sjabloon.unitPrice ?? 0) <= 0) {
+  if (sjabloon.billing !== "NONE" && Number(sjabloon.unitPrice ?? 0) <= 0) {
     return "Stel eerst een tarief in op het sjabloon.";
   }
 

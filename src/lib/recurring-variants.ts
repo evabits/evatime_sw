@@ -23,8 +23,8 @@ export function variantDenial(
   if (tracksQuality) {
     return "Een sjabloon houdt óf goed- en afkeur bij, óf varianten — niet allebei.";
   }
-  if (billing !== "PER_UNIT") {
-    return "Varianten kunnen alleen bij facturatie per stuk.";
+  if (billing !== "PER_UNIT" && billing !== "NONE") {
+    return "Varianten kunnen alleen bij facturatie per stuk of niet facturabel.";
   }
   const namen = varianten.map((v) => v.name.trim());
   if (namen.some((n) => n === "")) return "Geef elke variant een naam.";

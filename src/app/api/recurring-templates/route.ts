@@ -5,14 +5,16 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canManageRecurringTemplates } from "@/lib/roles";
 import { variantDenial } from "@/lib/recurring-variants";
+import { invoiceFieldsDenial } from "@/lib/recurring";
 
 const schema = z.object({
   name: z.string().trim().min(1),
   customerId: z.string().min(1),
-  billing: z.enum(["PER_UNIT", "FIXED", "HOURS"]).default("PER_UNIT"),
+  billing: z.enum(["PER_UNIT", "FIXED", "HOURS", "NONE"]).default("PER_UNIT"),
   unitPrice: z.number().positive().optional().nullable(),
   defaultQuantity: z.number().positive().optional().nullable(),
-  lineDescription: z.string().trim().min(1),
+  // Leeg mag alleen bij "niet facturabel": dan komt er geen factuurregel.
+  lineDescription: z.string().trim().default(""),
   invoiceSubject: z.string().trim().optional().nullable(),
   tracksQuality: z.boolean().default(false),
   referencePrefix: z.string().trim().optional().nullable(),
@@ -50,7 +52,8 @@ export async function POST(req: Request) {
     }
 
     const { variants, ...data } = schema.parse(await req.json());
-    const weigering = variantDenial(variants ?? [], data.billing, data.tracksQuality);
+    const weigering = variantDenial(variants ?? [], data.billing, data.tracksQuality)
+      ?? invoiceFieldsDenial(data.billing, data.lineDescription);
     if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
 
     const template = await prisma.recurringTemplate.create({

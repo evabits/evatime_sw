@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, deleteBatchDenial, batchReference, batchSubject } from "./recurring";
+import { batchTotal, suggestBatchName, recurringInvoiceIntro, recurringInvoiceDraft, completeBatchDenial, deleteBatchDenial, invoiceFieldsDenial, batchReference, batchSubject } from "./recurring";
 
 describe("batchTotal", () => {
   it("adds up approved and rejected for test work — everything tested is billed", () => {
@@ -354,5 +354,21 @@ describe("deleteBatchDenial", () => {
     expect(deleteBatchDenial(lopend, { ...leeg, timeEntries: 1 })).not.toBeNull();
     expect(deleteBatchDenial(lopend, { ...leeg, kmEntries: 1 })).not.toBeNull();
     expect(deleteBatchDenial(lopend, { ...leeg, expenses: 1 })).not.toBeNull();
+  });
+});
+
+describe("niet facturabel", () => {
+  it("completes an internal batch without a rate", () => {
+    expect(completeBatchDenial(sjabloon({ billing: "NONE", unitPrice: null }), batch(), invoer)).toBeNull();
+  });
+
+  it("still asks for a count", () => {
+    expect(completeBatchDenial(sjabloon({ billing: "NONE", unitPrice: null }), batch(), { quantity: 0 })).not.toBeNull();
+  });
+
+  it("needs no invoice line description, a billable template does", () => {
+    expect(invoiceFieldsDenial("NONE", "")).toBeNull();
+    expect(invoiceFieldsDenial("PER_UNIT", "")).not.toBeNull();
+    expect(invoiceFieldsDenial("PER_UNIT", "Testen")).toBeNull();
   });
 });
