@@ -180,6 +180,9 @@ enum BillingMode {
   /// Nog niet gebouwd; staat er zodat de derde manier later past zonder het
   /// model om te gooien. De voltooiroute weigert hem met een melding.
   HOURS
+  /// Intern werk: de batch houdt uren en aantallen bij, maar voltooien levert
+  /// geen factuur op.
+  NONE
 }
 
 model RecurringTemplate {

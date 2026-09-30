@@ -16,12 +16,12 @@ import { batchReference, batchTotal, recurringInvoiceDraft, suggestBatchName } f
 // HOURS staat wel in het schema (BillingMode), maar de voltooiroute weigert
 // hem nog. Het aanmaakvenster biedt hem daarom niet aan — niets aanbieden
 // voelt niet als een fout, een geweigerd verzoek wel.
-const BILLING_LABELS: Record<string, string> = { PER_UNIT: "Per stuk", FIXED: "Vast bedrag" };
+const BILLING_LABELS: Record<string, string> = { PER_UNIT: "Per stuk", FIXED: "Vast bedrag", NONE: "Niet facturabel" };
 
 const EMPTY_TEMPLATE_FORM = {
   name: "",
   customerId: "",
-  billing: "PER_UNIT" as "PER_UNIT" | "FIXED",
+  billing: "PER_UNIT" as "PER_UNIT" | "FIXED" | "NONE",
   unitPrice: "",
   defaultQuantity: "",
   lineDescription: "",
@@ -77,7 +77,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
       // Een sjabloon kan in theorie op HOURS staan (het schema laat het toe),
       // maar deze select biedt die keuze niet aan. Val terug op PER_UNIT in
       // plaats van een lege selectie te tonen.
-      billing: t.billing === "FIXED" ? "FIXED" : "PER_UNIT",
+      billing: t.billing === "FIXED" || t.billing === "NONE" ? t.billing : "PER_UNIT",
       unitPrice: t.unitPrice != null ? String(t.unitPrice) : "",
       defaultQuantity: t.defaultQuantity != null ? String(t.defaultQuantity) : "",
       lineDescription: t.lineDescription,
@@ -93,7 +93,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
 
   async function saveTemplate(e: React.FormEvent) {
     e.preventDefault();
-    if (!templateForm.name.trim() || !templateForm.customerId || !templateForm.unitPrice || !templateForm.lineDescription.trim()) {
+    const intern = templateForm.billing === "NONE";
+    if (!templateForm.name.trim() || !templateForm.customerId || (!intern && (!templateForm.unitPrice || !templateForm.lineDescription.trim()))) {
       setTemplateError("Vul de verplichte velden in");
       return;
     }
@@ -108,7 +109,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
           name: templateForm.name.trim(),
           customerId: templateForm.customerId,
           billing: templateForm.billing,
-          unitPrice: Number(templateForm.unitPrice),
+          unitPrice: intern ? null : Number(templateForm.unitPrice),
           defaultQuantity: templateForm.defaultQuantity ? Number(templateForm.defaultQuantity) : null,
           lineDescription: templateForm.lineDescription.trim(),
           invoiceSubject: templateForm.invoiceSubject.trim() || null,
@@ -246,6 +247,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
 
   const tracksQuality = !!completing?.template?.tracksQuality;
   const isFixed = completing?.template?.billing === "FIXED";
+  const isIntern = completing?.template?.billing === "NONE";
   const varianten: { id: string; name: string }[] = completing?.template?.variants ?? [];
   const invoer = tracksQuality
     ? { approved: Number(completeForm.approved || 0), rejected: Number(completeForm.rejected || 0) }
@@ -295,7 +297,9 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
       });
       if (res.ok) {
         const data = await res.json();
-        setCompletedInvoiceNumber(data.invoiceNumber);
+        // Zonder factuur valt er niets te melden: gewoon dicht.
+        if (data.invoiceNumber) setCompletedInvoiceNumber(data.invoiceNumber);
+        else setCompleting(null);
         router.refresh();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -357,7 +361,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                     )}
                   </TableCell>
                   {toonBedragen && (
-                    <TableCell className="text-right font-mono">{formatCurrency(t.unitPrice)}</TableCell>
+                    <TableCell className="text-right font-mono">{t.billing === "NONE" ? "—" : formatCurrency(t.unitPrice)}</TableCell>
                   )}
                   <TableCell>
                     <div className="flex gap-1 justify-end">
@@ -458,7 +462,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                     <TableCell className="text-sm">{b.projectCode || <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell>{b.customer?.name}</TableCell>
                     <TableCell>{formatDate(b.deliveredAt)}</TableCell>
-                    <TableCell>{b.generatedInvoice?.invoiceNumber ?? "—"}</TableCell>
+                    <TableCell>{b.generatedInvoice?.invoiceNumber ?? (b.template?.billing === "NONE" ? <span className="text-muted-foreground">Intern</span> : "—")}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -489,26 +493,33 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
             </div>
             <div className="space-y-1">
               <Label>Facturatie</Label>
-              <Select value={templateForm.billing} onValueChange={(v) => setTemplateForm((f) => ({ ...f, billing: v as "PER_UNIT" | "FIXED" }))}>
+              <Select value={templateForm.billing} onValueChange={(v) => setTemplateForm((f) => ({ ...f, billing: v as "PER_UNIT" | "FIXED" | "NONE" }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PER_UNIT">Per stuk</SelectItem>
                   <SelectItem value="FIXED">Vast bedrag</SelectItem>
+                  <SelectItem value="NONE">Niet facturabel</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label>{templateForm.billing === "FIXED" ? "Vast bedrag *" : "Tarief per stuk *"}</Label>
-              <Input type="number" step="0.01" min="0.01" value={templateForm.unitPrice}
-                onChange={(e) => setTemplateForm((f) => ({ ...f, unitPrice: e.target.value }))} />
-            </div>
-            {templateForm.billing === "PER_UNIT" && (
+            {templateForm.billing !== "NONE" && (
+              <div className="space-y-1">
+                <Label>{templateForm.billing === "FIXED" ? "Vast bedrag *" : "Tarief per stuk *"}</Label>
+                <Input type="number" step="0.01" min="0.01" value={templateForm.unitPrice}
+                  onChange={(e) => setTemplateForm((f) => ({ ...f, unitPrice: e.target.value }))} />
+              </div>
+            )}
+            {templateForm.billing === "NONE" && (
+              <p className="text-xs text-muted-foreground self-end">Intern werk: voltooien sluit de batch af zonder factuur.</p>
+            )}
+            {templateForm.billing !== "FIXED" && (
               <div className="space-y-1 sm:col-span-2">
                 <Label>Standaard aantal <span className="text-muted-foreground font-normal">(voorstel bij het voltooien)</span></Label>
                 <Input type="number" step="1" min="0" value={templateForm.defaultQuantity}
                   onChange={(e) => setTemplateForm((f) => ({ ...f, defaultQuantity: e.target.value }))} />
               </div>
             )}
+            {templateForm.billing !== "NONE" && (<>
             <div className="space-y-1 sm:col-span-2">
               <Label>Omschrijving factuurregel *</Label>
               <Input value={templateForm.lineDescription} placeholder="bijv. Testen H3X batterij omvormers"
@@ -529,6 +540,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                 </p>
               )}
             </div>
+            </>)}
             <div className="sm:col-span-2">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary"
@@ -541,7 +553,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
             {/* Varianten: alleen bij een stuksprijs zonder goed- en afkeur. Beide
                 tellen hetzelfde werk, en twee tellingen naast elkaar spreken
                 elkaar vroeg of laat tegen. */}
-            {templateForm.billing === "PER_UNIT" && !templateForm.tracksQuality && (
+            {templateForm.billing !== "FIXED" && !templateForm.tracksQuality && (
               <div className="sm:col-span-2 space-y-2">
                 <Label>Varianten <span className="text-muted-foreground font-normal">(optioneel)</span></Label>
                 {templateForm.variants.map((v, i) => (
@@ -716,7 +728,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
               </div>
               {/* Met varianten is de optelsom een regel per variant: precies de
                   regels die straks op de factuur staan. */}
-              {draft && varianten.length > 0 && (
+              {draft && !isIntern && varianten.length > 0 && (
                 <div className="text-sm font-mono bg-muted rounded-md px-3 py-2 space-y-0.5">
                   {draft.lines.map((r, i) => (
                     <p key={i}>
@@ -730,7 +742,10 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                   </p>
                 </div>
               )}
-              {draft && varianten.length === 0 && (
+              {isIntern && (
+                <p className="text-sm text-muted-foreground">Niet facturabel: de batch wordt afgesloten zonder factuur.</p>
+              )}
+              {draft && !isIntern && varianten.length === 0 && (
                 <p className="text-sm font-mono bg-muted rounded-md px-3 py-2">
                   {/* Zonder de bedragen blijft de optelsom staan: die is de
                       controle op wat er is ingevuld, en daar gaat het bij het
@@ -744,7 +759,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                       : `${totaal} stuks${toonBedragen ? ` × ${formatCurrency(draft.lines[0].unitPrice)} = ${formatCurrency(draft.subtotal)}` : ""}`}
                 </p>
               )}
-              {draft?.reference && (
+              {!isIntern && draft?.reference && (
                 <p className="text-sm text-muted-foreground">Kenmerk: {draft.reference}</p>
               )}
               {completeError && <p className="text-sm text-destructive">{completeError}</p>}

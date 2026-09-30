@@ -5,6 +5,7 @@ import { z } from "zod";
 import { handleError } from "@/lib/api";
 import { canManageRecurringTemplates } from "@/lib/roles";
 import { variantChanges, variantDenial } from "@/lib/recurring-variants";
+import { invoiceFieldsDenial } from "@/lib/recurring";
 
 const schema = z.object({
   name: z.string().trim().min(1),
@@ -13,10 +14,11 @@ const schema = z.object({
   // het scherm niet meestuurt stilzwijgend terugvallen op de standaard, en dan
   // verliest een sjabloon zijn facturatiemanier zodra iemand alleen het tarief
   // aanpast. Ontbrekend moet hier "laat staan" betekenen.
-  billing: z.enum(["PER_UNIT", "FIXED", "HOURS"]).optional(),
+  billing: z.enum(["PER_UNIT", "FIXED", "HOURS", "NONE"]).optional(),
   unitPrice: z.number().positive().optional().nullable(),
   defaultQuantity: z.number().positive().optional().nullable(),
-  lineDescription: z.string().trim().min(1),
+  // Leeg mag alleen bij "niet facturabel": dan komt er geen factuurregel.
+  lineDescription: z.string().trim().default(""),
   invoiceSubject: z.string().trim().optional().nullable(),
   tracksQuality: z.boolean().optional(),
   referencePrefix: z.string().trim().optional().nullable(),
@@ -52,7 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       straks,
       data.billing ?? bestaand.billing,
       data.tracksQuality ?? bestaand.tracksQuality,
-    );
+    ) ?? invoiceFieldsDenial(data.billing ?? bestaand.billing, data.lineDescription);
     if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
 
     if (variants) {

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { canManageRecurringBatches } from "@/lib/roles";
 import { handleError } from "@/lib/api";
 import { batchTotal, completeBatchDenial, recurringInvoiceDraft } from "@/lib/recurring";
@@ -80,11 +81,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const weigering = completeBatchDenial(batch.template as any, batchData, invoer);
     if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
 
+    const totaal = batchTotal(invoer, batch.template.tracksQuality);
+    const afronding = {
+      status: "COMPLETED" as const,
+      deliveredAt: opgeleverd,
+      quantity: totaal,
+      approvedCount: batch.template.tracksQuality ? Number(data.approved ?? 0) : null,
+      rejectedCount: batch.template.tracksQuality ? Number(data.rejected ?? 0) : null,
+      projectCode,
+    };
+    // De telling per variant bewaren: dat is de verantwoording van de batch, en
+    // bij een facturabele batch die onder de regels van de factuur. Opnieuw
+    // voltooien kan niet, maar een eerdere poging kan rijen hebben achtergelaten.
+    const bewaarVarianten = async (tx: Prisma.TransactionClient) => {
+      if (!varianten) return;
+      await tx.batchVariantQuantity.deleteMany({ where: { projectId: batch.id } });
+      await tx.batchVariantQuantity.createMany({
+        data: varianten.map((v) => ({ projectId: batch.id, variantId: v.id, quantity: v.quantity })),
+      });
+    };
+
+    // Intern werk: afsluiten zonder factuur. De grendel is hier de status, want
+    // er komt geen generatedInvoiceId om op te letten.
+    if (batch.template.billing === "NONE") {
+      try {
+        await prisma.$transaction(async (tx) => {
+          const bijgewerkt = await tx.project.updateMany({ where: { id: batch.id, status: "ACTIVE" }, data: afronding });
+          if (bijgewerkt.count === 0) throw new Error(INGEHAALD);
+          await bewaarVarianten(tx);
+        });
+      } catch (e) {
+        if (e instanceof Error && e.message === INGEHAALD) {
+          return NextResponse.json({ error: "Deze batch is al voltooid." }, { status: 409 });
+        }
+        throw e;
+      }
+      return NextResponse.json({ invoiceId: null, invoiceNumber: null }, { status: 201 });
+    }
+
     // De server rekent het aantal en het bedrag zelf uit; wat de client toont is
     // een voorbeeld en geen bewijs.
     const taal = batch.template.customer?.language ?? "NL";
     const draft = recurringInvoiceDraft(batch.template as any, batchData, invoer, taal);
-    const totaal = batchTotal(invoer, batch.template.tracksQuality);
 
     // 21%, hetzelfde vaste percentage dat POST /api/invoices als standaard
     // hanteert. Er is geen instelling voor het btw-tarief: de kolom op Invoice
@@ -131,27 +169,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // en bleef die van de verliezer als wees in de factuurlijst achter.
       const bijgewerkt = await tx.project.updateMany({
         where: { id: batch.id, generatedInvoiceId: null },
-        data: {
-          status: "COMPLETED",
-          deliveredAt: opgeleverd,
-          quantity: totaal,
-          approvedCount: batch.template!.tracksQuality ? Number(data.approved ?? 0) : null,
-          rejectedCount: batch.template!.tracksQuality ? Number(data.rejected ?? 0) : null,
-          generatedInvoiceId: inv.id,
-          projectCode,
-        },
+        data: { ...afronding, generatedInvoiceId: inv.id },
       });
       if (bijgewerkt.count === 0) throw new Error(INGEHAALD);
 
-      // De telling per variant bewaren: dat is de verantwoording onder de
-      // regels van deze factuur. Opnieuw voltooien kan niet, maar een eerdere
-      // poging kan rijen hebben achtergelaten.
-      if (varianten) {
-        await tx.batchVariantQuantity.deleteMany({ where: { projectId: batch.id } });
-        await tx.batchVariantQuantity.createMany({
-          data: varianten.map((v) => ({ projectId: batch.id, variantId: v.id, quantity: v.quantity })),
-        });
-      }
+      await bewaarVarianten(tx);
 
       return inv;
       });
