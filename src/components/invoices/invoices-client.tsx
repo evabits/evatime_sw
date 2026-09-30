@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,16 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
       return true;
     });
   }, [invoices, filterStatus, filterYear, filterSearch]);
+
+  // Over alle pagina's van het filter. Geannuleerde facturen tellen niet mee,
+  // tenzij je juist daarop filtert.
+  const totals = useMemo(() => {
+    const telt = filtered.filter((i) => i.status !== "CANCELLED" || filterStatus === "CANCELLED");
+    return {
+      ex: telt.reduce((s, i) => s + Number(i.subtotal), 0),
+      inc: telt.reduce((s, i) => s + Number(i.total), 0),
+    };
+  }, [filtered, filterStatus]);
 
   function handleFilterChange() {
     setPage(0);
@@ -183,6 +193,20 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
               </TableRow>
             ))}
           </TableBody>
+          {filtered.length > 0 && (
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={6} className="text-right text-muted-foreground">Totaal excl. BTW</TableCell>
+                <TableCell className="text-right">{formatCurrency(totals.ex)}</TableCell>
+                <TableCell />
+              </TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="text-right font-medium">Totaal incl. BTW</TableCell>
+                <TableCell className="text-right font-medium">{formatCurrency(totals.inc)}</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableFooter>
+          )}
         </Table>
         {pageCount > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
