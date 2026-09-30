@@ -50,7 +50,16 @@ export async function GET(req: Request) {
         ...(canSeeRates ? { levelRates: true, members: { select: { userId: true } } } : {}),
       },
     });
-    return NextResponse.json(projects);
+    // De geschreven uren, zoals de projectenpagina ze bij het laden ook meegeeft.
+    // Die pagina haalt de lijst na archiveren, samenvoegen en dergelijke hier
+    // opnieuw op; zonder dit veld stond daarna bij elk project "—".
+    const uren = await prisma.timeEntry.groupBy({
+      by: ["projectId"],
+      where: { projectId: { in: projects.map((p) => p.id) } },
+      _sum: { hours: true },
+    });
+    const urenPer = new Map(uren.map((r) => [r.projectId, Number(r._sum.hours ?? 0)]));
+    return NextResponse.json(projects.map((p) => ({ ...p, hours: urenPer.get(p.id) ?? 0 })));
   } catch (e) { return handleError(e); }
 }
 
