@@ -58,10 +58,13 @@ export async function POST(req: Request) {
         where: buildBulkWhere(ids),
         select: { userId: true },
       });
-      const buiten = rows.filter((r: any) => !isProjectMember(memberIds, r.userId)).length;
-      if (buiten > 0) {
+      const buiten = rows.filter((r: any) => !isProjectMember(memberIds, r.userId));
+      if (buiten.length > 0) {
+        // De ontbrekende paren gaan mee, zodat het scherm aanbiedt ze toe te voegen.
+        const missing = [...new Set(buiten.map((r: any) => r.userId as string))]
+          .map((userId) => ({ projectId: action.projectId, userId }));
         return NextResponse.json(
-          { error: `${buiten} van de ${rows.length} regels heeft een eigenaar die geen deelnemer is van dit project` },
+          { error: `${buiten.length} van de ${rows.length} regels heeft een eigenaar die geen deelnemer is van dit project`, code: "NOT_MEMBER", missing },
           { status: 400 },
         );
       }
@@ -81,10 +84,14 @@ export async function POST(req: Request) {
         select: { projectId: true },
       });
       const heeft = new Set(memberships.map((m) => m.projectId));
-      const buiten = projectIds.filter((p) => !heeft.has(p)).length;
-      if (buiten > 0) {
+      const buiten = projectIds.filter((p) => !heeft.has(p));
+      if (buiten.length > 0) {
         return NextResponse.json(
-          { error: `De gekozen medewerker is geen deelnemer van ${buiten} van de betrokken projecten` },
+          {
+            error: `De gekozen medewerker is geen deelnemer van ${buiten.length} van de betrokken projecten`,
+            code: "NOT_MEMBER",
+            missing: buiten.map((projectId) => ({ projectId, userId: action.userId })),
+          },
           { status: 400 },
         );
       }
