@@ -161,6 +161,11 @@ export async function sendReminderEmail(invoice: any, settings: any): Promise<vo
     ...customerMailCopy(settings),
     subject: t.mailOnderwerpHerinnering(invoice.invoiceNumber),
     html,
+    // De factuur zelf erbij: wie hem kwijt is, hoeft niet eerst de link te volgen.
+    attachments: [{
+      filename: t.bestandsnaamFactuur(invoice.invoiceNumber),
+      content: await renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any),
+    }],
   });
 }
 

@@ -13,7 +13,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const [invoice, settings] = await Promise.all([
       prisma.invoice.findUnique({
         where: { id },
-        include: { customer: true },
+        // De regels voor de PDF die met de herinnering meegaat.
+        include: { customer: true, lines: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
       }),
       prisma.companySettings.findFirst(),
     ]);
