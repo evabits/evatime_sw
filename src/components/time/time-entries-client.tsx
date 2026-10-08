@@ -451,6 +451,30 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     }
   }
 
+  /**
+   * Slaat op, en biedt een admin bij "geen deelnemer" aan de medewerker meteen
+   * aan het project toe te voegen. Daarna wordt dezelfde opslag nog één keer
+   * gedaan; zegt hij nee, dan blijft de gewone melding staan.
+   */
+  async function metDeelname(opslaan: () => Promise<Response>): Promise<Response> {
+    const res = await opslaan();
+    if (res.ok || !isAdmin) return res;
+    const body = await res.clone().json().catch(() => ({}));
+    if (body.code !== "NOT_MEMBER") return res;
+    const wie = users.find((u: any) => u.id === body.userId)?.name ?? "Deze medewerker";
+    const waar = projects.find((p: any) => p.id === body.projectId)?.name ?? "dit project";
+    if (!confirm(`${wie} is geen deelnemer van ${waar}. Toevoegen en opslaan?`)) return res;
+    const toegevoegd = await fetch(`/api/projects/${body.projectId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: body.userId }),
+    });
+    if (!toegevoegd.ok) return res;
+    setProjects((prev) => prev.map((p: any) =>
+      p.id === body.projectId ? { ...p, members: [...(p.members ?? []), { userId: body.userId }] } : p));
+    return opslaan();
+  }
+
   async function onSubmit(data: FormData) {
     setLoading(true);
     setSubmitError(null);
@@ -467,11 +491,11 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
     };
     try {
       if (editing) {
-        const res = await fetch(`/api/time/${editing}`, {
+        const res = await metDeelname(() => fetch(`/api/time/${editing}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
+        }));
         if (res.ok) {
           router.refresh();
           setEditing(null);
@@ -491,11 +515,11 @@ export function TimeEntriesClient({ projects: projectsProp, customers, users, in
           setSubmitError(body.issues ? "Controleer de ingevulde velden." : (body.error ?? "Opslaan mislukt"));
         }
       } else {
-        const res = await fetch("/api/time", {
+        const res = await metDeelname(() => fetch("/api/time", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
+        }));
         if (res.ok) {
           router.refresh();
           const targetUser = data.userId ?? userId;
