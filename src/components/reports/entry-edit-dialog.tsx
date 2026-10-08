@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
 import { toQuarter, HOUR_CHOICES } from "@/lib/quarter-hours";
+import { saveWithMembership } from "@/lib/membership-retry";
 
 const TITLE: Record<BulkKind, string> = { time: "Uren aanpassen", km: "Rit aanpassen", expense: "Uitgave aanpassen" };
 
@@ -18,11 +19,13 @@ interface Props {
   projects: any[];
   categories: any[];
   users: any[];
+  /** Mag bij "geen deelnemer" de medewerker meteen aan het project toevoegen. */
+  canAddMembers?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function EntryEditDialog({ kind, entry, projects, categories, users, onClose, onSaved }: Props) {
+export function EntryEditDialog({ kind, entry, projects, categories, users, canAddMembers = false, onClose, onSaved }: Props) {
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +89,12 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, onCl
         ? { projectId: form.projectId, date: form.date, km: Number(form.km), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
         : { categoryId: form.categoryId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), reimbursable: form.reimbursable, userId: form.userId };
 
-    const res = await fetch(`${ENTRY_ENDPOINT[kind as BulkKind]}/${entry.id}`, {
+    const opslaan = () => fetch(`${ENTRY_ENDPOINT[kind as BulkKind]}/${entry.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const res = canAddMembers ? await saveWithMembership(opslaan, { users, projects }) : await opslaan();
     setSaving(false);
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
