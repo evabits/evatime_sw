@@ -337,6 +337,7 @@ export function ReportsClient({
         projects={projects}
         categories={categories}
         users={users}
+        canAddMembers={canEdit}
         onClose={() => setEditing(null)}
         onSaved={async () => { setEditing(null); await loadReport(); }}
       />
