@@ -1,4 +1,5 @@
 "use client";
+import { saveWithMembership } from "@/lib/membership-retry";
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -92,11 +93,11 @@ export function ReportsClient({
     if (action.type === "delete" && !confirm(`Weet u zeker dat u ${ids.length} registratie(s) wilt verwijderen?`)) return;
 
     setBulkBusy(true);
-    const res = await fetch("/api/entries/bulk", {
+    const res = await saveWithMembership(() => fetch("/api/entries/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, ids, action }),
-    });
+    }), { users, projects });
     setBulkBusy(false);
 
     if (!res.ok) {
