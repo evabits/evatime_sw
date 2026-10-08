@@ -69,8 +69,10 @@ export async function projectMembershipError(
     );
   }
   if (isProjectMember(members.map((m) => m.userId), ownerId)) return null;
+  // De code en de twee id's laten het scherm een admin aanbieden de medewerker
+  // meteen toe te voegen, in plaats van alleen de melding te tonen.
   return NextResponse.json(
-    { error: "Deze medewerker is geen deelnemer van dit project" },
+    { error: "Deze medewerker is geen deelnemer van dit project", code: "NOT_MEMBER", projectId, userId: ownerId },
     { status: 400 },
   );
 }
