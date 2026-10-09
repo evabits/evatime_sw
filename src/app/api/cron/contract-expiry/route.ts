@@ -17,7 +17,8 @@ export async function GET(req: Request) {
   until.setUTCDate(until.getUTCDate() + CONTRACT_EXPIRY_REMINDER_DAYS);
 
   const contracts = await prisma.contract.findMany({
-    where: { endDate: { gte: from, lte: until }, expiryReminderSentAt: null },
+    // Wie gearchiveerd is werkt hier niet meer; zijn contract loopt vanzelf af.
+    where: { endDate: { gte: from, lte: until }, expiryReminderSentAt: null, user: { archivedAt: null } },
     select: {
       id: true, contractType: true, jobTitle: true, endDate: true,
       user: { select: { name: true } },

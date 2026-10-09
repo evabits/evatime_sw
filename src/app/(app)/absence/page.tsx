@@ -24,7 +24,7 @@ export default async function AbsencePage() {
   const [requests, budgets, users, currentUser, scheduleRows, contractRows, vakantieOpnames, openingRows] = await Promise.all([
     prisma.absenceRequest.findMany({
       where: {
-        ...(admin ? {} : { userId }),
+        ...(admin ? { user: { archivedAt: null } } : { userId }),
         startDate: { gte: yearStart, lte: yearEnd },
       },
       include: {

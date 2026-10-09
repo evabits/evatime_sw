@@ -58,8 +58,9 @@ export async function GET(req: Request) {
 
     const requests = await prisma.absenceRequest.findMany({
       where: {
-        ...(isAdmin(role) ? {} : { userId: session.user?.id }),
-        ...(userIdParam && isAdmin(role) ? { userId: userIdParam } : {}),
+        ...(isAdmin(role) ? { user: { archivedAt: null } } : { userId: session.user?.id }),
+        // Eén medewerker opgevraagd: dan ook als hij gearchiveerd is, voor de historie.
+        ...(userIdParam && isAdmin(role) ? { userId: userIdParam, user: undefined } : {}),
         ...(statusParam ? { status: statusParam as any } : {}),
         ...(typeParam ? { type: typeParam as any } : {}),
         ...(yearStart && yearEnd ? { startDate: { gte: yearStart, lte: yearEnd } } : {}),
