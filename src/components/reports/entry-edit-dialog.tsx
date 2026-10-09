@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { ENTRY_ENDPOINT, type BulkKind } from "@/lib/bulk-entries";
 import { toQuarter, HOUR_CHOICES } from "@/lib/quarter-hours";
 import { saveWithMembership } from "@/lib/membership-retry";
+import { projectOptions } from "@/lib/project-picker";
 
 const TITLE: Record<BulkKind, string> = { time: "Uren aanpassen", km: "Rit aanpassen", expense: "Uitgave aanpassen" };
 
@@ -29,10 +30,12 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoek, setZoek] = useState("");
 
   useEffect(() => {
     if (!entry || !kind) return;
     setError(null);
+    setZoek("");
     setForm({
       projectId: entry.projectId ?? "",
       categoryId: entry.categoryId ?? "",
@@ -104,6 +107,14 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
     onSaved();
   }
 
+  // Het huidige project blijft altijd in de lijst, ook als het zoekwoord of
+  // het archief het eruit zou filteren: anders staat het vak ineens leeg.
+  const gevonden = projectOptions(projects, { zoek });
+  const huidig = projects.find((p) => p.id === form.projectId);
+  const projectKeuzes = huidig && !gevonden.some((o) => o.id === huidig.id)
+    ? [{ id: huidig.id, label: `${huidig.customer?.name ? `${huidig.customer.name} — ` : ""}${huidig.name}` }, ...gevonden]
+    : gevonden;
+
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
@@ -133,15 +144,18 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
 
           <div className="space-y-2">
             <Label>Project</Label>
+            <Input value={zoek} onChange={(e) => setZoek(e.target.value)} placeholder="Zoek op klant of project" />
             <Select
               value={form.projectId}
               onValueChange={(v) => setForm((f: any) => ({ ...f, projectId: v }))}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>
-                ))}
+                {projectKeuzes.length === 0 ? (
+                  <p className="px-2 py-3 text-sm text-muted-foreground">Geen project gevonden</p>
+                ) : (
+                  projectKeuzes.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)
+                )}
               </SelectContent>
             </Select>
           </div>
