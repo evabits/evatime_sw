@@ -102,14 +102,14 @@ export default async function DashboardPage() {
     }),
     isAdmin
       ? prisma.absenceRequest.findMany({
-          where: { status: "APPROVED", endDate: { gte: today } },
+          where: { status: "APPROVED", endDate: { gte: today }, user: { archivedAt: null } },
           include: { user: { select: { name: true } } },
           orderBy: { startDate: "asc" },
           take: 5,
         })
       : Promise.resolve([]),
     isAdmin
-      ? prisma.absenceRequest.count({ where: { status: "PENDING" } })
+      ? prisma.absenceRequest.count({ where: { status: "PENDING", user: { archivedAt: null } } })
       : Promise.resolve(0),
     isAdmin
       ? prisma.project.count({ where: { customerId: null, archivedAt: null } })

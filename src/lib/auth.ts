@@ -16,6 +16,9 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+/** Hoe lang een al ingelogde gearchiveerde medewerker hoogstens binnen blijft. */
+const ARCHIEF_CONTROLE_MS = 5 * 60_000;
+
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
@@ -77,6 +80,20 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           token.id = user.id;
           token.role = (user as any).role;
         }
+      }
+
+      // Gearchiveerd is eruit, ook met een sessie die nog weken geldig is: het
+      // inloggen weigeren alleen haalt iemand die al binnen is er niet uit.
+      // Eens per vijf minuten nagekeken in plaats van bij elk verzoek. Bij
+      // meekijken telt de beheerder die werkelijk ingelogd is.
+      const nu = Date.now();
+      if (nu - Number(token.archiveCheckedAt ?? 0) > ARCHIEF_CONTROLE_MS) {
+        const echt = (token.realId ?? token.id) as string | undefined;
+        if (echt) {
+          const u = await prisma.user.findUnique({ where: { id: echt }, select: { archivedAt: true } });
+          if (!u || u.archivedAt) return null;
+        }
+        token.archiveCheckedAt = nu;
       }
 
       // Meekijken aan- of uitzetten. De rolcontrole hoort hier: het token is

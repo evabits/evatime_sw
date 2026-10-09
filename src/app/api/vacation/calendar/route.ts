@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     }
 
     const requests = await prisma.absenceRequest.findMany({
-      where: { status: "APPROVED" },
+      where: { status: "APPROVED", user: { archivedAt: null } },
       include: { user: { select: { name: true } } },
       orderBy: { startDate: "asc" },
     });
