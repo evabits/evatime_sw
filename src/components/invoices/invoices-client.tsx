@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { Check, ExternalLink, Trash2 } from "lucide-react";
+import { BookOpen, Check, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 const statusLabel: Record<string, string> = { DRAFT: "Concept", SENT: "Verzonden", PAID: "Betaald", CANCELLED: "Geannuleerd" };
 const statusVariant: Record<string, string> = { DRAFT: "secondary", SENT: "default", PAID: "success", CANCELLED: "destructive" };
 
 const PAGE_SIZE = 25;
+
+/** Alleen wat de klant al heeft, en nog niet naar de boekhouding is gegaan. */
+const kanBoeken = (inv: any) => (inv.status === "SENT" || inv.status === "PAID") && !inv.bookkeepingSentAt;
 
 interface Props {
   initialInvoices: any[];
@@ -28,6 +31,8 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
   const [filterSearch, setFilterSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [boekt, setBoekt] = useState<string | null>(null);
 
   const years = useMemo(() => {
     const ys = new Set(invoices.map((i) => new Date(i.issueDate).getFullYear()));
@@ -62,6 +67,40 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
 
   function handleFilterChange() {
     setPage(0);
+    setSelected(new Set());
+  }
+
+  const selecteerbaar = filtered.filter(kanBoeken);
+  const allesGeselecteerd = selecteerbaar.length > 0 && selecteerbaar.every((i) => selected.has(i.id));
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  // Eén voor één, zodat een mislukte factuur de rest niet tegenhoudt. Wat
+  // lukt, gaat meteen uit de selectie en krijgt de badge.
+  async function verkoopboeking() {
+    const ids = invoices.filter((i) => selected.has(i.id)).map((i) => i.id);
+    if (!confirm(`${ids.length} ${ids.length === 1 ? "factuur" : "facturen"} als verkoopboeking naar de boekhouding mailen?`)) return;
+    const fouten: string[] = [];
+    for (const id of ids) {
+      setBoekt(id);
+      const res = await fetch(`/api/invoices/${id}/bookkeeping`, { method: "POST" }).catch(() => null);
+      const body = await res?.json().catch(() => ({}));
+      if (res?.ok) {
+        setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, bookkeepingSentAt: body.bookkeepingSentAt } : i)));
+        setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      } else {
+        const nr = invoices.find((i) => i.id === id)?.invoiceNumber;
+        fouten.push(`${nr}: ${body?.error ?? "netwerkfout"}`);
+      }
+    }
+    setBoekt(null);
+    if (fouten.length) alert(`Niet gelukt:\n\n${fouten.join("\n")}`);
   }
 
   // Vanuit het overzicht op betaald zetten, zonder de factuur te openen. Geen
@@ -124,12 +163,30 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
         {filtered.length !== invoices.length && (
           <span className="text-sm text-muted-foreground self-center">{filtered.length} resultaten</span>
         )}
+        {canEdit && selected.size > 0 && (
+          <Button size="sm" className="h-8 ml-auto" onClick={verkoopboeking} disabled={!!boekt}>
+            <BookOpen className="h-3.5 w-3.5 mr-1" />
+            {boekt ? "Bezig..." : `Verkoopboeking (${selected.size})`}
+          </Button>
+        )}
       </div>
 
       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
+              {canEdit && (
+                <TableHead className="w-8">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input accent-primary"
+                    title="Alle verzonden en betaalde facturen die nog niet geboekt zijn"
+                    checked={allesGeselecteerd}
+                    disabled={selecteerbaar.length === 0}
+                    onChange={() => setSelected(allesGeselecteerd ? new Set() : new Set(selecteerbaar.map((i) => i.id)))}
+                  />
+                </TableHead>
+              )}
               <TableHead>Factuurnummer</TableHead>
               <TableHead>Klant</TableHead>
               <TableHead>Kenmerk</TableHead>
@@ -142,10 +199,22 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen facturen gevonden</TableCell></TableRow>
+              <TableRow><TableCell colSpan={canEdit ? 9 : 8} className="text-center text-muted-foreground py-8">Geen facturen gevonden</TableCell></TableRow>
             )}
             {paged.map((inv) => (
               <TableRow key={inv.id}>
+                {canEdit && (
+                  <TableCell>
+                    {kanBoeken(inv) && (
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-input accent-primary"
+                        checked={selected.has(inv.id)}
+                        onChange={() => toggle(inv.id)}
+                      />
+                    )}
+                  </TableCell>
+                )}
                 <TableCell className="font-mono font-medium">{inv.invoiceNumber}</TableCell>
                 <TableCell>{inv.customer.name}</TableCell>
                 <TableCell className="text-sm">{inv.reference || <span className="text-muted-foreground">—</span>}</TableCell>
@@ -164,6 +233,12 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
                         Herinnerd {formatDate(inv.reminderSentAt)}
                       </Badge>
                     )}
+                    {inv.bookkeepingSentAt && (
+                      <Badge variant="outline" className="font-normal" title={`Naar de boekhouding op ${formatDate(inv.bookkeepingSentAt)}`}>
+                        Geboekt
+                      </Badge>
+                    )}
+                    {boekt === inv.id && <span className="text-xs text-muted-foreground">Versturen...</span>}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{formatCurrency(Number(inv.total))}</TableCell>
@@ -196,12 +271,12 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
           {filtered.length > 0 && (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={6} className="text-right text-muted-foreground">Totaal excl. BTW</TableCell>
+                <TableCell colSpan={canEdit ? 7 : 6} className="text-right text-muted-foreground">Totaal excl. BTW</TableCell>
                 <TableCell className="text-right">{formatCurrency(totals.ex)}</TableCell>
                 <TableCell />
               </TableRow>
               <TableRow>
-                <TableCell colSpan={6} className="text-right font-medium">Totaal incl. BTW</TableCell>
+                <TableCell colSpan={canEdit ? 7 : 6} className="text-right font-medium">Totaal incl. BTW</TableCell>
                 <TableCell className="text-right font-medium">{formatCurrency(totals.inc)}</TableCell>
                 <TableCell />
               </TableRow>

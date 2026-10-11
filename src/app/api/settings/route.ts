@@ -17,6 +17,7 @@ const schema = z.object({
   iban: z.string().optional(),
   logoUrl: z.string().optional().nullable(),
   reminderDays: z.number().int().min(1).optional(),
+  bookkeepingEmail: z.string().email().optional().or(z.literal("")),
 });
 
 export async function GET() {
@@ -40,10 +41,10 @@ export async function PUT(req: Request) {
     const settings = existing
       ? await prisma.companySettings.update({
           where: { id: existing.id },
-          data: { ...data, email: data.email || null },
+          data: { ...data, email: data.email || null, bookkeepingEmail: data.bookkeepingEmail || null },
         })
       : await prisma.companySettings.create({
-          data: { ...data, email: data.email || null },
+          data: { ...data, email: data.email || null, bookkeepingEmail: data.bookkeepingEmail || null },
         });
     return NextResponse.json(settings);
   } catch (e) { return handleError(e); }
