@@ -241,8 +241,8 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
                       </Badge>
                     )}
                     {inv.bookkeepingSentAt && (
-                      <Badge variant="outline" className="font-normal" title={`Naar de boekhouding op ${formatDate(inv.bookkeepingSentAt)}`}>
-                        <BookOpen className="h-3 w-3 mr-1" /> Verkoopboeking {formatDate(inv.bookkeepingSentAt)}
+                      <Badge variant="info" title={`Als verkoopboeking naar de boekhouding op ${formatDate(inv.bookkeepingSentAt)}`}>
+                        Geboekt
                       </Badge>
                     )}
                   </div>
