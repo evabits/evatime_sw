@@ -83,8 +83,8 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
 
   // Eén voor één, zodat een mislukte factuur de rest niet tegenhoudt. Wat
   // lukt, gaat meteen uit de selectie en krijgt de badge.
-  async function verkoopboeking() {
-    const ids = invoices.filter((i) => selected.has(i.id)).map((i) => i.id);
+  async function verkoopboeking(ids = invoices.filter((i) => selected.has(i.id)).map((i) => i.id)) {
+    if (ids.length === 0) return;
     if (!confirm(`${ids.length} ${ids.length === 1 ? "factuur" : "facturen"} als verkoopboeking naar de boekhouding mailen?`)) return;
     const fouten: string[] = [];
     for (const id of ids) {
@@ -163,10 +163,17 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
         {filtered.length !== invoices.length && (
           <span className="text-sm text-muted-foreground self-center">{filtered.length} resultaten</span>
         )}
-        {canEdit && selected.size > 0 && (
-          <Button size="sm" className="h-8 ml-auto" onClick={verkoopboeking} disabled={!!boekt}>
+        {/* Altijd zichtbaar, zodat je weet dat het kan; aanvinken bepaalt welke. */}
+        {canEdit && (
+          <Button
+            size="sm"
+            className="h-8 ml-auto"
+            onClick={() => verkoopboeking()}
+            disabled={!!boekt || selected.size === 0}
+            title={selected.size === 0 ? "Vink eerst de facturen aan" : undefined}
+          >
             <BookOpen className="h-3.5 w-3.5 mr-1" />
-            {boekt ? "Bezig..." : `Verkoopboeking (${selected.size})`}
+            {boekt ? "Bezig..." : `Verkoopboeking${selected.size ? ` (${selected.size})` : ""}`}
           </Button>
         )}
       </div>
@@ -235,10 +242,9 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
                     )}
                     {inv.bookkeepingSentAt && (
                       <Badge variant="outline" className="font-normal" title={`Naar de boekhouding op ${formatDate(inv.bookkeepingSentAt)}`}>
-                        Geboekt
+                        <BookOpen className="h-3 w-3 mr-1" /> Verkoopboeking {formatDate(inv.bookkeepingSentAt)}
                       </Badge>
                     )}
-                    {boekt === inv.id && <span className="text-xs text-muted-foreground">Versturen...</span>}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{formatCurrency(Number(inv.total))}</TableCell>
@@ -255,6 +261,19 @@ export function InvoicesClient({ initialInvoices, canEdit = false }: Props) {
                       >
                         <Check className="h-3.5 w-3.5 mr-1" />
                         {bezig === inv.id ? "Bezig..." : "Betaald"}
+                      </Button>
+                    )}
+                    {canEdit && kanBoeken(inv) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        onClick={() => verkoopboeking([inv.id])}
+                        disabled={!!boekt}
+                        title="Als verkoopboeking naar de boekhouding mailen"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 mr-1" />
+                        {boekt === inv.id ? "Bezig..." : "Boeken"}
                       </Button>
                     )}
                     <Button variant="ghost" size="icon" asChild>
