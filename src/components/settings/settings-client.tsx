@@ -21,6 +21,7 @@ const schema = z.object({
   kvkNumber: z.string().optional(),
   iban: z.string().optional(),
   reminderDays: z.coerce.number().int().min(1).optional(),
+  bookkeepingEmail: z.string().email("Geen geldig e-mailadres").optional().or(z.literal("")),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -51,6 +52,7 @@ export function SettingsClient({ initialSettings }: Props) {
       kvkNumber: initialSettings?.kvkNumber ?? "",
       iban: initialSettings?.iban ?? "",
       reminderDays: initialSettings?.reminderDays ?? 14,
+      bookkeepingEmail: initialSettings?.bookkeepingEmail ?? "",
     },
   });
 
@@ -196,6 +198,16 @@ export function SettingsClient({ initialSettings }: Props) {
             <div className="space-y-1">
               <Label>Betalingsherinnering na (dagen)</Label>
               <Input type="number" min="1" {...form.register("reminderDays")} placeholder="14" />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>E-mailadres verkoopboekingen</Label>
+              <Input type="email" {...form.register("bookkeepingEmail")} placeholder="inkoop-verkoop@…snelstart.nl" />
+              <p className="text-xs text-muted-foreground">
+                Het inmailadres van de boekhouding. De knop Verkoopboeking stuurt de factuur-PDF hierheen.
+              </p>
+              {form.formState.errors.bookkeepingEmail && (
+                <p className="text-xs text-destructive">{form.formState.errors.bookkeepingEmail.message}</p>
+              )}
             </div>
             {serverError && <p className="sm:col-span-2 text-sm text-destructive">{serverError}</p>}
             <div className="sm:col-span-2 flex items-center gap-3">

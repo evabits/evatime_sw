@@ -220,8 +220,7 @@ export async function sendHoursReminderEmail(
   });
 }
 
-export async function sendBookkeepingEmail(invoice: any, settings: any): Promise<void> {
-  const to = process.env.BOOKKEEPING_EMAIL!;
+export async function sendBookkeepingEmail(invoice: any, settings: any, to: string): Promise<void> {
   const from = `"${settings?.name ?? "EVAbits"}" <${FROM_ADDRESS}>`;
 
   const pdfBuffer = await renderToBuffer(createElement(InvoicePdf, { invoice, settings }) as any);

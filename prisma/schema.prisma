@@ -452,6 +452,8 @@ model Invoice {
   viewToken         String              @unique @default(dbgenerated("gen_random_uuid()"))
   sentAt            DateTime?
   reminderSentAt    DateTime?
+  /// Wanneer de factuur als verkoopboeking naar de boekhouding is gemaild.
+  bookkeepingSentAt DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   lines             InvoiceLine[]
@@ -535,20 +537,23 @@ model Expense {
 }
 
 model CompanySettings {
-  id           String   @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  address      String?
-  city         String?
-  postalCode   String?
-  country      String?
-  vatNumber    String?
-  kvkNumber    String?
-  iban         String?
-  logoUrl      String?
-  reminderDays Int      @default(14)
-  updatedAt    DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  email            String?
+  phone            String?
+  address          String?
+  city             String?
+  postalCode       String?
+  country          String?
+  vatNumber        String?
+  kvkNumber        String?
+  iban             String?
+  logoUrl          String?
+  reminderDays     Int      @default(14)
+  /// Het inmailadres van de boekhouding (SnelStart). Verkoopboekingen gaan
+  /// hierheen; leeg valt terug op BOOKKEEPING_EMAIL uit de omgeving.
+  bookkeepingEmail String?
+  updatedAt        DateTime @updatedAt
 }
 
 /// De taal van een factuur of offerte. Bepaalt de vaste teksten op het
