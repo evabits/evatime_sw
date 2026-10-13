@@ -18,6 +18,8 @@ const schema = z.object({
   projectCode: z.string().trim().optional().nullable(),
   // De aantallen per variant, als het sjabloon varianten heeft.
   variants: z.array(z.object({ id: z.string().min(1), quantity: z.number() })).optional(),
+  // Toch voltooien terwijl niet elke deelnemer uren heeft geboekt.
+  force: z.boolean().optional(),
 });
 
 /** Sein dat de grendel dichtsloeg; alleen bedoeld om de transactie terug te draaien. */
@@ -80,6 +82,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const weigering = completeBatchDenial(batch.template as any, batchData, invoer);
     if (weigering) return NextResponse.json({ error: weigering }, { status: 400 });
+
+    // Deelnemers zonder uren op deze batch: waarschuwen, de voltooier beslist.
+    if (!data.force) {
+      const zonderUren = await prisma.projectMember.findMany({
+        where: { projectId: batch.id, user: { archivedAt: null, timeEntries: { none: { projectId: batch.id } } } },
+        select: { user: { select: { name: true } } },
+      });
+      if (zonderUren.length > 0) {
+        return NextResponse.json(
+          { error: "Niet alle deelnemers hebben uren geboekt", code: "MISSING_HOURS", names: zonderUren.map((m) => m.user.name) },
+          { status: 409 },
+        );
+      }
+    }
 
     const totaal = batchTotal(invoer, batch.template.tracksQuality);
     const afronding = {
