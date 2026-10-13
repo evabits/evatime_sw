@@ -273,7 +273,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
       )
     : null;
 
-  async function confirmComplete() {
+  async function confirmComplete(force = false) {
     if (!completing) return;
     setCompleteBusy(true);
     setCompleteError("");
@@ -290,6 +290,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
       } else {
         body.quantity = isFixed ? 1 : Number(completeForm.quantity || 0);
       }
+      if (force) body.force = true;
       const res = await fetch(`/api/projects/${completing.id}/complete-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -303,6 +304,12 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
         router.refresh();
       } else {
         const err = await res.json().catch(() => ({}));
+        if (err.code === "MISSING_HOURS" && confirm(
+          `Nog geen uren geboekt door: ${err.names.join(", ")}.\n\nToch voltooien? Daarna kan niemand meer op deze batch schrijven.`,
+        )) {
+          setCompleteBusy(false);
+          return confirmComplete(true);
+        }
         setCompleteError(err.error ?? `Fout ${res.status}`);
       }
     } catch {
@@ -765,7 +772,7 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
               {completeError && <p className="text-sm text-destructive">{completeError}</p>}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setCompleting(null)}>Annuleren</Button>
-                <Button type="button" onClick={confirmComplete} disabled={completeBusy}>
+                <Button type="button" onClick={() => confirmComplete()} disabled={completeBusy}>
                   {completeBusy ? "Bezig..." : "Voltooien"}
                 </Button>
               </DialogFooter>
