@@ -14,8 +14,8 @@ export default async function ExpensesPage() {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [categories, projects, initialExpenses, users] = await Promise.all([
-    prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
+  const [customers, projects, initialExpenses, users] = await Promise.all([
+    prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.project.findMany({
       where: {
         status: "ACTIVE",
@@ -24,7 +24,7 @@ export default async function ExpensesPage() {
       },
       orderBy: { name: "asc" },
       // description is voor de tooltip op de projectkeuze.
-      select: { id: true, name: true, description: true, customer: { select: { name: true } } },
+      select: { id: true, name: true, description: true, customerId: true, customer: { select: { name: true } } },
     }),
     prisma.expense.findMany({
       where: {
@@ -33,8 +33,8 @@ export default async function ExpensesPage() {
       },
       orderBy: { date: "desc" },
       include: {
-        category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
+        customer: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, billable: true, customerId: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     }),
@@ -45,7 +45,7 @@ export default async function ExpensesPage() {
 
   return (
     <ExpensesClient
-      categories={serialize(categories)}
+      customers={serialize(customers)}
       projects={serialize(projects)}
       initialExpenses={serialize(initialExpenses)}
       users={serialize(users)}

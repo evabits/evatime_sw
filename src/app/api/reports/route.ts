@@ -72,6 +72,7 @@ export async function GET(req: Request) {
         },
         include: {
           category: { select: { id: true, name: true } },
+          customer: { select: { id: true, name: true } },
           project: { select: { id: true, name: true, billable: true, customer: { select: { id: true, name: true } } } },
           user: { select: { id: true, name: true } },
         },

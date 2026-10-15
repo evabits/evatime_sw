@@ -18,7 +18,7 @@ interface Props {
   kind: BulkKind | null;
   entry: any | null;
   projects: any[];
-  categories: any[];
+  customers: any[];
   users: any[];
   /** Mag bij "geen deelnemer" de medewerker meteen aan het project toevoegen. */
   canAddMembers?: boolean;
@@ -26,7 +26,7 @@ interface Props {
   onSaved: () => void;
 }
 
-export function EntryEditDialog({ kind, entry, projects, categories, users, canAddMembers = false, onClose, onSaved }: Props) {
+export function EntryEditDialog({ kind, entry, projects, customers, users, canAddMembers = false, onClose, onSaved }: Props) {
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
     setZoek("");
     setForm({
       projectId: entry.projectId ?? "",
-      categoryId: entry.categoryId ?? "",
+      customerId: entry.customerId ?? entry.project?.customer?.id ?? "",
       userId: entry.userId ?? "",
       date: format(new Date(entry.date), "yyyy-MM-dd"),
       hours: entry.hours != null ? String(entry.hours) : "",
@@ -58,7 +58,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
 
   function validate(): string | null {
     if (kind === "expense") {
-      if (!form.categoryId) return "Categorie is verplicht";
+      if (!form.customerId) return "Klant is verplicht";
       if (!form.date) return "Datum is verplicht";
       if (!(Number(form.amount) > 0)) return "Bedrag moet groter dan 0 zijn";
       if (form.vatRate === "") return "BTW% is verplicht";
@@ -90,7 +90,7 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
         ? { projectId: form.projectId, date: form.date, hours: toQuarter(Number(form.hours)), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
         : kind === "km"
         ? { projectId: form.projectId, date: form.date, km: Number(form.km), description: form.description, rateOverride: num(form.rateOverride), userId: form.userId }
-        : { categoryId: form.categoryId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), reimbursable: form.reimbursable, userId: form.userId };
+        : { customerId: form.customerId, projectId: form.projectId || null, date: form.date, description: form.description, amount: Number(form.amount), vatRate: Number(form.vatRate), reimbursable: form.reimbursable, userId: form.userId };
 
     const opslaan = () => fetch(`${ENTRY_ENDPOINT[kind as BulkKind]}/${entry.id}`, {
       method: "PUT",
@@ -132,11 +132,11 @@ export function EntryEditDialog({ kind, entry, projects, categories, users, canA
 
           {kind === "expense" && (
             <div className="space-y-2">
-              <Label>Categorie</Label>
-              <Select value={form.categoryId} onValueChange={(v) => set("categoryId", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>Klant</Label>
+              <Select value={form.customerId} onValueChange={(v) => set("customerId", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

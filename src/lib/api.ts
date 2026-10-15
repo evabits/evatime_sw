@@ -135,3 +135,10 @@ export async function resolveTagNames(names: string[]): Promise<string[]> {
   const bestaande = await prisma.tag.findMany({ select: { name: true } });
   return canonicalizeTagNames(names, bestaande.map((t) => t.name));
 }
+
+/** De klant van een project, als standaard voor een uitgave zonder eigen klant. */
+export async function projectCustomerId(projectId: string | null | undefined): Promise<string | null> {
+  if (!projectId) return null;
+  const p = await prisma.project.findUnique({ where: { id: projectId }, select: { customerId: true } });
+  return p?.customerId ?? null;
+}
