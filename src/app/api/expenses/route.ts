@@ -2,12 +2,13 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError, projectMembershipError } from "@/lib/api";
+import { handleError, projectCustomerId, projectMembershipError } from "@/lib/api";
 import { canViewAllEntries, canViewReimbursements } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
-  categoryId: z.string().min(1),
+  categoryId: z.string().optional().nullable(),
+  customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   date: z.string(),
   description: z.string().optional(),
@@ -40,7 +41,8 @@ export async function GET(req: Request) {
       ...(projectId ? { projectId } : {}),
       // Zoals /api/time en /api/km: de factuuropbouw vraagt om alles van één
       // klant, en die zit aan het project vast.
-      ...(customerId ? { project: { customerId } } : {}),
+      // Een eigen klant op de uitgave wint; anders die van het project.
+      ...(customerId ? { OR: [{ customerId }, { customerId: null, project: { customerId } }] } : {}),
     };
 
     if (canViewAllEntries(role)) {
@@ -59,7 +61,8 @@ export async function GET(req: Request) {
       orderBy: { date: "desc" },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
+        customer: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, billable: true, customerId: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });
@@ -86,10 +89,16 @@ export async function POST(req: Request) {
     if (memberError) return memberError;
 
     const expense = await prisma.expense.create({
-      data: { ...entryData, date: new Date(data.date), userId: ownerId },
+      data: {
+        ...entryData,
+        customerId: entryData.customerId || (await projectCustomerId(data.projectId)),
+        date: new Date(data.date),
+        userId: ownerId,
+      },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
+        customer: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, billable: true, customerId: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });

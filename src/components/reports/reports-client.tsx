@@ -19,7 +19,6 @@ interface Props {
   projects: any[];
   users: { id: string; name: string; weeklyHours: number | null }[];
   tags: { id: string; name: string }[];
-  categories: any[];
   role: string;
   /** Voorgevuld vanuit de URL, bijvoorbeeld vanaf het projectoverzicht. */
   initialProjectId?: string;
@@ -31,7 +30,6 @@ export function ReportsClient({
   projects,
   users,
   tags,
-  categories,
   role,
   initialProjectId = "",
   initialPeriod,
@@ -336,7 +334,7 @@ export function ReportsClient({
         kind={editing?.kind ?? null}
         entry={editing?.entry ?? null}
         projects={projects}
-        categories={categories}
+        customers={customers}
         users={users}
         canAddMembers={canEdit}
         onClose={() => setEditing(null)}

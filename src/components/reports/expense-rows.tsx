@@ -40,7 +40,7 @@ export function ExpenseRows({ entries, total, canEdit, selected, selectableIds, 
               <TableHead>Datum</TableHead>
               <TableHead>Medewerker</TableHead>
               <TableHead>Klant / Project</TableHead>
-              <TableHead>Categorie</TableHead>
+              <TableHead>Klant</TableHead>
               <TableHead>Omschrijving</TableHead>
               <TableHead className="text-right">Bedrag</TableHead>
               <TableHead></TableHead>
@@ -72,7 +72,7 @@ export function ExpenseRows({ entries, total, canEdit, selected, selectableIds, 
                     </>
                   ) : "—"}
                 </TableCell>
-                <TableCell>{e.category?.name}</TableCell>
+                <TableCell>{e.customer?.name ?? e.project?.customer?.name ?? "—"}</TableCell>
                 <TableCell className="max-w-32 truncate" title={e.description ?? undefined}>
                   {e.description ?? "—"}
                 </TableCell>

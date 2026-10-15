@@ -14,7 +14,7 @@ export default async function ReportsPage({
   const { project, period } = await searchParams;
   const session = await auth();
   if (!canViewReports((session?.user as any)?.role ?? "EMPLOYEE")) redirect("/");
-  const [customers, projects, users, tags, categories] = await Promise.all([
+  const [customers, projects, users, tags] = await Promise.all([
     prisma.customer.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.project.findMany({
       where: { archivedAt: null },
@@ -23,7 +23,6 @@ export default async function ReportsPage({
     }),
     prisma.user.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, weeklyHours: true } }),
     prisma.tag.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.expenseCategory.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   const serializedUsers = users.map((u) => ({ ...u, weeklyHours: u.weeklyHours ? Number(u.weeklyHours) : null }));
@@ -41,7 +40,6 @@ export default async function ReportsPage({
       projects={serialize(projects)}
       users={serializedUsers}
       tags={serialize(tags)}
-      categories={serialize(categories)}
       role={(session?.user as any)?.role ?? "EMPLOYEE"}
       initialProjectId={gekozenProject}
       initialPeriod={gekozenPeriode}

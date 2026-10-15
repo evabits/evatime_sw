@@ -17,7 +17,7 @@ import { isBillable } from "@/lib/billable";
 import { Pencil, Trash2, Paperclip, Download } from "lucide-react";
 
 const schema = z.object({
-  categoryId: z.string().min(1, "Verplicht"),
+  customerId: z.string().min(1, "Verplicht"),
   projectId: z.string().optional(),
   date: z.string().min(1, "Verplicht"),
   description: z.string().optional(),
@@ -37,7 +37,7 @@ function monthBounds(ym: string) {
 }
 
 interface Props {
-  categories: any[];
+  customers: any[];
   projects: any[];
   initialExpenses: any[];
   users: any[];
@@ -46,7 +46,7 @@ interface Props {
   canViewReimbursements: boolean;
 }
 
-export function ExpensesClient({ categories, projects, initialExpenses, users, userId, role, canViewReimbursements }: Props) {
+export function ExpensesClient({ customers, projects, initialExpenses, users, userId, role, canViewReimbursements }: Props) {
   const isAdmin = role === "ADMIN";
   const [expenses, setExpenses] = useState(initialExpenses);
   const [editing, setEditing] = useState<string | null>(null);
@@ -58,6 +58,8 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const receiptRef = useRef<HTMLInputElement>(null);
   const [pendingReceiptExpenseId, setPendingReceiptExpenseId] = useState<string | null>(null);
+  // Bon die met het formulier meegaat; wordt na het opslaan geüpload.
+  const formReceiptRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -101,7 +103,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          const updated = await res.json();
+          const updated = await uploadFormReceipt(await res.json());
           setExpenses((prev) => prev.map((e) => (e.id === editing ? updated : e)));
           setEditing(null);
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId });
@@ -113,7 +115,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          const created = await res.json();
+          const created = await uploadFormReceipt(await res.json());
           const { from, to } = monthBounds(filterMonth);
           if (data.date >= from && data.date <= to && (filterProject === "all" || data.projectId === filterProject)) {
             setExpenses((prev) => [created, ...prev]);
@@ -122,6 +124,24 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
         }
       }
     } finally { setLoading(false); }
+  }
+
+  async function postReceipt(expenseId: string, file: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/expenses/${expenseId}/receipt`, { method: "POST", body: fd });
+    if (res.ok) return (await res.json()).receiptUrl;
+    const err = await res.json().catch(() => ({}));
+    alert(`Bijlage uploaden mislukt: ${err.error ?? `fout ${res.status}`}`);
+    return null;
+  }
+
+  async function uploadFormReceipt(expense: any) {
+    const file = formReceiptRef.current?.files?.[0];
+    if (!file) return expense;
+    const receiptUrl = await postReceipt(expense.id, file);
+    formReceiptRef.current!.value = "";
+    return receiptUrl ? { ...expense, receiptUrl } : expense;
   }
 
   async function deleteExpense(id: string) {
@@ -133,7 +153,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
   function startEdit(expense: any) {
     setEditing(expense.id);
     form.reset({
-      categoryId: expense.categoryId,
+      customerId: expense.customerId ?? expense.project?.customerId ?? "",
       projectId: expense.projectId ?? undefined,
       date: format(new Date(expense.date), "yyyy-MM-dd"),
       description: expense.description ?? "",
@@ -148,11 +168,8 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
     const file = e.target.files?.[0];
     if (!file || !pendingReceiptExpenseId) return;
     setUploadingId(pendingReceiptExpenseId);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(`/api/expenses/${pendingReceiptExpenseId}/receipt`, { method: "POST", body: fd });
-    if (res.ok) {
-      const { receiptUrl } = await res.json();
+    const receiptUrl = await postReceipt(pendingReceiptExpenseId, file);
+    if (receiptUrl) {
       setExpenses((prev) => prev.map((e) => e.id === pendingReceiptExpenseId ? { ...e, receiptUrl } : e));
     }
     setUploadingId(null);
@@ -189,19 +206,27 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
               )}
 
               <div className="space-y-2">
-                <Label>Categorie *</Label>
-                <Select onValueChange={(v) => form.setValue("categoryId", v)} value={form.watch("categoryId")}>
-                  <SelectTrigger><SelectValue placeholder="Selecteer categorie" /></SelectTrigger>
+                <Label>Klant *</Label>
+                <Select onValueChange={(v) => form.setValue("customerId", v)} value={form.watch("customerId") ?? ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                {form.formState.errors.categoryId && <p className="text-xs text-destructive">{form.formState.errors.categoryId.message}</p>}
+                {form.formState.errors.customerId && <p className="text-xs text-destructive">{form.formState.errors.customerId.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label>Project</Label>
-                <Select onValueChange={(v) => form.setValue("projectId", v === "_none" ? undefined : v)} value={form.watch("projectId") || "_none"}>
+                <Select
+                  onValueChange={(v) => {
+                    form.setValue("projectId", v === "_none" ? undefined : v);
+                    // Het project bepaalt meestal de klant; vul die alvast in.
+                    const klant = projects.find((p) => p.id === v)?.customerId;
+                    if (klant) form.setValue("customerId", klant);
+                  }}
+                  value={form.watch("projectId") || "_none"}
+                >
                   <SelectTrigger><SelectValue placeholder="Geen project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">Geen project</SelectItem>
@@ -236,6 +261,11 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
                     <SelectItem value="true">Ja</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Bon / bijlage</Label>
+                <Input ref={formReceiptRef} type="file" accept=".pdf,.png,.jpg,.jpeg" />
               </div>
 
               <div className="space-y-2 sm:col-span-2">
@@ -298,7 +328,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
               <TableRow>
                 <TableHead>Datum</TableHead>
                 {(showReimbursements || isAdmin) && <TableHead>Medewerker</TableHead>}
-                <TableHead>Categorie</TableHead>
+                <TableHead>Klant</TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Omschrijving</TableHead>
                 <TableHead className="text-right">Bedrag</TableHead>
@@ -315,7 +345,7 @@ export function ExpensesClient({ categories, projects, initialExpenses, users, u
                   <TableRow key={expense.id}>
                     <TableCell className="whitespace-nowrap">{formatDate(expense.date)}</TableCell>
                     {(showReimbursements || isAdmin) && <TableCell>{expense.user?.name}</TableCell>}
-                    <TableCell>{expense.category?.name}</TableCell>
+                    <TableCell>{expense.customer?.name ?? expense.project?.customer?.name ?? "—"}</TableCell>
                     <TableCell>
                       {expense.project ? (
                         <div>

@@ -2,13 +2,14 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleError, projectMembershipError } from "@/lib/api";
+import { handleError, projectCustomerId, projectMembershipError } from "@/lib/api";
 import { isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
 import { membershipCheckNeeded, resolveNextProjectId } from "@/lib/project-members";
 
 const schema = z.object({
-  categoryId: z.string().min(1),
+  categoryId: z.string().optional().nullable(),
+  customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   date: z.string(),
   description: z.string().optional(),
@@ -52,10 +53,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const expense = await prisma.expense.update({
       where: { id },
-      data: { ...entryData, projectId: nextProjectId, date: new Date(data.date), userId: ownerId },
+      data: {
+        ...entryData,
+        projectId: nextProjectId,
+        customerId: entryData.customerId || (await projectCustomerId(nextProjectId)),
+        date: new Date(data.date),
+        userId: ownerId,
+      },
       include: {
         category: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true, billable: true, customer: { select: { name: true } } } },
+        customer: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, billable: true, customerId: true, customer: { select: { name: true } } } },
         user: { select: { id: true, name: true } },
       },
     });
