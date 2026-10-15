@@ -43,7 +43,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // Check en write moeten hetzelfde project zien; zie resolveNextProjectId.
     const nextProjectId = resolveNextProjectId(existing.projectId, data.projectId);
 
-    if (membershipCheckNeeded(
+    // Een admin mag op elk project uitgaven boeken, ook zonder deelname.
+    if (!isAdmin(role) && membershipCheckNeeded(
       { projectId: existing.projectId, userId: existing.userId },
       { projectId: nextProjectId, userId: ownerId },
     )) {

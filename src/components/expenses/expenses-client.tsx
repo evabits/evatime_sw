@@ -60,6 +60,7 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
   const [pendingReceiptExpenseId, setPendingReceiptExpenseId] = useState<string | null>(null);
   // Bon die met het formulier meegaat; wordt na het opslaan geüpload.
   const formReceiptRef = useRef<HTMLInputElement>(null);
+  const [formError, setFormError] = useState("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -92,8 +93,14 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
     fetchExpenses(filterMonth, filterProject, val);
   }
 
+  async function toonFout(res: Response) {
+    const err = await res.json().catch(() => ({}));
+    setFormError(err.error ?? `Opslaan mislukt (fout ${res.status})`);
+  }
+
   async function onSubmit(data: FormData) {
     setLoading(true);
+    setFormError("");
     const payload = { ...data, projectId: data.projectId || null };
     try {
       if (editing) {
@@ -102,6 +109,7 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) await toonFout(res);
         if (res.ok) {
           const updated = await uploadFormReceipt(await res.json());
           setExpenses((prev) => prev.map((e) => (e.id === editing ? updated : e)));
@@ -114,6 +122,7 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res.ok) await toonFout(res);
         if (res.ok) {
           const created = await uploadFormReceipt(await res.json());
           const { from, to } = monthBounds(filterMonth);
@@ -123,6 +132,8 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId: data.userId ?? userId });
         }
       }
+    } catch {
+      setFormError("Netwerkfout, probeer opnieuw");
     } finally { setLoading(false); }
   }
 
@@ -194,7 +205,7 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
         <Card>
           <CardHeader><CardTitle>{editing ? "Uitgaven aanpassen" : "Uitgaven toevoegen"}</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+            <form onSubmit={form.handleSubmit(onSubmit, (fouten) => setFormError(`Controleer: ${Object.keys(fouten).join(", ")}`))} className="grid gap-4 sm:grid-cols-2">
               {isAdmin && users.length > 0 && (
                 <div className="space-y-2">
                   <Label>Medewerker</Label>
@@ -284,6 +295,8 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
                 <Label>Omschrijving</Label>
                 <Textarea placeholder="Bijv. lunch klantbezoek" {...form.register("description")} rows={2} />
               </div>
+
+              {formError && <p className="sm:col-span-2 text-sm text-destructive">{formError}</p>}
 
               <div className="sm:col-span-2 flex gap-2">
                 <Button type="submit" disabled={loading}>{loading ? (editing ? "Opslaan..." : "Toevoegen...") : (editing ? "Opslaan" : "Toevoegen")}</Button>
