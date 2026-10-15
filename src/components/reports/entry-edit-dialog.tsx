@@ -109,7 +109,11 @@ export function EntryEditDialog({ kind, entry, projects, customers, users, canAd
 
   // Het huidige project blijft altijd in de lijst, ook als het zoekwoord of
   // het archief het eruit zou filteren: anders staat het vak ineens leeg.
-  const gevonden = projectOptions(projects, { zoek });
+  // Een uitgave met een klant kiest alleen uit de projecten van die klant.
+  const klantProjecten = kind === "expense" && form.customerId
+    ? projects.filter((p) => p.customerId === form.customerId)
+    : projects;
+  const gevonden = projectOptions(klantProjecten, { zoek });
   const huidig = projects.find((p) => p.id === form.projectId);
   const projectKeuzes = huidig && !gevonden.some((o) => o.id === huidig.id)
     ? [{ id: huidig.id, label: `${huidig.customer?.name ? `${huidig.customer.name} — ` : ""}${huidig.name}` }, ...gevonden]
