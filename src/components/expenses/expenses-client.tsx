@@ -177,6 +177,10 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
     if (receiptRef.current) receiptRef.current.value = "";
   }
 
+  // Met een klant gekozen alleen de projecten van die klant.
+  const gekozenKlant = form.watch("customerId");
+  const formProjects = gekozenKlant ? projects.filter((p) => p.customerId === gekozenKlant) : projects;
+
   const totalAmount = expenses.reduce((s, e) => s + Number(e.amount), 0);
 
   return (
@@ -207,7 +211,15 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
 
               <div className="space-y-2">
                 <Label>Klant *</Label>
-                <Select onValueChange={(v) => form.setValue("customerId", v)} value={form.watch("customerId") ?? ""}>
+                <Select
+                  onValueChange={(v) => {
+                    form.setValue("customerId", v);
+                    // Een project van een andere klant past niet meer.
+                    const project = projects.find((p) => p.id === form.getValues("projectId"));
+                    if (project && project.customerId !== v) form.setValue("projectId", undefined);
+                  }}
+                  value={gekozenKlant ?? ""}
+                >
                   <SelectTrigger><SelectValue placeholder="Selecteer klant" /></SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -231,7 +243,7 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
                   <SelectContent>
                     <SelectItem value="_none">Geen project</SelectItem>
                     {/* title toont de projectomschrijving bij het over-hoveren. */}
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id} title={p.description || undefined}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
+                    {formProjects.map((p) => <SelectItem key={p.id} value={p.id} title={p.description || undefined}>{p.customer ? `${p.customer.name} — ` : ""}{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

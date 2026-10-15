@@ -97,7 +97,11 @@ export async function POST(req: Request) {
       : Promise.resolve(0),
     expenseIds.length > 0
       ? prisma.expense.count({
-          where: { id: { in: expenseIds }, project: { customerId: { not: data.customerId } } },
+          // Dezelfde regel als GET /api/expenses: de eigen klant wint, anders die van het project.
+          where: {
+            id: { in: expenseIds },
+            NOT: { OR: [{ customerId: data.customerId }, { customerId: null, project: { customerId: data.customerId } }] },
+          },
         })
       : Promise.resolve(0),
   ]);
