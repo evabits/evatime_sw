@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { isBillable } from "@/lib/billable";
 import { Pencil, Trash2, Paperclip, Download } from "lucide-react";
-import { saveWithMembership } from "@/lib/membership-retry";
 
 const schema = z.object({
   customerId: z.string().min(1, "Verplicht"),
@@ -94,10 +93,6 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
     fetchExpenses(filterMonth, filterProject, val);
   }
 
-  // Admin boekt namens anderen: bij "geen deelnemer" meteen aanbieden toe te voegen.
-  const metDeelname = (opslaan: () => Promise<Response>) =>
-    isAdmin ? saveWithMembership(opslaan, { users, projects }) : opslaan();
-
   async function toonFout(res: Response) {
     const err = await res.json().catch(() => ({}));
     setFormError(err.error ?? `Opslaan mislukt (fout ${res.status})`);
@@ -109,11 +104,11 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
     const payload = { ...data, projectId: data.projectId || null };
     try {
       if (editing) {
-        const res = await metDeelname(() => fetch(`/api/expenses/${editing}`, {
+        const res = await fetch(`/api/expenses/${editing}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }));
+        });
         if (!res.ok) await toonFout(res);
         if (res.ok) {
           const updated = await uploadFormReceipt(await res.json());
@@ -122,11 +117,11 @@ export function ExpensesClient({ customers, projects, initialExpenses, users, us
           form.reset({ date: format(new Date(), "yyyy-MM-dd"), reimbursable: false, vatRate: 21, userId });
         }
       } else {
-        const res = await metDeelname(() => fetch("/api/expenses", {
+        const res = await fetch("/api/expenses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }));
+        });
         if (!res.ok) await toonFout(res);
         if (res.ok) {
           const created = await uploadFormReceipt(await res.json());

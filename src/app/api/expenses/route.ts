@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handleError, projectCustomerId, projectMembershipError } from "@/lib/api";
-import { canViewAllEntries, canViewReimbursements } from "@/lib/roles";
+import { canViewAllEntries, canViewReimbursements, isAdmin } from "@/lib/roles";
 import { resolveEntryUserId } from "@/lib/entry-owner";
 
 const schema = z.object({
@@ -85,7 +85,8 @@ export async function POST(req: Request) {
       if (!target) return NextResponse.json({ error: "Onbekende medewerker" }, { status: 400 });
     }
 
-    const memberError = await projectMembershipError(data.projectId ?? null, ownerId);
+    // Een admin mag op elk project uitgaven boeken, ook zonder deelname.
+    const memberError = isAdmin(role) ? null : await projectMembershipError(data.projectId ?? null, ownerId);
     if (memberError) return memberError;
 
     const expense = await prisma.expense.create({
