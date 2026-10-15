@@ -460,6 +460,8 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                   <TableHead>Klant</TableHead>
                   <TableHead>Opgeleverd</TableHead>
                   <TableHead>Factuurnummer</TableHead>
+                  {toonBedragen && <TableHead className="text-right">Uren</TableHead>}
+                  {toonBedragen && <TableHead className="text-right">Per uur (ex btw)</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -470,6 +472,12 @@ export function RecurringClient({ initialTemplates, initialBatches, customers, u
                     <TableCell>{b.customer?.name}</TableCell>
                     <TableCell>{formatDate(b.deliveredAt)}</TableCell>
                     <TableCell>{b.generatedInvoice?.invoiceNumber ?? (b.template?.billing === "NONE" ? <span className="text-muted-foreground">Intern</span> : "—")}</TableCell>
+                    {toonBedragen && <TableCell className="text-right font-mono">{b.hours ? b.hours.toFixed(2) : "—"}</TableCell>}
+                    {toonBedragen && (
+                      <TableCell className="text-right font-mono">
+                        {b.generatedInvoice && b.hours ? formatCurrency(Number(b.generatedInvoice.subtotal) / b.hours) : "—"}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
