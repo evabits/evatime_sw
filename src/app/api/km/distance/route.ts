@@ -1,18 +1,15 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
+import { OSM_UA, zoekAdressen } from "@/lib/photon";
 
-// Publieke OpenStreetMap-diensten, zonder sleutel. Nominatim eist een
-// herkenbare User-Agent en hooguit één verzoek per seconde.
-// ponytail: publieke demoservers zonder SLA; eigen OSRM of betaalde dienst als dat gaat haperen.
-const UA = { "User-Agent": "EVAtime/1.0 (time.evabits.work)" };
+const COORD = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
 
-async function geocode(adres: string): Promise<[number, number] | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(adres)}`;
-  const res = await fetch(url, { headers: UA });
-  if (!res.ok) return null;
-  const [hit] = await res.json();
-  return hit ? [Number(hit.lon), Number(hit.lat)] : null;
+/** "lon,lat" van een gekozen suggestie, of anders de beste treffer voor de tekst. */
+async function punt(invoer: string): Promise<string | null> {
+  if (COORD.test(invoer)) return invoer;
+  const [hit] = await zoekAdressen(invoer, 1);
+  return hit?.coord ?? null;
 }
 
 /** Rijafstand in km tussen twee adressen, enkele reis. */
@@ -25,12 +22,14 @@ export async function GET(req: Request) {
     const to = searchParams.get("to")?.trim();
     if (!from || !to) return NextResponse.json({ error: "Vul zowel van als naar in" }, { status: 400 });
 
-    const van = await geocode(from);
+    const van = await punt(from);
     if (!van) return NextResponse.json({ error: `Adres niet gevonden: ${from}` }, { status: 404 });
-    const naar = await geocode(to);
+    const naar = await punt(to);
     if (!naar) return NextResponse.json({ error: `Adres niet gevonden: ${to}` }, { status: 404 });
 
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${van.join(",")};${naar.join(",")}?overview=false`, { headers: UA });
+    // Openbare OSRM-demoserver van OpenStreetMap.
+    // ponytail: geen SLA; eigen OSRM of betaalde dienst als dat gaat haperen.
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${van};${naar}?overview=false`, { headers: OSM_UA });
     const route = res.ok ? (await res.json()).routes?.[0] : null;
     if (!route) return NextResponse.json({ error: "Geen route gevonden" }, { status: 502 });
 
