@@ -69,6 +69,29 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Van/naar alleen om de afstand op te halen; opgeslagen worden de km en de omschrijving.
+  const [route, setRoute] = useState({ van: "", naar: "", retour: false });
+  const [routeBezig, setRouteBezig] = useState(false);
+  const [routeFout, setRouteFout] = useState("");
+
+  async function berekenAfstand() {
+    setRouteBezig(true);
+    setRouteFout("");
+    try {
+      const res = await fetch(`/api/km/distance?${new URLSearchParams({ from: route.van, to: route.naar })}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setRouteFout(data.error ?? `Fout ${res.status}`); return; }
+      form.setValue("km", route.retour ? Math.round(data.km * 20) / 10 : data.km, { shouldValidate: true });
+      if (!form.getValues("description")) {
+        form.setValue("description", `${route.van} → ${route.naar}${route.retour ? " (retour)" : ""}`);
+      }
+      setAppliedTemplate("");
+    } catch {
+      setRouteFout("Netwerkfout, probeer opnieuw");
+    } finally {
+      setRouteBezig(false);
+    }
+  }
   const [filterMonth, setFilterMonth] = useState(currentMonth());
   const [filterProject, setFilterProject] = useState("all");
   const [filterUser, setFilterUser] = useState("all");
@@ -385,6 +408,22 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             <div className="space-y-2">
               <Label>Datum *</Label>
               <Input type="date" {...form.register("date")} />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Afstand berekenen <span className="text-muted-foreground font-normal">(optioneel)</span></Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="flex-1 min-w-40" placeholder="Van: straat, plaats" value={route.van} onChange={(e) => setRoute((r) => ({ ...r, van: e.target.value }))} />
+                <Input className="flex-1 min-w-40" placeholder="Naar: straat, plaats" value={route.naar} onChange={(e) => setRoute((r) => ({ ...r, naar: e.target.value }))} />
+                <label className="flex items-center gap-1 text-sm">
+                  <input type="checkbox" checked={route.retour} onChange={(e) => setRoute((r) => ({ ...r, retour: e.target.checked }))} />
+                  Retour
+                </label>
+                <Button type="button" variant="outline" onClick={berekenAfstand} disabled={routeBezig || !route.van.trim() || !route.naar.trim()}>
+                  {routeBezig ? "Bezig..." : "Bereken km"}
+                </Button>
+              </div>
+              {routeFout && <p className="text-xs text-destructive">{routeFout}</p>}
             </div>
 
             <div className="space-y-2">
