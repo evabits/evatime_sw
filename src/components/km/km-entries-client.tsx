@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,6 +18,46 @@ import { isBillable } from "@/lib/billable";
 import { Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
 import { WeekGrid } from "@/components/shared/week-grid";
 import { perDayTotals } from "@/lib/per-day-totals";
+import type { AdresSuggestie } from "@/lib/photon";
+
+type Adres = { tekst: string; coord: string | null };
+
+/**
+ * Adresveld met suggesties tijdens het typen (native datalist). Kies je er één,
+ * dan staat er een vinkje en rekent de route met precies die plek.
+ */
+function AdresVeld({ placeholder, waarde, onChange }: { placeholder: string; waarde: Adres; onChange: (a: Adres) => void }) {
+  const lijstId = useId();
+  const [suggesties, setSuggesties] = useState<AdresSuggestie[]>([]);
+
+  useEffect(() => {
+    if (waarde.coord || waarde.tekst.trim().length < 3) return;
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/km/address?${new URLSearchParams({ q: waarde.tekst })}`).catch(() => null);
+      if (res?.ok) setSuggesties(await res.json());
+    }, 300);
+    return () => clearTimeout(t);
+  }, [waarde.tekst, waarde.coord]);
+
+  return (
+    <div className="relative flex-1 min-w-48">
+      <Input
+        list={lijstId}
+        placeholder={placeholder}
+        value={waarde.tekst}
+        className={waarde.coord ? "pr-7" : undefined}
+        onChange={(e) => {
+          const tekst = e.target.value;
+          onChange({ tekst, coord: suggesties.find((s) => s.label === tekst)?.coord ?? null });
+        }}
+      />
+      {waarde.coord && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600" title="Adres gevonden">✓</span>}
+      <datalist id={lijstId}>
+        {suggesties.map((s) => <option key={s.coord + s.label} value={s.label} />)}
+      </datalist>
+    </div>
+  );
+}
 
 const schema = z.object({
   projectId: z.string().min(1, "Verplicht"),
@@ -70,7 +110,11 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
   const [editing, setEditing] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Van/naar alleen om de afstand op te halen; opgeslagen worden de km en de omschrijving.
-  const [route, setRoute] = useState({ van: "", naar: "", retour: false });
+  const [route, setRoute] = useState<{ van: Adres; naar: Adres; retour: boolean }>({
+    van: { tekst: "", coord: null },
+    naar: { tekst: "", coord: null },
+    retour: false,
+  });
   const [routeBezig, setRouteBezig] = useState(false);
   const [routeFout, setRouteFout] = useState("");
 
@@ -78,12 +122,12 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
     setRouteBezig(true);
     setRouteFout("");
     try {
-      const res = await fetch(`/api/km/distance?${new URLSearchParams({ from: route.van, to: route.naar })}`);
+      const res = await fetch(`/api/km/distance?${new URLSearchParams({ from: route.van.coord ?? route.van.tekst, to: route.naar.coord ?? route.naar.tekst })}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setRouteFout(data.error ?? `Fout ${res.status}`); return; }
       form.setValue("km", route.retour ? Math.round(data.km * 20) / 10 : data.km, { shouldValidate: true });
       if (!form.getValues("description")) {
-        form.setValue("description", `${route.van} → ${route.naar}${route.retour ? " (retour)" : ""}`);
+        form.setValue("description", `${route.van.tekst} → ${route.naar.tekst}${route.retour ? " (retour)" : ""}`);
       }
       setAppliedTemplate("");
     } catch {
@@ -413,13 +457,13 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
             <div className="space-y-2 sm:col-span-2">
               <Label>Afstand berekenen <span className="text-muted-foreground font-normal">(optioneel)</span></Label>
               <div className="flex flex-wrap items-center gap-2">
-                <Input className="flex-1 min-w-40" placeholder="Van: straat, plaats" value={route.van} onChange={(e) => setRoute((r) => ({ ...r, van: e.target.value }))} />
-                <Input className="flex-1 min-w-40" placeholder="Naar: straat, plaats" value={route.naar} onChange={(e) => setRoute((r) => ({ ...r, naar: e.target.value }))} />
+                <AdresVeld placeholder="Van: straat, plaats" waarde={route.van} onChange={(van) => setRoute((r) => ({ ...r, van }))} />
+                <AdresVeld placeholder="Naar: straat, plaats" waarde={route.naar} onChange={(naar) => setRoute((r) => ({ ...r, naar }))} />
                 <label className="flex items-center gap-1 text-sm">
                   <input type="checkbox" checked={route.retour} onChange={(e) => setRoute((r) => ({ ...r, retour: e.target.checked }))} />
                   Retour
                 </label>
-                <Button type="button" variant="outline" onClick={berekenAfstand} disabled={routeBezig || !route.van.trim() || !route.naar.trim()}>
+                <Button type="button" variant="outline" onClick={berekenAfstand} disabled={routeBezig || !route.van.tekst.trim() || !route.naar.tekst.trim()}>
                   {routeBezig ? "Bezig..." : "Bereken km"}
                 </Button>
               </div>
