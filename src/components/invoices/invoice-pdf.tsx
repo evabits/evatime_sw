@@ -69,6 +69,10 @@ export function InvoicePdf({ invoice, settings }: { invoice: any; settings: any 
             {customerAddressLines(invoiceCustomer(invoice.customer, invoice), invoice.attention, taal).map((regel, i) => (
               <Text key={i} style={i === 0 ? s.bold : undefined}>{regel}</Text>
             ))}
+            {/* Het btw-nummer van de klant, zoals op het scherm; de boekhouding herkent de klant eraan. */}
+            {invoiceCustomer(invoice.customer, invoice).vatNumber?.trim() && (
+              <Text>{t.labelBtwNummer}: {invoiceCustomer(invoice.customer, invoice).vatNumber!.trim()}</Text>
+            )}
           </View>
           <View style={s.companyBlock}>
             <Text style={s.bold}>{settings?.name ?? ""}</Text>
