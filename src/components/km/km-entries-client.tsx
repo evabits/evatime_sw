@@ -20,7 +20,7 @@ import { WeekGrid } from "@/components/shared/week-grid";
 import { perDayTotals } from "@/lib/per-day-totals";
 import type { AdresSuggestie } from "@/lib/photon";
 
-type Adres = { tekst: string; coord: string | null };
+type Adres = { tekst: string; punt: string | null };
 
 /**
  * Adresveld met suggesties tijdens het typen (native datalist). Kies je er één,
@@ -31,13 +31,13 @@ function AdresVeld({ placeholder, waarde, onChange }: { placeholder: string; waa
   const [suggesties, setSuggesties] = useState<AdresSuggestie[]>([]);
 
   useEffect(() => {
-    if (waarde.coord || waarde.tekst.trim().length < 3) return;
+    if (waarde.punt || waarde.tekst.trim().length < 3) return;
     const t = setTimeout(async () => {
       const res = await fetch(`/api/km/address?${new URLSearchParams({ q: waarde.tekst })}`).catch(() => null);
       if (res?.ok) setSuggesties(await res.json());
     }, 300);
     return () => clearTimeout(t);
-  }, [waarde.tekst, waarde.coord]);
+  }, [waarde.tekst, waarde.punt]);
 
   return (
     <div className="relative flex-1 min-w-48">
@@ -45,15 +45,15 @@ function AdresVeld({ placeholder, waarde, onChange }: { placeholder: string; waa
         list={lijstId}
         placeholder={placeholder}
         value={waarde.tekst}
-        className={waarde.coord ? "pr-7" : undefined}
+        className={waarde.punt ? "pr-7" : undefined}
         onChange={(e) => {
           const tekst = e.target.value;
-          onChange({ tekst, coord: suggesties.find((s) => s.label === tekst)?.coord ?? null });
+          onChange({ tekst, punt: suggesties.find((s) => s.label === tekst)?.punt ?? null });
         }}
       />
-      {waarde.coord && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600" title="Adres gevonden">✓</span>}
+      {waarde.punt && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600" title="Adres gevonden">✓</span>}
       <datalist id={lijstId}>
-        {suggesties.map((s) => <option key={s.coord + s.label} value={s.label} />)}
+        {suggesties.map((s) => <option key={s.punt + s.label} value={s.label} />)}
       </datalist>
     </div>
   );
@@ -111,8 +111,8 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
   const [loading, setLoading] = useState(false);
   // Van/naar alleen om de afstand op te halen; opgeslagen worden de km en de omschrijving.
   const [route, setRoute] = useState<{ van: Adres; naar: Adres; retour: boolean }>({
-    van: { tekst: "", coord: null },
-    naar: { tekst: "", coord: null },
+    van: { tekst: "", punt: null },
+    naar: { tekst: "", punt: null },
     retour: false,
   });
   const [routeBezig, setRouteBezig] = useState(false);
@@ -122,7 +122,7 @@ export function KmEntriesClient({ projects, customers, users, initialEntries, in
     setRouteBezig(true);
     setRouteFout("");
     try {
-      const res = await fetch(`/api/km/distance?${new URLSearchParams({ from: route.van.coord ?? route.van.tekst, to: route.naar.coord ?? route.naar.tekst })}`);
+      const res = await fetch(`/api/km/distance?${new URLSearchParams({ from: route.van.punt ?? route.van.tekst, to: route.naar.punt ?? route.naar.tekst })}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setRouteFout(data.error ?? `Fout ${res.status}`); return; }
       form.setValue("km", route.retour ? Math.round(data.km * 20) / 10 : data.km, { shouldValidate: true });
