@@ -3,7 +3,8 @@
 // ponytail: publieke server zonder SLA; eigen Photon of betaalde dienst als dat gaat haperen.
 export const OSM_UA = { "User-Agent": "EVAtime/1.0 (time.evabits.work)" };
 
-export type AdresSuggestie = { label: string; coord: string };
+/** `punt` is "lon,lat", of een adres dat de afstandsroute nog moet opzoeken. */
+export type AdresSuggestie = { label: string; punt: string };
 
 /** Adressen die op de invoer lijken, met Nederland voorop. */
 export async function zoekAdressen(q: string, limit = 5): Promise<AdresSuggestie[]> {
@@ -17,8 +18,9 @@ export async function zoekAdressen(q: string, limit = 5): Promise<AdresSuggestie
     const plaats = [p.postcode, p.city ?? (p.name !== straat ? p.name : null)].filter(Boolean).join(" ");
     const land = p.countrycode && p.countrycode !== "NL" ? p.country : null;
     return {
-      label: [straat, plaats, land].filter(Boolean).join(", "),
-      coord: f.geometry.coordinates.join(","),
+      // Een bedrijf of andere plek heeft een naam naast zijn straat; die voorop.
+      label: [p.name !== straat ? p.name : null, straat, plaats, land].filter(Boolean).join(", "),
+      punt: f.geometry.coordinates.join(","),
     };
   });
 }

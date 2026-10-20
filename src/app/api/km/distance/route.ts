@@ -9,7 +9,7 @@ const COORD = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
 async function punt(invoer: string): Promise<string | null> {
   if (COORD.test(invoer)) return invoer;
   const [hit] = await zoekAdressen(invoer, 1);
-  return hit?.coord ?? null;
+  return hit?.punt ?? null;
 }
 
 /** Rijafstand in km tussen twee adressen, enkele reis. */
