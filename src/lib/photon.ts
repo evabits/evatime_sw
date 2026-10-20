@@ -17,7 +17,8 @@ export async function zoekAdressen(q: string, limit = 5): Promise<AdresSuggestie
     const plaats = [p.postcode, p.city ?? (p.name !== straat ? p.name : null)].filter(Boolean).join(" ");
     const land = p.countrycode && p.countrycode !== "NL" ? p.country : null;
     return {
-      label: [straat, plaats, land].filter(Boolean).join(", "),
+      // Een bedrijf of andere plek heeft een naam naast zijn straat; die voorop.
+      label: [p.name !== straat ? p.name : null, straat, plaats, land].filter(Boolean).join(", "),
       coord: f.geometry.coordinates.join(","),
     };
   });
