@@ -16,6 +16,9 @@ import { contractYearBalance, toContractVacation, toVacationOpening, vacationBal
 import { getEffectiveContract } from "@/lib/contracts";
 import { firstOfMonth, unbilledByCustomer } from "@/lib/unbilled";
 import Link from "next/link";
+import { overtimeLedgerFor } from "@/lib/overtime-saldo";
+import { serializeContract, contractSelect } from "@/app/api/contracts/route";
+import { OvertimeLedgerList, monthLabel, signed } from "@/components/shared/overtime-ledger";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -152,6 +155,19 @@ export default async function DashboardPage() {
   // peildatum stapelt het recht over alle contractjaren, zonder blijft het bij
   // het lopende jaar.
   const vandaag = format(now, "yyyy-MM-dd");
+  // Het eigen overurensaldo, zoals op de personeelspagina. Alleen met een beginstand.
+  const eigenSaldoGebruiker = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true, overtimeOpeningDate: true, overtimeOpeningHours: true,
+      contracts: { select: contractSelect },
+      overtimeAdjustments: { select: { id: true, date: true, hours: true, reason: true } },
+    },
+  });
+  const overuren = eigenSaldoGebruiker?.overtimeOpeningDate
+    ? await overtimeLedgerFor({ ...eigenSaldoGebruiker, contracts: eigenSaldoGebruiker.contracts.map(serializeContract) })
+    : null;
+
   const eigenVakantieContracten = toContractVacation(eigenContracten);
   const eigenOpening = toVacationOpening(eigenGebruiker);
   const eigenOpnames = vacationApproved.map((a) => ({
@@ -340,6 +356,31 @@ export default async function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
+
+        {overuren && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Overuren</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${overuren.saldo < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                {signed(overuren.saldo)}
+              </div>
+              {overuren.lopend && (
+                <p className="text-xs text-muted-foreground">
+                  {monthLabel(overuren.lopend.key)} loopt nog: {formatHours(overuren.lopend.geboekt)} geboekt
+                  {overuren.lopend.target != null && ` van ${formatHours(overuren.lopend.target)}`}
+                </p>
+              )}
+              {/* Native uitklap: geen JavaScript nodig voor de historie. */}
+              <details className="mt-1">
+                <summary className="text-xs text-primary cursor-pointer hover:underline">Historie</summary>
+                <OvertimeLedgerList lines={overuren.lines} />
+              </details>
+            </CardContent>
+          </Card>
+        )}
 
         {isAdmin && teFactureren.length > 0 && (
           <Card>

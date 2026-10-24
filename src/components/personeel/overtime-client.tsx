@@ -1,39 +1,15 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDate, formatHours } from "@/lib/utils";
+import { formatHours } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import type { LedgerLine, MonthKey } from "@/lib/overtime";
-
-/** "2026-09" -> "september 2026", net als de periode-titel van het uren-overzicht. */
-function monthLabel(key: MonthKey): string {
-  const [jaar, maand] = key.split("-").map(Number);
-  return new Date(jaar, maand - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
-}
-
-/**
- * Uren met teken: `+` voor een overschot, een eigen `-` voor een tekort.
- *
- * formatHours() zelf kan geen negatieve uren aan — Math.floor van bijvoorbeeld
- * -2,5 geeft -3, en de minuten erna kloppen dan niet meer. Daarom hier altijd
- * de absolute waarde aan formatHours geven en het teken er zelf voor zetten.
- */
-function signed(hours: number): string {
-  if (hours > 0) return `+${formatHours(hours)}`;
-  if (hours < 0) return `-${formatHours(Math.abs(hours))}`;
-  return formatHours(0);
-}
-
-function lineKey(line: LedgerLine): string {
-  if (line.kind === "opening") return "opening";
-  if (line.kind === "month") return line.key;
-  return line.id;
-}
+import { OvertimeLedgerList, monthLabel, signed } from "@/components/shared/overtime-ledger";
 
 interface OvertimeUser {
   id: string;
@@ -203,39 +179,7 @@ export function OvertimeClient({ user, lines, saldo, lopend }: Props) {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="divide-y divide-border">
-                {lines.map((line) => (
-                  <div key={lineKey(line)} className="flex items-center justify-between py-2 text-sm gap-4">
-                    {line.kind === "opening" && (
-                      <span>Beginstand {formatDate(line.date)}</span>
-                    )}
-                    {line.kind === "month" && (
-                      <span>
-                        {monthLabel(line.key)}
-                        <span className="text-muted-foreground text-xs ml-2">
-                          {line.target != null
-                            ? `geboekt ${formatHours(line.geboekt)} / target ${formatHours(line.target)}`
-                            : `geboekt ${formatHours(line.geboekt)} (geen contract)`}
-                        </span>
-                      </span>
-                    )}
-                    {line.kind === "adjustment" && (
-                      <span>
-                        {formatDate(line.date)}
-                        <span className="text-muted-foreground text-xs ml-2">{line.reason}</span>
-                      </span>
-                    )}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={line.hours < 0 ? "text-destructive" : ""}>{signed(line.hours)}</span>
-                      {line.kind === "adjustment" && (
-                        <Button variant="ghost" size="icon" onClick={() => deleteAdjustment(line.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <OvertimeLedgerList lines={lines} onDelete={deleteAdjustment} />
 
               <div className="flex items-center justify-between border-t pt-2 font-medium">
                 <span>Saldo</span>
