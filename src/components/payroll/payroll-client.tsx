@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { MemberPicker } from "@/components/shared/member-picker";
 import { formatHoursDecimal } from "@/lib/utils";
 import { readHiddenIds, hiddenStorageKey } from "@/lib/hidden-members";
@@ -63,26 +64,47 @@ export function PayrollClient({ userId }: { userId: string }) {
 
   const [herlaad, setHerlaad] = useState(0);
 
-  /** Uitbetalen = een negatieve mutatie op de laatste dag van deze maand. */
-  async function uitbetalen(row: PayrollRow) {
-    const invoer = prompt(`Hoeveel uren uitbetalen aan ${row.name}?`, row.saldo && row.saldo > 0 ? String(row.saldo) : "");
-    if (invoer == null) return;
-    const uren = Number(invoer.replace(",", "."));
-    if (!uren || uren < 0 || Number.isNaN(uren)) { alert("Vul een positief aantal uren in"); return; }
+  // Uitbetalen = een negatieve mutatie, standaard op de laatste dag van deze maand.
+  const [betaal, setBetaal] = useState<{ row: PayrollRow; uren: string; datum: string; reden: string } | null>(null);
+  const [betaalFout, setBetaalFout] = useState("");
+  const [betaalBezig, setBetaalBezig] = useState(false);
+
+  function openUitbetalen(row: PayrollRow) {
     const [j, m] = month.split("-").map(Number);
     const maandNaam = new Date(j, m - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
-    const res = await fetch("/api/overtime-adjustments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: row.userId,
-        date: `${month}-${String(new Date(j, m, 0).getDate()).padStart(2, "0")}`,
-        hours: -uren,
-        reason: `Uitbetaald bij salaris ${maandNaam}`,
-      }),
+    setBetaalFout("");
+    setBetaal({
+      row,
+      uren: row.saldo && row.saldo > 0 ? String(row.saldo) : "",
+      datum: `${month}-${String(new Date(j, m, 0).getDate()).padStart(2, "0")}`,
+      reden: `Uitbetaald bij salaris ${maandNaam}`,
     });
-    if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? `Fout ${res.status}`); return; }
-    setHerlaad((n) => n + 1);
+  }
+
+  async function bevestigUitbetalen() {
+    if (!betaal) return;
+    const uren = Number(betaal.uren.replace(",", "."));
+    if (!(uren > 0)) { setBetaalFout("Vul een positief aantal uren in"); return; }
+    if (!betaal.datum) { setBetaalFout("Vul een datum in"); return; }
+    setBetaalBezig(true);
+    setBetaalFout("");
+    try {
+      const res = await fetch("/api/overtime-adjustments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: betaal.row.userId, date: betaal.datum, hours: -uren, reason: betaal.reden }),
+      });
+      if (!res.ok) {
+        setBetaalFout((await res.json().catch(() => ({}))).error ?? `Fout ${res.status}`);
+        return;
+      }
+      setBetaal(null);
+      setHerlaad((n) => n + 1);
+    } catch {
+      setBetaalFout("Netwerkfout, probeer opnieuw");
+    } finally {
+      setBetaalBezig(false);
+    }
   }
 
   useEffect(() => {
@@ -186,7 +208,7 @@ export function PayrollClient({ userId }: { userId: string }) {
                     {row.saldo != null ? formatHoursDecimal(row.saldo) : <span className="text-muted-foreground" title="Geen beginstand ingesteld op de personeelspagina">—</span>}
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.saldo != null && <Button size="sm" variant="outline" onClick={() => uitbetalen(row)}>Uitbetalen</Button>}
+                    {row.saldo != null && <Button size="sm" variant="outline" onClick={() => openUitbetalen(row)}>Uitbetalen</Button>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -194,6 +216,36 @@ export function PayrollClient({ userId }: { userId: string }) {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!betaal} onOpenChange={(open) => { if (!open) setBetaal(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Overuren uitbetalen — {betaal?.row.name}</DialogTitle>
+          </DialogHeader>
+          {betaal && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Uren</Label>
+                <Input type="number" step="0.1" min="0" value={betaal.uren} onChange={(e) => setBetaal({ ...betaal, uren: e.target.value })} autoFocus />
+                {betaal.row.saldo != null && <p className="text-xs text-muted-foreground">Saldo: {formatHoursDecimal(betaal.row.saldo)} uur</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Datum</Label>
+                <Input type="date" value={betaal.datum} onChange={(e) => setBetaal({ ...betaal, datum: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Reden</Label>
+                <Input value={betaal.reden} onChange={(e) => setBetaal({ ...betaal, reden: e.target.value })} />
+              </div>
+              {betaalFout && <p className="text-sm text-destructive">{betaalFout}</p>}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBetaal(null)}>Annuleren</Button>
+            <Button type="button" disabled={betaalBezig} onClick={bevestigUitbetalen}>{betaalBezig ? "Bezig..." : "Uitbetalen"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MemberPicker
         open={kiezerOpen}
