@@ -6,6 +6,7 @@ import { buildPayrollRows, weeksInMonth, type PayrollUser } from "@/lib/payroll"
 import { getEffectiveContract } from "@/lib/contracts";
 import { serializeContract, contractSelect } from "@/app/api/contracts/route";
 import { RESERVED_TAG_NAME } from "@/lib/tags";
+import { overtimeLedgerFor } from "@/lib/overtime-saldo";
 
 export async function GET(req: Request) {
   try {
@@ -42,7 +43,11 @@ export async function GET(req: Request) {
           ],
         },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, contracts: { select: contractSelect } },
+        select: {
+          id: true, name: true, contracts: { select: contractSelect },
+          overtimeOpeningDate: true, overtimeOpeningHours: true,
+          overtimeAdjustments: { select: { id: true, date: true, hours: true, reason: true } },
+        },
       }),
       // Verlofregels tellen niet mee als gewerkte uren (en dus niet als bron
       // van overwerk) — dat is precies waarvoor /uren-overzicht en de
@@ -79,7 +84,18 @@ export async function GET(req: Request) {
     });
 
     const rows = buildPayrollRows(payrollUsers, workedMap, wbsoMap, kmMap, weeksInMonth(year, month));
-    return NextResponse.json(rows);
+
+    // Het overurensaldo aan het eind van deze maand: tekorten gaan eraf,
+    // uitbetalingen ook. Een maand die nog loopt telt niet mee, net als op de
+    // personeelspagina.
+    const peil = to < now ? to : now;
+    const saldi = new Map(await Promise.all(users.map(async (u) => {
+      if (!u.overtimeOpeningDate) return [u.id, null] as const;
+      const ledger = await overtimeLedgerFor({ ...u, contracts: u.contracts.map(serializeContract) }, peil, monthEnd);
+      return [u.id, ledger.saldo] as const;
+    })));
+
+    return NextResponse.json(rows.map((r) => ({ ...r, saldo: saldi.get(r.userId) ?? null })));
   } catch (e) {
     return handleError(e);
   }

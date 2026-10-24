@@ -21,6 +21,8 @@ interface PayrollRow {
   wbsoHours: number;
   overtime: number | null;
   km: number;
+  /** Overurensaldo aan het eind van de maand; null zonder beginstand. */
+  saldo: number | null;
 }
 
 const contractLabel: Record<ContractType, string> = {
@@ -59,6 +61,30 @@ export function PayrollClient({ userId }: { userId: string }) {
     }
   }
 
+  const [herlaad, setHerlaad] = useState(0);
+
+  /** Uitbetalen = een negatieve mutatie op de laatste dag van deze maand. */
+  async function uitbetalen(row: PayrollRow) {
+    const invoer = prompt(`Hoeveel uren uitbetalen aan ${row.name}?`, row.saldo && row.saldo > 0 ? String(row.saldo) : "");
+    if (invoer == null) return;
+    const uren = Number(invoer.replace(",", "."));
+    if (!uren || uren < 0 || Number.isNaN(uren)) { alert("Vul een positief aantal uren in"); return; }
+    const [j, m] = month.split("-").map(Number);
+    const maandNaam = new Date(j, m - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+    const res = await fetch("/api/overtime-adjustments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: row.userId,
+        date: `${month}-${String(new Date(j, m, 0).getDate()).padStart(2, "0")}`,
+        hours: -uren,
+        reason: `Uitbetaald bij salaris ${maandNaam}`,
+      }),
+    });
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? `Fout ${res.status}`); return; }
+    setHerlaad((n) => n + 1);
+  }
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -73,7 +99,7 @@ export function PayrollClient({ userId }: { userId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [month]);
+  }, [month, herlaad]);
 
   const zichtbaar = data.filter((r) => !verborgen.includes(r.userId));
 
@@ -115,22 +141,24 @@ export function PayrollClient({ userId }: { userId: string }) {
                 <TableHead className="text-right">WBSO-uren</TableHead>
                 <TableHead className="text-right">Overuren</TableHead>
                 <TableHead className="text-right">Kilometers</TableHead>
+                <TableHead className="text-right">Saldo overuren</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Laden...</TableCell>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">Laden...</TableCell>
                 </TableRow>
               )}
               {!loading && data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Geen medewerkers gevonden</TableCell>
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">Geen medewerkers gevonden</TableCell>
                 </TableRow>
               )}
               {!loading && data.length > 0 && zichtbaar.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Iedereen staat uit beeld. Kies wie u wilt zien via &quot;In beeld&quot;.
                   </TableCell>
                 </TableRow>
@@ -154,6 +182,12 @@ export function PayrollClient({ userId }: { userId: string }) {
                       salarissysteem is precisie die niemand gebruikt. De
                       registraties zelf houden hun decimalen. */}
                   <TableCell className="text-right font-mono">{Math.round(row.km).toLocaleString("nl-NL")} km</TableCell>
+                  <TableCell className={`text-right font-mono ${row.saldo != null && row.saldo < 0 ? "text-destructive" : ""}`}>
+                    {row.saldo != null ? formatHoursDecimal(row.saldo) : <span className="text-muted-foreground" title="Geen beginstand ingesteld op de personeelspagina">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row.saldo != null && <Button size="sm" variant="outline" onClick={() => uitbetalen(row)}>Uitbetalen</Button>}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
